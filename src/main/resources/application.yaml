@@ -37,6 +37,7 @@ app:
     public-endpoints:
       - "/api/auth/**"
       - "/api/storage/**"
+      - "/api/files/**"
 
 jwt:
   signerKey: ${JWT_SIGNER_KEY}
@@ -46,5 +47,5 @@ supabase:
   url: ${SUPABASE_URL}
   service-key: ${SUPABASE_SERVICE_KEY}
   storage:
-    bucket: documents
+    bucket: Documents
     signed-url-expiration: 3600
