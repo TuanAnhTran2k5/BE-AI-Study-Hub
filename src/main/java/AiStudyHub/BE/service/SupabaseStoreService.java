@@ -22,10 +22,10 @@ public class SupabaseStoreService {
     @Value("${supabase.url}")
     private String supabaseUrl;
 
-    @Value("${supabase.key}")
+    @Value("${supabase.service-key}")
     private String supabaseKey;
 
-    @Value("${supabase.bucket}")
+    @Value("${supabase.storage.bucket}")
     private String supabaseBucket;
 
     public SupabaseStoreService(WebClient.Builder webClientBuilder) {
