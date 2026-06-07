@@ -41,13 +41,13 @@ Thumbs.db
 
 # Environment / secrets
 .env
+.env.*
 *.env
 
-# Spring Boot config chứa thông tin máy cá nhân / secret
-src/main/resources/application.yml
-src/main/resources/application.yaml
-src/main/resources/application.properties
+# File mẫu được phép push
+!.env.example
 
+# Spring Boot config chứa thông tin máy cá nhân / secret
 src/main/resources/application-local.yml
 src/main/resources/application-dev.yml
 src/main/resources/application-prod.yml
@@ -57,8 +57,3 @@ src/main/resources/application-prod.yaml
 src/main/resources/application-local.properties
 src/main/resources/application-dev.properties
 src/main/resources/application-prod.properties
-
-# File mẫu được phép push
-!src/main/resources/application-example.yml
-!src/main/resources/application-example.yaml
-!src/main/resources/application-example.properties
