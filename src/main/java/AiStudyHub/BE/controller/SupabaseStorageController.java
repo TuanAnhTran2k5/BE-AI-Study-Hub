@@ -1,13 +1,13 @@
 package AiStudyHub.BE.controller;
 
 import AiStudyHub.BE.constraint.VisibilityStatus;
+import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
+import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
 import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.service.DocumentService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/files")
@@ -20,7 +20,7 @@ public class SupabaseStorageController {
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<Map<String, Object>> uploadFile(
+    public ResponseEntity<DocumentUploadResponse> uploadFile(
             @RequestParam("file") MultipartFile file,
             @RequestParam("title") String title,
             @RequestParam("ownerId") Long ownerId,
@@ -28,21 +28,21 @@ public class SupabaseStorageController {
             @RequestParam(value = "visibilityStatus", defaultValue = "PRIVATE") VisibilityStatus visibilityStatus
     ) throws Exception {
 
-        Document document = documentService.uploadDocument(
-                file,
-                title,
-                ownerId,
-                subjectId,
-                visibilityStatus
-        );
+        DocumentUploadRequest request = new DocumentUploadRequest();
+        request.setTitle(title);
+        request.setOwnerId(ownerId);
+        request.setSubjectId(subjectId);
+        request.setVisibilityStatus(visibilityStatus);
 
-        return ResponseEntity.ok(
-                Map.of(
-                        "message", "File uploaded and metadata saved successfully",
-                        "documentId", document.getDocumentId(),
-                        "fileUrl", document.getFileUrl(),
-                        "title", document.getTitle()
-                )
-        );
+        Document document = documentService.uploadDocument(file, request);
+
+        DocumentUploadResponse response = DocumentUploadResponse.builder()
+                                                                .documentId(document.getDocumentId())
+                                                                .title(document.getTitle())
+                                                                .fileUrl(document.getFileUrl())
+                                                                .message("File uploaded and metadata saved successfully")
+                                                                .build();
+
+        return ResponseEntity.ok(response);
     }
 }

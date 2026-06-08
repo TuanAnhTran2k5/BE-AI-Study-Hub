@@ -2,6 +2,7 @@ package AiStudyHub.BE.service.impl;
 
 import AiStudyHub.BE.constraint.ModerationStatus;
 import AiStudyHub.BE.constraint.VisibilityStatus;
+import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
 import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.Subject;
 import AiStudyHub.BE.entity.User;
@@ -39,16 +40,13 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public Document uploadDocument(
             MultipartFile file,
-            String title,
-            Long ownerId,
-            Long subjectId,
-            VisibilityStatus visibilityStatus
+            DocumentUploadRequest request
     ) throws Exception {
 
-        User owner = userRepo.findById(ownerId)
+        User owner = userRepo.findById(request.getOwnerId())
                              .orElseThrow(() -> new RuntimeException("User not found"));
 
-        Subject subject = subjectRepo.findById(subjectId)
+        Subject subject = subjectRepo.findById(request.getSubjectId())
                                      .orElseThrow(() -> new RuntimeException("Subject not found"));
 
         byte[] fileBytes = file.getBytes();
@@ -59,16 +57,21 @@ public class DocumentServiceImpl implements DocumentService {
                 file.getContentType()
         );
 
+        VisibilityStatus visibilityStatus =
+                request.getVisibilityStatus() == null
+                        ? VisibilityStatus.PRIVATE
+                        : request.getVisibilityStatus();
+
         Document document = Document.builder()
                                     .owner(owner)
                                     .subject(subject)
-                                    .title(title)
+                                    .title(request.getTitle())
                                     .fileName(file.getOriginalFilename())
                                     .fileUrl(fileUrl)
                                     .fileType(file.getContentType())
                                     .fileSize(file.getSize())
                                     .contentHashSha256(hashSha256(fileBytes))
-                                    .visibilityStatus(visibilityStatus == null ? VisibilityStatus.PRIVATE : visibilityStatus)
+                                    .visibilityStatus(visibilityStatus)
                                     .moderationStatus(ModerationStatus.NORMAL)
                                     .averageRating(0.0)
                                     .ratingCount(0)
