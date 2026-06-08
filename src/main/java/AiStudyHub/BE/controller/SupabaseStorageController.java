@@ -8,36 +8,42 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Map;
-
 @RestController
 @RequestMapping("/api/files")
 @SecurityRequirement(name = "api")
 public class SupabaseStorageController {
 
-    private final SupabaseStoreService supabaseStoreService;
+    private final DocumentService documentService;
 
-    public SupabaseStorageController(SupabaseStoreService supabaseStoreService) {
-        this.supabaseStoreService = supabaseStoreService;
+    public SupabaseStorageController(DocumentService documentService) {
+        this.documentService = documentService;
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<Map<String, String>> uploadFile(
-            @RequestParam("file") MultipartFile file
+    public ResponseEntity<DocumentUploadResponse> uploadFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("title") String title,
+            @RequestParam("ownerId") Long ownerId,
+            @RequestParam("subjectId") Long subjectId,
+            @RequestParam(value = "visibilityStatus", defaultValue = "PRIVATE") VisibilityStatus visibilityStatus
     ) throws Exception {
 
-        String fileUrl = supabaseStoreService.uploadFile(
-                file.getOriginalFilename(),
-                file.getBytes(),
-                file.getContentType()
-        );
+        DocumentUploadRequest request = new DocumentUploadRequest();
+        request.setTitle(title);
+        request.setOwnerId(ownerId);
+        request.setSubjectId(subjectId);
+        request.setVisibilityStatus(visibilityStatus);
 
-        return ResponseEntity.ok(
-                Map.of(
-                        "message", "File uploaded successfully",
-                        "fileUrl", fileUrl
-                )
-        );
+        Document document = documentService.uploadDocument(file, request);
+
+        DocumentUploadResponse response = DocumentUploadResponse.builder()
+                                                                .documentId(document.getDocumentId())
+                                                                .title(document.getTitle())
+                                                                .fileUrl(document.getFileUrl())
+                                                                .message("File uploaded and metadata saved successfully")
+                                                                .build();
+
+        return ResponseEntity.ok(response);
     }
 
     @Operation(

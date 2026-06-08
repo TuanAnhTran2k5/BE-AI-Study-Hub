@@ -37,6 +37,7 @@ public class SupabaseStoreService {
         String uniqueFileName = UUID.randomUUID() + "_" + sanitizedFileName;
 
         try {
+            logger.info("SUPABASE_URL = {}", supabaseUrl);
             String uploadUrl = String.format(
                     "%s/storage/v1/object/%s/%s",
                     supabaseUrl,
