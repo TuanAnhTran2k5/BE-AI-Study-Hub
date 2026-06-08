@@ -1,11 +1,10 @@
 package AiStudyHub.BE.controller;
 
-import AiStudyHub.BE.service.SupabaseStoreService;
+import AiStudyHub.BE.constraint.VisibilityStatus;
+import AiStudyHub.BE.entity.Document;
+import AiStudyHub.BE.service.DocumentService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
@@ -14,27 +13,35 @@ import java.util.Map;
 @RequestMapping("/api/files")
 public class SupabaseStorageController {
 
-    private final SupabaseStoreService supabaseStoreService;
+    private final DocumentService documentService;
 
-    public SupabaseStorageController(SupabaseStoreService supabaseStoreService) {
-        this.supabaseStoreService = supabaseStoreService;
+    public SupabaseStorageController(DocumentService documentService) {
+        this.documentService = documentService;
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<Map<String, String>> uploadFile(
-            @RequestParam("file") MultipartFile file
+    public ResponseEntity<Map<String, Object>> uploadFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("title") String title,
+            @RequestParam("ownerId") Long ownerId,
+            @RequestParam("subjectId") Long subjectId,
+            @RequestParam(value = "visibilityStatus", defaultValue = "PRIVATE") VisibilityStatus visibilityStatus
     ) throws Exception {
 
-        String fileUrl = supabaseStoreService.uploadFile(
-                file.getOriginalFilename(),
-                file.getBytes(),
-                file.getContentType()
+        Document document = documentService.uploadDocument(
+                file,
+                title,
+                ownerId,
+                subjectId,
+                visibilityStatus
         );
 
         return ResponseEntity.ok(
                 Map.of(
-                        "message", "File uploaded successfully",
-                        "fileUrl", fileUrl
+                        "message", "File uploaded and metadata saved successfully",
+                        "documentId", document.getDocumentId(),
+                        "fileUrl", document.getFileUrl(),
+                        "title", document.getTitle()
                 )
         );
     }
