@@ -1,5 +1,6 @@
 package AiStudyHub.BE.entity;
 
+import AiStudyHub.BE.constraint.AuthProvider;
 import AiStudyHub.BE.constraint.UserRole;
 import AiStudyHub.BE.constraint.UserStatus;
 import jakarta.persistence.*;
@@ -63,6 +64,12 @@ public class User implements UserDetails {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bannedBy", referencedColumnName = "userId")
     User bannedBy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AuthProvider authProvider = AuthProvider.LOCAL;
+
+    private String googleId;
 
     LocalDateTime createdAt;
 
