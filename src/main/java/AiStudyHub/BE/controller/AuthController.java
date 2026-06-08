@@ -34,13 +34,11 @@ public class AuthController {
     public ResponseEntity<APIResponse<UserResponse>> verifyEmail(@Valid @RequestBody VerifyOtpRequest request) {
         UserResponse userResponse = authenticationService.verifyEmail(request);
 
-        return ResponseEntity.ok(
-                APIResponse.response(
-                        200,
-                        "Verify Email Successfully",
-                        userResponse
-                )
-        );
+        return ResponseEntity.status(200)
+                .body(
+                        APIResponse.response(
+                                200, "Verify Email Successfully", userResponse
+                        ));
     }
 
     @PostMapping("login")

@@ -66,10 +66,9 @@ public class User implements UserDetails {
     User bannedBy;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private AuthProvider authProvider = AuthProvider.LOCAL;
+    AuthProvider authProvider;
 
-    private String googleId;
+    String googleId;
 
     LocalDateTime createdAt;
 
@@ -94,4 +93,27 @@ public class User implements UserDetails {
     public String getUsername() {
         return this.email;
     }
+<<<<<<< Updated upstream
+=======
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return true;
+    }
+>>>>>>> Stashed changes
 }

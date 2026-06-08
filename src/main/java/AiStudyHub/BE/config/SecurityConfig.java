@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -27,16 +28,17 @@ import java.util.Map;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@RequiredArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 public class SecurityConfig {
 
-    SecurityProperties securityProperties;
+    @Autowired
+    private SecurityProperties securityProperties;
 
-    Filter filter;
+    @Autowired
+    private Filter filter;
 
-    OAuth2LoginConfig oAuth2LoginConfig;
+    @Autowired
+    private OAuth2LoginConfig oAuth2LoginConfig;
 
     public static final String[] SWAGGER = {
             "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml", "/v3/api-docs", "/error"
