@@ -1,21 +1,25 @@
 package AiStudyHub.BE.dto.Request;
 
 import AiStudyHub.BE.constraint.VisibilityStatus;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 import org.springframework.web.multipart.MultipartFile;
 
 @Getter
 @Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class DocumentUploadRequest {
 
-    private MultipartFile file;
+    MultipartFile file;
 
-    private String title;
+    String title;
 
-    private Long ownerId;
+    Long ownerId;
 
-    private Long subjectId;
+    Long subjectId;
 
-    private VisibilityStatus visibilityStatus = VisibilityStatus.PRIVATE;
+    VisibilityStatus visibilityStatus = VisibilityStatus.PRIVATE;
 }

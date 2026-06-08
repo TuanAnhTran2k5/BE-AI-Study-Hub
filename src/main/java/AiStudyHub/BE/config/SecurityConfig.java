@@ -32,13 +32,13 @@ import java.util.Map;
 public class SecurityConfig {
 
     @Autowired
-    private SecurityProperties securityProperties;
+    SecurityProperties securityProperties;
 
     @Autowired
-    private Filter filter;
+    Filter filter;
 
     @Autowired
-    private OAuth2LoginConfig oAuth2LoginConfig;
+    OAuth2LoginConfig oAuth2LoginConfig;
 
     public static final String[] SWAGGER = {
             "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml", "/v3/api-docs", "/error"

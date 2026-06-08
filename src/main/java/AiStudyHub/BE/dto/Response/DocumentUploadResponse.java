@@ -1,21 +1,24 @@
 package AiStudyHub.BE.dto.Response;
 
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
-@Getter
-@Setter
+@Data
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class DocumentUploadResponse {
 
-    private Long documentId;
+    Long documentId;
 
-    private Long ownerId;
+    Long ownerId;
 
-    private String title;
+    String title;
 
-    private String fileUrl;
+    String fileUrl;
 
-    private String message;
+    String message;
 }

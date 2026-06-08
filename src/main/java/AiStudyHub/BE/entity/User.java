@@ -93,9 +93,6 @@ public class User implements UserDetails {
     public String getUsername() {
         return this.email;
     }
-<<<<<<< Updated upstream
-=======
-
     @Override
     public boolean isAccountNonExpired() {
         return true;
@@ -115,5 +112,4 @@ public class User implements UserDetails {
     public boolean isEnabled() {
         return true;
     }
->>>>>>> Stashed changes
 }

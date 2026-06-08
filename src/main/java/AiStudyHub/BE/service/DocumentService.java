@@ -1,4 +1,4 @@
-package AiStudyHub.BE.service.impl;
+package AiStudyHub.BE.service;
 
 import AiStudyHub.BE.constraint.ModerationStatus;
 import AiStudyHub.BE.constraint.VisibilityStatus;
@@ -9,7 +9,7 @@ import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.repository.DocumentRepo;
 import AiStudyHub.BE.repository.SubjectRepo;
 import AiStudyHub.BE.repository.UserRepo;
-import AiStudyHub.BE.service.DocumentService;
+import AiStudyHub.BE.service.impl.IDocument;
 import AiStudyHub.BE.service.SupabaseStoreService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -19,7 +19,7 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 
 @Service
-public class DocumentServiceImpl implements DocumentService {
+public class DocumentService implements IDocument {
 
     @Autowired
     private DocumentRepo documentRepo;

@@ -2,8 +2,6 @@ package AiStudyHub.BE.dto.Response;
 
 import AiStudyHub.BE.constraint.UserRole;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 

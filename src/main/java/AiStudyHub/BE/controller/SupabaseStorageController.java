@@ -1,25 +1,12 @@
 package AiStudyHub.BE.controller;
 
-<<<<<<< Updated upstream
+import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.service.SupabaseStoreService;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
-=======
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
-
-import AiStudyHub.BE.dto.Response.APIResponse;
 import org.springframework.http.ResponseEntity;
->>>>>>> Stashed changes
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -28,7 +15,6 @@ import java.util.Map;
 @SecurityRequirement(name = "api")
 public class SupabaseStorageController {
 
-<<<<<<< Updated upstream
     private final SupabaseStoreService supabaseStoreService;
 
     public SupabaseStorageController(SupabaseStoreService supabaseStoreService) {
@@ -52,7 +38,8 @@ public class SupabaseStorageController {
                         "fileUrl", fileUrl
                 )
         );
-=======
+    }
+
     @Operation(
             summary = "Thông tin Storage API",
             description = "Upload tài liệu vui lòng dùng endpoint: `POST /api/user/document/upload`"
@@ -69,6 +56,5 @@ public class SupabaseStorageController {
                         APIResponse.response(
                                 200, "Thông tin API Storage", data
                         ));
->>>>>>> Stashed changes
     }
 }
