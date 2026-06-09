@@ -29,8 +29,8 @@ public class Subject {
     Semester semester;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "semesterComboSubjectId")
-    SemesterComboSubject semesterComboSubject;
+    @JoinColumn(name = "comboId")
+    ComboSubject comboSubject;
 
     String subjectCode;
     String subjectName;

@@ -1,19 +1,39 @@
 package AiStudyHub.BE.dto.Response;
 
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
+import AiStudyHub.BE.constraint.VisibilityStatus;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
-@Getter
-@Setter
+import java.time.LocalDateTime;
+
+@Data
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class DocumentUploadResponse {
 
-    private Long documentId;
+    Long documentId;
 
-    private String title;
+    Long ownerId;
 
-    private String fileUrl;
+    Long subjectId;
 
-    private String message;
+    String title;
+
+    String fileName;
+
+    String fileUrl;
+
+    String fileType;
+
+    Long fileSize;
+
+    VisibilityStatus visibilityStatus;
+
+    LocalDateTime createdAt;
+
+    String message;
 }

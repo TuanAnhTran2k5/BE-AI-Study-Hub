@@ -26,8 +26,7 @@ public class UserUpdateService implements IUser {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
-        user.setFullName(request.getFullName());
-        user.setAvatarUrl(request.getAvatarUrl());
+        userMapper.updateUserFromRequest(request, user);
 
         userRepo.save(user);
 

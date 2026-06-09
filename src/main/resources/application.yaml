@@ -63,3 +63,7 @@ supabase:
   storage:
     bucket: Documents
     signed-url-expiration: 3600
+
+springdoc:
+  swagger-ui:
+    persist-authorization: true

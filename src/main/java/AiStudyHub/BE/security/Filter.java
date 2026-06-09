@@ -75,7 +75,7 @@ public class Filter extends OncePerRequestFilter {
                 UsernamePasswordAuthenticationToken authentication
                         = new UsernamePasswordAuthenticationToken(user,null, user.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                // để vô đây nghĩa là xác thực rồi khi đi quua SecurityConfig sẽ không bị chặn lỗi 403 nữa
+                // Authentication passed — SecurityConfig will no longer block with 403
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }catch (GlobalException ex){
                 SecurityContextHolder.clearContext();
