@@ -17,6 +17,7 @@ import AiStudyHub.BE.mapper.UserMapper;
 import AiStudyHub.BE.repository.OtpVerificationRepo;
 import AiStudyHub.BE.repository.UserRepo;
 import AiStudyHub.BE.service.impl.IAuthentication;
+import AiStudyHub.BE.service.impl.IEmail;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -52,7 +53,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     @Autowired
     private OtpVerificationRepo otpVerificationRepo;
     @Autowired
-    private EmailService emailService;
+    private IEmail emailService;
 
 
 
