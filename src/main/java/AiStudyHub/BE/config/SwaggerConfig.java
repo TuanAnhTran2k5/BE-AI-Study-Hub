@@ -29,7 +29,7 @@ public class SwaggerConfig {
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
                                         .bearerFormat("JWT")
-                                        .description("Nhập JWT token vào đây. Ví dụ: eyJhbGci...")
+                                        .description("Get JWT token in here. Ex: eyJhbGci...")
                         )
                 );
     }

@@ -17,8 +17,8 @@ public class JWTConfig {
     private String jwtSingerKey;
 
 
-    //2. Check chữ ký
-    //3. check hạn sử dụng
+    // 2. Verify signature
+    // 3. Check expiry
     @Bean
     public JwtDecoder jwtDecoder() {
         byte[] decoderSecret = Base64.getDecoder().decode(jwtSingerKey);

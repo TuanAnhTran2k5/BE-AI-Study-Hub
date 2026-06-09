@@ -32,6 +32,11 @@ public enum ErrorCode {
     NOT_FOUND("not found", HttpStatus.NOT_FOUND),
     AVATAR_URL_TOO_LONG("Avatar URL must be less than 2000 characters", HttpStatus.BAD_REQUEST),
 
+    // Document
+    SUBJECT_NOT_FOUND("Subject not found", HttpStatus.NOT_FOUND),
+    FILE_UPLOAD_FAILED("File upload to storage failed", HttpStatus.INTERNAL_SERVER_ERROR),
+    FILE_DELETE_FAILED("File delete from storage failed", HttpStatus.INTERNAL_SERVER_ERROR),
+
     // Authentication
     EMAIL_ALREADY_EXISTS("Email already exists", HttpStatus.BAD_REQUEST),
     EMAIL_NOT_VERIFIED("Please verify your email before login", HttpStatus.FORBIDDEN),
@@ -44,7 +49,7 @@ public enum ErrorCode {
     OTP_EXPIRED("OTP expired", HttpStatus.BAD_REQUEST),;
 
 
-    // DRY: Don't Repeat Yourself: cấm viết dòng code lặp đi lặp lại nhiều lần
+    // DRY: Don't Repeat Yourself — avoid writing the same code more than once
     final String message;
     final HttpStatus httpStatus;
 

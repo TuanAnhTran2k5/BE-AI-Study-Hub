@@ -67,7 +67,7 @@ public class OAuth2LoginConfig implements AuthenticationSuccessHandler {
 
         String accessToken = tokenService.generateAccessToken(user);
 
-        /// String frontendUrl = "http://localhost:5173/oauth2/success?token=" + accessToken;
+        // String frontendUrl = "http://localhost:5173/oauth2/success?token=" + accessToken;
         //
         // response.sendRedirect(frontendUrl);
 

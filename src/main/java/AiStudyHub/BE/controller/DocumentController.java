@@ -17,7 +17,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/user/document")
@@ -31,17 +31,7 @@ public class DocumentController {
     @Operation(summary = "Upload Document")
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<APIResponse<DocumentUploadResponse>> uploadFile(
-            @io.swagger.v3.oas.annotations.Parameter(description = "File tài liệu cần upload") 
-            @RequestPart("file") MultipartFile file,
-            
-            @io.swagger.v3.oas.annotations.Parameter(description = "Tiêu đề tài liệu") 
-            @RequestParam("title") String title,
-            
-            @io.swagger.v3.oas.annotations.Parameter(description = "ID của môn học") 
-            @RequestParam("subjectId") Long subjectId,
-            
-            @io.swagger.v3.oas.annotations.Parameter(description = "Trạng thái hiển thị (PUBLIC/PRIVATE)") 
-            @RequestParam(value = "visibilityStatus", defaultValue = "PRIVATE") VisibilityStatus visibilityStatus
+            @Valid @ModelAttribute DocumentUploadRequest request
     ) throws Exception {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -49,21 +39,9 @@ public class DocumentController {
             throw new GlobalException(ErrorCode.INVALID_TOKEN);
         }
 
-        DocumentUploadRequest request = new DocumentUploadRequest();
-        request.setTitle(title);
         request.setOwnerId(currentUser.getUserId());
-        request.setSubjectId(subjectId);
-        request.setVisibilityStatus(visibilityStatus);
 
-        Document document = documentService.uploadDocument(file, request);
-
-        DocumentUploadResponse response = DocumentUploadResponse.builder()
-                .documentId(document.getDocumentId())
-                .ownerId(document.getOwner().getUserId())
-                .title(document.getTitle())
-                .fileUrl(document.getFileUrl())
-                .message("File uploaded and metadata saved successfully")
-                .build();
+        DocumentUploadResponse response = documentService.uploadDocument(request.getFile(), request);
 
         return ResponseEntity.status(200)
                 .body(

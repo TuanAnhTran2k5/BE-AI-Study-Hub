@@ -8,6 +8,7 @@ import AiStudyHub.BE.constraint.UserStatus;
 import AiStudyHub.BE.dto.Request.LoginRequest;
 import AiStudyHub.BE.dto.Request.RegisterRequest;
 import AiStudyHub.BE.dto.Request.VerifyOtpRequest;
+import AiStudyHub.BE.dto.Response.RegisterResponse;
 import AiStudyHub.BE.dto.Response.UserResponse;
 import AiStudyHub.BE.entity.OtpVerification;
 import AiStudyHub.BE.entity.User;
@@ -53,49 +54,58 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     @Autowired
     private EmailService emailService;
 
-    // Bộ nhớ tạm lưu trữ thông tin đăng ký (OTP-first, DB-last)
-    private final Map<String, PendingRegistration> pendingRegistrations = new ConcurrentHashMap<>();
 
-    @Getter
-    @Setter
-    @Builder
-    public static class PendingRegistration {
-        private String email;
-        private String password;
-        private String fullName;
-        private String otpCode;
-        private LocalDateTime expiredAt;
-    }
 
     @Override
-    public UserResponse register(RegisterRequest registerRequest) {
-        // Kiểm tra xem email đã tồn tại dưới DB chưa
-        if (userRepo.existsByEmail(registerRequest.getEmail())) {
-            throw new GlobalException(ErrorCode.EMAIL_ALREADY_EXISTS);
+    public RegisterResponse register(RegisterRequest registerRequest) {
+        String email = registerRequest.getEmail();
+        Optional<User> existingUserOpt = userRepo.findUserByEmail(email);
+        User user;
+
+        if (existingUserOpt.isPresent()) {
+            user = existingUserOpt.get();
+            if (user.getStatus() == UserStatus.ACTIVE) {
+                throw new GlobalException(ErrorCode.EMAIL_ALREADY_EXISTS);
+            }
+            if (user.getStatus() == UserStatus.BANNED) {
+                throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+            }
+            // Update existing PENDING user
+            user.setFullName(registerRequest.getFullName());
+            user.setPasswordHash(passwordEncoder.encode(registerRequest.getPassword()));
+            user = userRepo.save(user);
+        } else {
+            // Use mapper to convert Request -> Entity
+            user = userMapper.toUser(registerRequest);
+            user.setPasswordHash(passwordEncoder.encode(registerRequest.getPassword()));
+            user.setStatus(UserStatus.PENDING);
+            user.setAuthProvider(AuthProvider.LOCAL);
+            user.setRole(UserRole.US);
+            user = userRepo.save(user);
         }
 
-        // Tạo OTP code
+        // Generate OTP code
         String otpCode = String.valueOf((int) (Math.random() * 900000) + 100000);
 
-        // Lưu thông tin đăng ký vào bộ nhớ tạm thay vì Database
-        PendingRegistration pendingReg = PendingRegistration.builder()
-                .email(registerRequest.getEmail())
-                .password(passwordEncoder.encode(registerRequest.getPassword()))
-                .fullName(registerRequest.getFullName())
+        // Save OtpVerification to DB
+        OtpVerification otpVerification = OtpVerification.builder()
+                .user(user)
+                .email(email)
                 .otpCode(otpCode)
+                .purpose(OtpPurpose.REGISTER)
                 .expiredAt(LocalDateTime.now().plusMinutes(5))
+                .isUse(false)
                 .build();
+        otpVerificationRepo.save(otpVerification);
 
-        pendingRegistrations.put(registerRequest.getEmail(), pendingReg);
+        // Send OTP via email
+        emailService.sendOtpEmail(email, otpCode);
 
-        // Gửi OTP qua email
-        emailService.sendOtpEmail(registerRequest.getEmail(), otpCode);
-
-        // Trả về thông tin cơ bản cho frontend biết đăng ký thành công (chờ xác thực)
-        UserResponse response = new UserResponse();
-        response.setEmail(registerRequest.getEmail());
-        response.setFullName(registerRequest.getFullName());
-        return response;
+        // Return info the FE needs (e.g. email to pre-fill the form, OTP expiry time for countdown)
+        return RegisterResponse.builder()
+                .email(email)
+                .otpExpiredAt(otpVerification.getExpiredAt())
+                .build();
     }
 
     @Override
@@ -138,43 +148,6 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     @Override
     public UserResponse verifyEmail(VerifyOtpRequest request) {
         String email = request.getEmail();
-
-        // Ưu tiên kiểm tra trong bộ nhớ tạm (luồng mới)
-        if (pendingRegistrations.containsKey(email)) {
-            PendingRegistration pendingReg = pendingRegistrations.get(email);
-
-            if (pendingReg.getExpiredAt().isBefore(LocalDateTime.now())) {
-                pendingRegistrations.remove(email);
-                throw new GlobalException(ErrorCode.OTP_EXPIRED);
-            }
-
-            if (!pendingReg.getOtpCode().equals(request.getOtpCode())) {
-                throw new GlobalException(ErrorCode.INVALID_OTP);
-            }
-
-            // Kiểm tra xem email đã được lưu dưới DB chưa (VD: user đăng nhập GG trong lúc chờ OTP)
-            if (userRepo.existsByEmail(email)) {
-                pendingRegistrations.remove(email);
-                throw new GlobalException(ErrorCode.EMAIL_ALREADY_EXISTS);
-            }
-
-            // OTP đúng và chưa hết hạn -> Tạo User thực sự dưới DB
-            User newUser = User.builder()
-                    .email(pendingReg.getEmail())
-                    .passwordHash(pendingReg.getPassword())
-                    .fullName(pendingReg.getFullName())
-                    .status(UserStatus.ACTIVE)
-                    .authProvider(AuthProvider.LOCAL)
-                    .role(UserRole.US)
-                    .build();
-
-            userRepo.save(newUser);
-            pendingRegistrations.remove(email);
-
-            return userMapper.toUserResponse(newUser);
-        }
-
-        // Fallback: Kiểm tra trong DB (trường hợp user PENDING cũ đang tồn tại dưới DB)
         User user = userRepo.findUserByEmail(email)
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 

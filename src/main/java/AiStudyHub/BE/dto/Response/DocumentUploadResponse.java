@@ -1,8 +1,11 @@
 package AiStudyHub.BE.dto.Response;
 
+import AiStudyHub.BE.constraint.VisibilityStatus;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -16,9 +19,21 @@ public class DocumentUploadResponse {
 
     Long ownerId;
 
+    Long subjectId;
+
     String title;
 
+    String fileName;
+
     String fileUrl;
+
+    String fileType;
+
+    Long fileSize;
+
+    VisibilityStatus visibilityStatus;
+
+    LocalDateTime createdAt;
 
     String message;
 }
