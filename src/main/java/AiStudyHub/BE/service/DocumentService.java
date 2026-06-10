@@ -19,7 +19,6 @@ import AiStudyHub.BE.service.impl.IDocument;
 import AiStudyHub.BE.service.impl.ISupabaseStorage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -39,7 +38,7 @@ public class DocumentService implements IDocument {
     private DocumentMapper documentMapper;
 
     @Override
-    public DocumentUploadResponse uploadDocument(MultipartFile file, DocumentUploadRequest request) throws Exception {
+    public DocumentUploadResponse uploadDocument(DocumentUploadRequest request) throws Exception {
 
         User owner = userRepo.findById(request.getOwnerId())
                              .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
@@ -49,9 +48,9 @@ public class DocumentService implements IDocument {
                                      .orElseThrow(() -> new GlobalException(ErrorCode.SUBJECT_NOT_FOUND));
 
 
-        byte[] fileBytes = file.getBytes();
+        byte[] fileBytes = request.getFile().getBytes();
 
-        FileUploadResponse fileMetadata = supabaseStorageService.uploadFile(file, null);
+        FileUploadResponse fileMetadata = supabaseStorageService.uploadFile(request.getFile(), null);
 
 
         VisibilityStatus visibilityStatus =
