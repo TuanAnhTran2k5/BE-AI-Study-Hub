@@ -4,6 +4,7 @@ import AiStudyHub.BE.dto.Request.LoginRequest;
 import AiStudyHub.BE.dto.Request.RegisterRequest;
 import AiStudyHub.BE.dto.Request.VerifyOtpRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
+import AiStudyHub.BE.dto.Response.RegisterResponse;
 import AiStudyHub.BE.dto.Response.UserResponse;
 import AiStudyHub.BE.service.AuthenticationService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -21,12 +22,12 @@ public class AuthController {
     AuthenticationService authenticationService;
 
     @PostMapping("register")
-    public ResponseEntity<APIResponse<UserResponse>> register(@Valid @RequestBody RegisterRequest registerRequest) {
-        UserResponse userResponse = authenticationService.register(registerRequest);
+    public ResponseEntity<APIResponse<RegisterResponse>> register(@Valid @RequestBody RegisterRequest registerRequest) {
+        RegisterResponse response = authenticationService.register(registerRequest);
         return ResponseEntity.status(201)
                 .body(
                         APIResponse.response(
-                                201,"Register Successfully",userResponse
+                                201,"Register Successfully, Please Verify Email", response
                         ));
     }
 
@@ -34,13 +35,11 @@ public class AuthController {
     public ResponseEntity<APIResponse<UserResponse>> verifyEmail(@Valid @RequestBody VerifyOtpRequest request) {
         UserResponse userResponse = authenticationService.verifyEmail(request);
 
-        return ResponseEntity.ok(
-                APIResponse.response(
-                        200,
-                        "Verify Email Successfully",
-                        userResponse
-                )
-        );
+        return ResponseEntity.status(200)
+                .body(
+                        APIResponse.response(
+                                200, "Verify Email Successfully", userResponse
+                        ));
     }
 
     @PostMapping("login")

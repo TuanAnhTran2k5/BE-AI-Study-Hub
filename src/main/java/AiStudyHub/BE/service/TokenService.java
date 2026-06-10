@@ -51,8 +51,8 @@ public class TokenService implements IToken {
 
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject(Long.toString(user.getUserId()))
-                .issuer("bth")
-                .audience("bth-app")
+                .issuer("aistudyhub")
+                .audience("aistudyhub-app")
                 .issueTime(new Date())
                 .expirationTime(new Date(Instant.now().plus(VALID_DURATION, ChronoUnit.SECONDS).toEpochMilli()))
                 .jwtID(UUID.randomUUID().toString())

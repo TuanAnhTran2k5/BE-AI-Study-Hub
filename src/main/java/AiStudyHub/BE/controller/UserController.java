@@ -36,6 +36,10 @@ public class UserController {
 
         UpdateProfileResponse response = userUpdateService.updateProfile(currentUser.getUserId(), updateProfileRequest);
 
-        return ResponseEntity.ok(APIResponse.response(200, "Update profile successfully", response));
+        return ResponseEntity.status(200)
+                .body(
+                        APIResponse.response(
+                                200, "Update profile successfully", response
+                        ));
     }
 }

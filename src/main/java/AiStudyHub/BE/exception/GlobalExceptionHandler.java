@@ -12,19 +12,19 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import java.util.List;
 
 @ControllerAdvice
-@Slf4j // ghi log dưới terminal
+@Slf4j // enables SLF4J logging
 public class GlobalExceptionHandler {
     @ExceptionHandler(GlobalException.class)
     public ResponseEntity<APIResponse<Object>> handleGlobal(GlobalException exception) {
         int status = (exception.getCode() != null)
-                ? exception.getCode() // value của code
+                ? exception.getCode() // HTTP status code value
                 : HttpStatus.INTERNAL_SERVER_ERROR.value();
 
         return ResponseEntity.status(status).body(APIResponse.response(status, exception.getMessage(),null));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    // hàm bắt cấu hình exception của thư viện validation rồi trả về FE
+    // Catches validation exceptions from the Bean Validation library and returns errors to the client
     public ResponseEntity<APIResponse<Object>> handleValidation(MethodArgumentNotValidException exception) {
         List<String> errors = exception
                 .getBindingResult()
