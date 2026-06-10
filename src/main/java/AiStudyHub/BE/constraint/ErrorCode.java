@@ -46,12 +46,20 @@ public enum ErrorCode {
 
     // OTP
     INVALID_OTP("Invalid OTP code", HttpStatus.BAD_REQUEST),
-    OTP_EXPIRED("OTP expired", HttpStatus.BAD_REQUEST),;
+    OTP_EXPIRED("OTP expired", HttpStatus.BAD_REQUEST),
+
+    // File storage
+    FILE_TOO_LARGE("File exceeds 20MB", HttpStatus.BAD_REQUEST),
+    STORAGE_LIMIT_EXCEEDED("2GB storage capacity exceeded", HttpStatus.BAD_REQUEST),
+    ;
+
 
 
     // DRY: Don't Repeat Yourself — avoid writing the same code more than once
     final String message;
     final HttpStatus httpStatus;
+
+
 
     public int getCode(){
         return httpStatus.value();

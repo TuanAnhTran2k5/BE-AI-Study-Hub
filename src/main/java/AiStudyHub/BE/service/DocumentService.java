@@ -16,6 +16,7 @@ import AiStudyHub.BE.repository.SubjectRepo;
 import AiStudyHub.BE.repository.UserRepo;
 import AiStudyHub.BE.mapper.DocumentMapper;
 import AiStudyHub.BE.service.impl.IDocument;
+import AiStudyHub.BE.service.impl.IStorageService;
 import AiStudyHub.BE.service.impl.ISupabaseStorage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -37,16 +38,22 @@ public class DocumentService implements IDocument {
     @Autowired
     private DocumentMapper documentMapper;
 
+    @Autowired
+    private IStorageService storageService;
+
     @Override
     public DocumentUploadResponse uploadDocument(DocumentUploadRequest request) throws Exception {
 
         User owner = userRepo.findById(request.getOwnerId())
                              .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
-
         Subject subject = subjectRepo.findById(request.getSubjectId())
                                      .orElseThrow(() -> new GlobalException(ErrorCode.SUBJECT_NOT_FOUND));
 
+        long fileSize = request.getFile().getSize();
+
+        // Check file <= 20MB and total user capacity <= 2GB
+        storageService.validateUpload(owner, fileSize);
 
         byte[] fileBytes = request.getFile().getBytes();
 
@@ -75,6 +82,12 @@ public class DocumentService implements IDocument {
         document.setReportCount(0);
 
         document = documentRepo.save(document);
+
+
+        // After uploading + saving the document, add the capacity
+        storageService.increaseStorage(owner, fileSize);
+        userRepo.save(owner);
+
         return documentMapper.toDocumentUploadResponse(document);
     }
 
