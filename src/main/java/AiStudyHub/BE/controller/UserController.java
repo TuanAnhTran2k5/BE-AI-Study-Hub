@@ -6,7 +6,7 @@ import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.UpdateProfileResponse;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
-import AiStudyHub.BE.service.UserUpdateService;
+import AiStudyHub.BE.service.UserService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +23,7 @@ public class UserController {
 
 
     @Autowired
-    UserUpdateService userUpdateService;
+    UserService userService;
 
 
     @PutMapping("profile")
@@ -34,7 +34,7 @@ public class UserController {
             throw new GlobalException(ErrorCode.INVALID_TOKEN);
         }
 
-        UpdateProfileResponse response = userUpdateService.updateProfile(currentUser.getUserId(), updateProfileRequest);
+        UpdateProfileResponse response = userService.updateProfile(currentUser.getUserId(), updateProfileRequest);
 
         return ResponseEntity.status(200)
                 .body(

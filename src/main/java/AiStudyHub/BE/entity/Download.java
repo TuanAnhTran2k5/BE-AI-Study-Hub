@@ -7,15 +7,7 @@ import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(
-        name = "download",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uq_download_user_document",
-                        columnNames = {"userId", "documentId"}
-                )
-        }
-)
+@Table(name = "download")
 @Getter
 @Setter
 @NoArgsConstructor

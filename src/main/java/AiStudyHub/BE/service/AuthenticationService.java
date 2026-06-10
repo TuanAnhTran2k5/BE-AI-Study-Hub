@@ -6,6 +6,7 @@ import AiStudyHub.BE.constraint.OtpPurpose;
 import AiStudyHub.BE.constraint.UserRole;
 import AiStudyHub.BE.constraint.UserStatus;
 import AiStudyHub.BE.dto.Request.LoginRequest;
+import AiStudyHub.BE.dto.Request.LogoutRequest;
 import AiStudyHub.BE.dto.Request.RegisterRequest;
 import AiStudyHub.BE.dto.Request.VerifyOtpRequest;
 import AiStudyHub.BE.dto.Response.RegisterResponse;
@@ -32,6 +33,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -186,5 +188,11 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         return userRepo.findUserByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    }
+
+    @Override
+    public void logout(LogoutRequest request) {
+        // Do nothing on backend for stateless JWT.
+        // Frontend is responsible for discarding the token.
     }
 }

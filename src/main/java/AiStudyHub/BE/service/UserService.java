@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @Slf4j
-public class UserUpdateService implements IUser {
+public class UserService implements IUser {
 
     @Autowired
     UserRepo userRepo;
@@ -29,7 +29,6 @@ public class UserUpdateService implements IUser {
         userMapper.updateUserFromRequest(request, user);
 
         userRepo.save(user);
-
 
         return userMapper.toUpdateProfileResponse(user);
     }
