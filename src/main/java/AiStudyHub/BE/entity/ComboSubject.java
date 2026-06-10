@@ -18,5 +18,9 @@ public class ComboSubject {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long comboId;
 
+    @Column(nullable = false, unique = true)
+    String comboCode;
+
+    @Column(nullable = false)
     String comboName;
 }

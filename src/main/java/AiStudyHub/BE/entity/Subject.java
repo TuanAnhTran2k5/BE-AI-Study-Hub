@@ -29,10 +29,13 @@ public class Subject {
     Semester semester;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "semesterComboSubjectId")
-    SemesterComboSubject semesterComboSubject;
+    @JoinColumn(name = "comboId")
+    ComboSubject comboSubject;
 
+    @Column(nullable = false, unique = true)
     String subjectCode;
+
+    @Column(nullable = false)
     String subjectName;
 
     @Column(columnDefinition = "TEXT")
