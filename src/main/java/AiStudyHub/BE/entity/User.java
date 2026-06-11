@@ -11,7 +11,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.io.Serializable;
+
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -51,8 +51,11 @@ public class User implements UserDetails {
     @Column(nullable = false, length = 20)
     UserRole role;
 
-    Long storageUsed;
-    Long storageLimit;
+    //Limit Storage
+    @Column(nullable = false)
+    Long storageUsed = 0L;
+    @Column(nullable = false)
+    Long storageLimit = 2L * 1024 * 1024 * 1024; //2GB
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
@@ -77,6 +80,13 @@ public class User implements UserDetails {
         if (this.createdAt == null) this.createdAt = LocalDateTime.now();
         if (role == null) role = UserRole.US;
         if (status == null) status = UserStatus.PENDING;
+
+        if (storageUsed == null)
+            storageUsed = 0L;
+        if (storageLimit == null)
+            storageLimit = 2L * 1024 * 1024 * 1024;
+        if (totalScore == null)
+            totalScore = 0L;
     }
 
     @Override

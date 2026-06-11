@@ -18,6 +18,7 @@ public class Semester {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long semesterId;
 
+    @Column(nullable = false, unique = true)
     String semesterNo;
 
     @Column(columnDefinition = "TEXT")
