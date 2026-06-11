@@ -77,7 +77,7 @@ public class DocumentService implements IDocument {
         long fileSize = request.getFile().getSize();
 
         // Check file <= 20MB and total user capacity <= 2GB
-        storageService.validateUpload(owner, fileSize);
+        storageService.validateStorage(owner, fileSize);
 
         byte[] fileBytes = request.getFile().getBytes();
 
@@ -126,6 +126,10 @@ public class DocumentService implements IDocument {
                 LocalDateTime.now()
         );
 
+        Long fileSize = document.getFileSize() == null ? 0L : document.getFileSize();
+
+        User owner = document.getOwner();
+
         supabaseStorageService.deleteFile(document.getFileUrl());
 
         long deletedRows = documentRepo.deleteByDocumentId(documentId);
@@ -133,6 +137,8 @@ public class DocumentService implements IDocument {
         if (deletedRows == 0) {
             throw new GlobalException(ErrorCode.DOCUMENT_DELETE_FAILED);
         }
+
+        storageService.decreaseStorage(owner, fileSize);
 
         return response;
     }
@@ -146,12 +152,17 @@ public class DocumentService implements IDocument {
             throw new GlobalException(ErrorCode.DOCUMENT_NOT_PUBLIC);
         }
 
-        User currentUser = getCurrentUser();
+        User authUser = getCurrentUser();
+
+        User currentUser = userRepo.findById(authUser.getUserId())
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
         User publicOwner = publicDocument.getOwner();
         String publicOwnerName = publicOwner.getFullName();
 
         byte[] fileBytes = supabaseStorageService.downloadFile(publicDocument.getFileUrl());
+
+        storageService.validateStorage(currentUser, fileBytes.length);
 
         String personalFolder = "users/" + currentUser.getUserId() + "/documents";
 
@@ -176,6 +187,7 @@ public class DocumentService implements IDocument {
                 .build();
 
         privateDocument = documentRepo.save(privateDocument);
+        storageService.increaseStorage(currentUser, uploadResponse.getFileSize());
 
         boolean firstDownload = !downloadRepo.existsByUserAndDocument(currentUser, publicDocument);
         Integer addedPoint = 0;
