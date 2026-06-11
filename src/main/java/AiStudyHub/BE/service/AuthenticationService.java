@@ -62,7 +62,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     @Override
     public RegisterResponse register(RegisterRequest registerRequest) {
         String email = registerRequest.getEmail();
-        Optional<User> existingUserOpt = userRepo.findUserByEmail(email);
+        Optional<User> existingUserOpt = userRepo.findByEmail(email);
         User user;
 
         if (existingUserOpt.isPresent()) {
@@ -151,7 +151,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     @Override
     public UserResponse verifyEmail(VerifyOtpRequest request) {
         String email = request.getEmail();
-        User user = userRepo.findUserByEmail(email)
+        User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
         if (user.getStatus() == UserStatus.ACTIVE) {
@@ -186,7 +186,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        return userRepo.findUserByEmail(email)
+        return userRepo.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 
