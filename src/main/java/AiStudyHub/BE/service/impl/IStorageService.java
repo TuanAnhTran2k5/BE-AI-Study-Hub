@@ -4,7 +4,7 @@ import AiStudyHub.BE.entity.User;
 
 public interface IStorageService {
 
-    void validateUpload(User user, long fileSize);
+    void validateStorage(User user, long fileSize);
 
     void increaseStorage(User user, long fileSize);
 

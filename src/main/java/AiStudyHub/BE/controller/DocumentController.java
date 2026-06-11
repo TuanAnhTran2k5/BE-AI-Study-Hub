@@ -5,6 +5,8 @@ import AiStudyHub.BE.constraint.VisibilityStatus;
 
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
+import AiStudyHub.BE.dto.Response.DocumentDeleteResponse;
+import AiStudyHub.BE.dto.Response.DocumentDownloadResponse;
 import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
@@ -61,5 +63,31 @@ public class DocumentController {
                 APIResponse.response(200, "Upload document successfully", response)
         );
     }
+
+    @DeleteMapping("/{documentId}")
+    public ResponseEntity<APIResponse<DocumentDeleteResponse>> deleteDocument(@PathVariable Long documentId) throws Exception {
+        DocumentDeleteResponse response = documentService.deleteDocument(documentId);
+
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Delete document successfully", response));
+    }
+
+    @PostMapping("/{documentId}/download/public")
+    public ResponseEntity<APIResponse<DocumentDownloadResponse>> downloadPublicDocument(
+            @PathVariable Long documentId
+    ) throws Exception {
+
+        DocumentDownloadResponse response = documentService.downloadPublicDocument(documentId);
+
+        return ResponseEntity.ok(
+                APIResponse.response(
+                        200,
+                        "Download public document successfully",
+                        response
+                )
+        );
+    }
+
+
 
 }

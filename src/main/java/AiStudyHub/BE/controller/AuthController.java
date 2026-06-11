@@ -1,6 +1,7 @@
 package AiStudyHub.BE.controller;
 
 import AiStudyHub.BE.dto.Request.LoginRequest;
+import AiStudyHub.BE.dto.Request.LogoutRequest;
 import AiStudyHub.BE.dto.Request.RegisterRequest;
 import AiStudyHub.BE.dto.Request.VerifyOtpRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
@@ -50,5 +51,13 @@ public class AuthController {
                         APIResponse.response(
                                 201,"Login Successfully",userResponse
                         ));
+    }
+
+    @PostMapping("logout")
+    public ResponseEntity<APIResponse<Void>> logout(@Valid @RequestBody LogoutRequest logoutRequest) {
+        authenticationService.logout(logoutRequest);
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Logout Successfully", null)
+        );
     }
 }

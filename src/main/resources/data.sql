@@ -11,7 +11,7 @@ VALUES
 ('8', 'Ethics, political subjects, mobile, and advanced combo subjects.'),
 ('9', 'Final political subjects and capstone project.');
 
---// Combo
+
 INSERT IGNORE INTO combo_subject (combo_code, combo_name)
 VALUES
 ('SPRING_REACT', 'Spring Boot with React'),
@@ -23,7 +23,7 @@ VALUES
 ('DS', 'Data Science'),
 ('SECURITY', 'Cyber Security');
 
---//CORE
+
 INSERT IGNORE INTO subject
 (semester_id, combo_id, subject_code, subject_name, description, subject_type)
 VALUES
@@ -83,7 +83,7 @@ VALUES
 ((SELECT semester_id FROM semester WHERE semester_no='9'), NULL, 'HCM202', 'Ho Chi Minh Ideology', NULL, 'CORE'),
 ((SELECT semester_id FROM semester WHERE semester_no='9'), NULL, 'SEP490', 'SE Capstone Project', NULL, 'CORE');
 
---//COMBO
+
 INSERT IGNORE INTO subject
 (semester_id, combo_id, subject_code, subject_name, description, subject_type)
 VALUES
@@ -131,8 +131,26 @@ VALUES
 ((SELECT semester_id FROM semester WHERE semester_no='7'), (SELECT combo_id FROM combo_subject WHERE combo_code='SECURITY'), 'ISC302', 'Advanced Information Security', NULL, 'COMBO'),
 ((SELECT semester_id FROM semester WHERE semester_no='8'), (SELECT combo_id FROM combo_subject WHERE combo_code='SECURITY'), 'CPV301', 'Cybersecurity Practice', NULL, 'COMBO');
 
---//semester_combo_subject
+
 INSERT IGNORE INTO semester_combo_subject (semester_id, combo_id)
 SELECT DISTINCT semester_id, combo_id
 FROM subject
 WHERE subject_type = 'COMBO';
+
+INSERT INTO score_type (type_code, type_name, default_point)
+VALUES
+    ('UPLOAD_PUBLIC', 'Upload public document', 5),
+    ('DOWNLOAD', 'Document downloaded', 2),
+    ('BOOKMARK', 'Document bookmarked', 3),
+    ('GOOD_RATING', 'Good rating received', 5),
+
+-- Report Management - Level 1
+    ('REPORT_MINOR_FIRST_PENALTY', 'Minor report first penalty', -5),
+    ('REPORT_MINOR_FINAL_PENALTY', 'Minor report final penalty', -10),
+
+-- Report Management - Level 2
+    ('ADS_CONTENT_PENALTY', 'Advertisement content penalty', -15),
+    ('DUPLICATE_CONTENT_PENALTY', 'Duplicate content penalty', -20)
+    ON DUPLICATE KEY UPDATE
+                         type_name = VALUES(type_name),
+                         default_point = VALUES(default_point);

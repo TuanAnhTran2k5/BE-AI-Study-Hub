@@ -13,7 +13,7 @@ public class StorageService implements IStorageService {
     private static final long DEFAULT_STORAGE_LIMIT = 2L * 1024 * 1024 * 1024; // 2GB
 
     @Override
-    public void validateUpload(User user, long fileSize){
+    public void validateStorage(User user, long fileSize){
 
         if (fileSize > MAX_FILE_SIZE) {
             throw new GlobalException(ErrorCode.FILE_TOO_LARGE);

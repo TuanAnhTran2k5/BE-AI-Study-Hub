@@ -6,6 +6,7 @@ import AiStudyHub.BE.constraint.OtpPurpose;
 import AiStudyHub.BE.constraint.UserRole;
 import AiStudyHub.BE.constraint.UserStatus;
 import AiStudyHub.BE.dto.Request.LoginRequest;
+import AiStudyHub.BE.dto.Request.LogoutRequest;
 import AiStudyHub.BE.dto.Request.RegisterRequest;
 import AiStudyHub.BE.dto.Request.VerifyOtpRequest;
 import AiStudyHub.BE.dto.Response.RegisterResponse;
@@ -32,6 +33,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,7 +62,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     @Override
     public RegisterResponse register(RegisterRequest registerRequest) {
         String email = registerRequest.getEmail();
-        Optional<User> existingUserOpt = userRepo.findUserByEmail(email);
+        Optional<User> existingUserOpt = userRepo.findByEmail(email);
         User user;
 
         if (existingUserOpt.isPresent()) {
@@ -149,7 +151,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     @Override
     public UserResponse verifyEmail(VerifyOtpRequest request) {
         String email = request.getEmail();
-        User user = userRepo.findUserByEmail(email)
+        User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
         if (user.getStatus() == UserStatus.ACTIVE) {
@@ -184,7 +186,13 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        return userRepo.findUserByEmail(email)
+        return userRepo.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    }
+
+    @Override
+    public void logout(LogoutRequest request) {
+        // Do nothing on backend for stateless JWT.
+        // Frontend is responsible for discarding the token.
     }
 }

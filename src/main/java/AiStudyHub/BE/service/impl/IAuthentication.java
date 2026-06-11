@@ -12,4 +12,6 @@ public interface IAuthentication {
     UserResponse login(LoginRequest loginRequest);
 
     UserResponse verifyEmail(VerifyOtpRequest request);
+
+    void logout(AiStudyHub.BE.dto.Request.LogoutRequest request);
 }
