@@ -38,6 +38,7 @@ public class Notification {
     String message;
 
     String type;
+    @Builder.Default
     Boolean isRead = false;
     String notificationCase;
     LocalDateTime createdAt;

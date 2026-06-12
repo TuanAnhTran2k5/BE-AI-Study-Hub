@@ -13,5 +13,5 @@ public interface IAuthentication {
 
     UserResponse verifyEmail(VerifyOtpRequest request);
 
-    void logout(AiStudyHub.BE.dto.Request.LogoutRequest request);
+    boolean logout(AiStudyHub.BE.dto.Request.LogoutRequest request);
 }

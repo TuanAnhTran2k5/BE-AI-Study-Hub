@@ -34,6 +34,7 @@ public class WeeklyScore {
     User user;
 
     LocalDate weekStart;
+    @Builder.Default
     Integer score = 0;
     String rankPosition;
     LocalDateTime createdAt;

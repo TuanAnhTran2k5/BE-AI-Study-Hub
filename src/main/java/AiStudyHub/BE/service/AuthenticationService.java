@@ -19,9 +19,6 @@ import AiStudyHub.BE.repository.OtpVerificationRepo;
 import AiStudyHub.BE.repository.UserRepo;
 import AiStudyHub.BE.service.impl.IAuthentication;
 import AiStudyHub.BE.service.impl.IEmail;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.*;
@@ -32,15 +29,16 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Date;
-import java.util.Map;
+import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
 public class AuthenticationService implements UserDetailsService, IAuthentication {
+
+    private final SecureRandom secureRandom = new SecureRandom();
 
     @Autowired
     private UserRepo userRepo;
@@ -87,8 +85,17 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             user = userRepo.save(user);
         }
 
-        // Generate OTP code
-        String otpCode = String.valueOf((int) (Math.random() * 900000) + 100000);
+        // Invalidate any previously issued, still-unused REGISTER OTPs for this user
+        // so only the newest code can be used.
+        List<OtpVerification> oldOtps =
+                otpVerificationRepo.findByUserAndPurposeAndIsUseFalse(user, OtpPurpose.REGISTER);
+        if (!oldOtps.isEmpty()) {
+            oldOtps.forEach(o -> o.setIsUse(true));
+            otpVerificationRepo.saveAll(oldOtps);
+        }
+
+        // Generate a cryptographically strong 6-digit OTP code
+        String otpCode = String.valueOf(secureRandom.nextInt(900000) + 100000);
 
         // Save OtpVerification to DB
         OtpVerification otpVerification = OtpVerification.builder()
@@ -191,8 +198,9 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     }
 
     @Override
-    public void logout(LogoutRequest request) {
+    public boolean logout(LogoutRequest request) {
         // Do nothing on backend for stateless JWT.
         // Frontend is responsible for discarding the token.
+        return true;
     }
 }

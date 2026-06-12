@@ -203,7 +203,7 @@ public class SupabaseStoreService implements ISupabaseStorage {
 
 
     //-----------------------------------------------------------------------------
-    private void doUpload(String storagePath, byte[] fileBytes, String contentType) {
+    private boolean doUpload(String storagePath, byte[] fileBytes, String contentType) {
         String uploadUrl = String.format(
                 "%s/storage/v1/object/%s/%s",
                 supabaseUrl,
@@ -230,6 +230,7 @@ public class SupabaseStoreService implements ISupabaseStorage {
                     storagePath, e.getStatusCode(), e.getResponseBodyAsString());
             throw new GlobalException(ErrorCode.FILE_UPLOAD_FAILED);
         }
+        return true;
     }
 
     private String buildPublicUrl(String storagePath) {

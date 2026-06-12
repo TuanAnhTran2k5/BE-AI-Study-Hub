@@ -14,6 +14,7 @@ logs/
 *.iml
 *.ipr
 out/
+.kiro/
 
 # Eclipse / STS
 .apt_generated
