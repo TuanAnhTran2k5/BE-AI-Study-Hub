@@ -6,9 +6,11 @@ import AiStudyHub.BE.entity.ScoreLog;
 import AiStudyHub.BE.entity.ScoreType;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.repository.DocumentRepo;
+import AiStudyHub.BE.repository.RatingRepo;
 import AiStudyHub.BE.repository.ScoreLogRepo;
 import AiStudyHub.BE.repository.ScoreTypeRepo;
 import AiStudyHub.BE.repository.UserRepo;
+import AiStudyHub.BE.service.impl.IReputation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -20,7 +22,7 @@ import java.util.List;
 
 @Service
 @Slf4j
-public class ReputationService {
+public class ReputationService implements IReputation {
 
     static final String RATING_REPUTATION = "RATING_REPUTATION";
 
@@ -36,19 +38,25 @@ public class ReputationService {
     @Autowired
     private ScoreLogRepo scoreLogRepo;
 
+    @Autowired
+    private RatingRepo ratingRepo;
+
     // Self-reference so that applyReputation(Document) is invoked through the Spring proxy.
     // This keeps each per-document call inside its own @Transactional boundary, giving the
     // fault isolation required (a failed document does not roll back already-committed
     // documents).
     @Autowired
     @Lazy
-    private ReputationService self;
+    private IReputation self;
 
     // Scheduled entry point. Processes each eligible document, isolating failures per document so a
     // single failure does not stop the job. Returns the number of documents processed successfully.
+    @Override
     @Scheduled(cron = "${reputation.job.cron:0 0 2 * * *}")
     public int runDailyReputation() {
-        List<Document> docs = documentRepo.findEligibleForReputation(VisibilityStatus.PUBLIC, 10);
+        self.recomputeAllAggregates(); // Recompute ratings for all documents first
+
+        List<Document> docs = documentRepo.findByVisibilityStatusAndRatingCountGreaterThanEqual(VisibilityStatus.PUBLIC, 10);
 
         log.info("Reputation job started: {} eligible document(s)", docs.size());
 
@@ -69,9 +77,8 @@ public class ReputationService {
 
     // Applies the reputation threshold table for a single document inside its own transaction.
     // Loads the document by id within the transaction so its lazy owner can be initialized.
-    // A document is eligible if it has reached the rating threshold at least once (sticky flag)
-    // or currently has ratingCount >= 10; once eligible it stays eligible (flag is set true).
     // Returns true if a reputation change was applied, false if the document did not qualify.
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean applyReputation(Long documentId) {
         Document doc = documentRepo.findById(documentId).orElse(null);
@@ -80,15 +87,9 @@ public class ReputationService {
         }
 
         int count = doc.getRatingCount() == null ? 0 : doc.getRatingCount();
-        boolean eligible = Boolean.TRUE.equals(doc.getRatingThresholdReached()) || count >= 10;
+        boolean eligible = count >= 10;
         if (!eligible) {
             return false;
-        }
-
-        // Sticky: once the document qualifies, keep it eligible for future runs.
-        if (!Boolean.TRUE.equals(doc.getRatingThresholdReached())) {
-            doc.setRatingThresholdReached(true);
-            documentRepo.save(doc);
         }
 
         double avg = doc.getAverageRating() == null ? 0.0 : doc.getAverageRating();
@@ -117,5 +118,33 @@ public class ReputationService {
                 .build());
 
         return true;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean recomputeAllAggregates() {
+        List<Document> docsWithRatings = documentRepo.findByVisibilityStatus(VisibilityStatus.PUBLIC);
+        for (Document doc : docsWithRatings) {
+            List<AiStudyHub.BE.entity.Rating> ratings = ratingRepo.findByDocument(doc);
+            int count = ratings.size();
+            if (count == 0) {
+                doc.setRatingCount(0);
+                doc.setAverageRating(0.0);
+            } else {
+                double avg = ratings.stream().mapToDouble(AiStudyHub.BE.entity.Rating::getRatingValue).average().orElse(0.0);
+                doc.setRatingCount(count);
+                doc.setAverageRating(round2(avg));
+            }
+            documentRepo.save(doc);
+        }
+        return true;
+    }
+
+    //---------------------------------------------------------------------------
+
+    private static double round2(double value) {
+        return java.math.BigDecimal.valueOf(value)
+                .setScale(2, java.math.RoundingMode.HALF_UP)
+                .doubleValue();
     }
 }

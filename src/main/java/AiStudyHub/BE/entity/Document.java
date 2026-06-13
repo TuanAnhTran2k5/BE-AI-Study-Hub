@@ -56,12 +56,6 @@ public class Document {
     @Builder.Default
     Integer ratingCount = 0;
 
-    // Sticky eligibility flag for reputation scoring: once the document has reached the
-    // rating threshold (ratingCount >= 10) at least once, it stays eligible for the daily
-    // reputation job even if ratingCount later drops below 10.
-    @Builder.Default
-    Boolean ratingThresholdReached = false;
-
     @Builder.Default
     Integer downloadCount = 0;
     @Builder.Default

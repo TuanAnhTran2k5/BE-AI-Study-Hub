@@ -20,8 +20,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 @Service
 @Slf4j
@@ -79,46 +77,13 @@ public class RatingService implements IRating {
         rating.setComment(request.getComment());
         rating = ratingRepo.save(rating);
 
-        // 8. Recompute aggregates and persist Document in the same transaction
-        recomputeAggregates(document);
-
-        // 9. Build response
+        // 8. Return rating for rating response of document
         return ratingMapper.toRatingResponse(rating, document);
     }
 
     // --------------------------------------------------------------------------------------------
 
-    // Recompute ratingCount and averageRating of a document from the rating table,
-    // then persist the document within the current transaction.
-    // Recompute ratingCount and averageRating of a document from the rating table,
-    // then persist the document within the current transaction. Returns the persisted document.
-    private Document recomputeAggregates(Document document) {
-        java.util.List<AiStudyHub.BE.entity.Rating> ratings = ratingRepo.findByDocument(document);
-        int count = ratings.size();
 
-        if (count == 0) {
-            document.setRatingCount(0);
-            document.setAverageRating(0.0);
-        } else {
-            double avg = ratings.stream().mapToDouble(AiStudyHub.BE.entity.Rating::getRatingValue).average().orElse(0.0);
-            document.setRatingCount(count);
-            document.setAverageRating(round2(avg));
-            // Once the document reaches the rating threshold, mark it eligible for reputation
-            // scoring permanently (sticky) so it keeps being scored even if count later drops.
-            if (count >= 10) {
-                document.setRatingThresholdReached(true);
-            }
-        }
-
-        return documentRepo.save(document);
-    }
-
-    // Pure helper: round to 2 decimal places using HALF_UP.
-    private static double round2(double value) {
-        return BigDecimal.valueOf(value)
-                .setScale(2, RoundingMode.HALF_UP)
-                .doubleValue();
-    }
 
     private User getCurrentUser() {
         Authentication authentication = SecurityContextHolder
