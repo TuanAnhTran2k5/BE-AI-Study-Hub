@@ -10,13 +10,7 @@ public interface SubjectRepo extends JpaRepository<Subject, Long> {
 
     List<Subject> findBySemester_SemesterId(Long semesterId);
 
-    @Query("""
-        SELECT s FROM Subject s
-        WHERE s.semester.semesterId = :semesterId
-        AND (
-            s.comboSubject IS NULL
-            OR s.comboSubject.comboId = :comboId
-        )
-    """)
-    List<Subject> findSubjectsBySemesterAndCombo(Long semesterId, Long comboId);
+    List<Subject> findBySemester_SemesterIdAndComboSubjectIsNull(Long semesterId);
+
+    List<Subject> findBySemester_SemesterIdAndComboSubject_ComboId(Long semesterId, Long comboId);
 }

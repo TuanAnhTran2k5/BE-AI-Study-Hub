@@ -40,6 +40,7 @@ public class Document {
     @Column(nullable = false, length = 30)
     ModerationStatus moderationStatus;
 
+    @Builder.Default
     Double averageRating = 0.0;
     String fileName;
 
@@ -52,9 +53,14 @@ public class Document {
     @Column(columnDefinition = "TEXT")
     String contentHashSha256;
 
+    @Builder.Default
     Integer ratingCount = 0;
+
+    @Builder.Default
     Integer downloadCount = 0;
+    @Builder.Default
     Integer bookmarkCount = 0;
+    @Builder.Default
     Integer reportCount = 0;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;

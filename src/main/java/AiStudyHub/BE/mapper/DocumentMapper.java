@@ -3,6 +3,7 @@ package AiStudyHub.BE.mapper;
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
 import AiStudyHub.BE.dto.Response.DocumentDeleteResponse;
 import AiStudyHub.BE.dto.Response.DocumentDownloadResponse;
+import AiStudyHub.BE.dto.Response.DocumentUpdateResponse;
 import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
 import AiStudyHub.BE.entity.Document;
 import org.mapstruct.Context;
@@ -46,4 +47,11 @@ public interface DocumentMapper {
             Long ownerTotalScore,
             LocalDateTime downloadedAt
     );
+
+    @Mapping(source = "documentId", target = "documentId")
+    @Mapping(source = "title", target = "title")
+    @Mapping(source = "subject.subjectId", target = "subjectId")
+    @Mapping(source = "visibilityStatus", target = "visibilityStatus")
+    @Mapping(source = "updatedAt", target = "updatedAt")
+    DocumentUpdateResponse toDocumentUpdateResponse(Document document);
 }

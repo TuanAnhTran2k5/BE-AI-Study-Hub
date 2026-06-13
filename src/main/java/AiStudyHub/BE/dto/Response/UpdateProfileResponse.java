@@ -16,11 +16,14 @@ public class UpdateProfileResponse {
 
     String fullName;
     String avatarUrl;
+    @Builder.Default
     Long totalScore = 0L;
     String email;
 
     UserRole role;
 
+    @Builder.Default
     Long storageUsed = 0L;
+    @Builder.Default
     Long storageLimit = 0L;
 }

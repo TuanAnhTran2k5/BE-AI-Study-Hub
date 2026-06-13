@@ -1,5 +1,11 @@
 package AiStudyHub.BE.controller;
 
+import AiStudyHub.BE.dto.Request.ForgotPasswordRequest;
+import AiStudyHub.BE.dto.Request.ResetPasswordRequest;
+import AiStudyHub.BE.dto.Request.ResendOtpRequest;
+import AiStudyHub.BE.dto.Response.ForgotPasswordResponse;
+import AiStudyHub.BE.dto.Response.ResendOtpResponse;
+import AiStudyHub.BE.dto.Request.GoogleLoginRequest;
 import AiStudyHub.BE.dto.Request.LoginRequest;
 import AiStudyHub.BE.dto.Request.LogoutRequest;
 import AiStudyHub.BE.dto.Request.RegisterRequest;
@@ -53,11 +59,51 @@ public class AuthController {
                         ));
     }
 
+    @PostMapping("google-login")
+    public ResponseEntity<APIResponse<UserResponse>> googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
+        UserResponse userResponse = authenticationService.googleLogin(request);
+        return ResponseEntity.status(200)
+                .body(
+                        APIResponse.response(
+                                200, "Login Google Successfully", userResponse
+                        ));
+    }
+
     @PostMapping("logout")
     public ResponseEntity<APIResponse<Void>> logout(@Valid @RequestBody LogoutRequest logoutRequest) {
         authenticationService.logout(logoutRequest);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Logout Successfully", null)
         );
+    }
+
+    @PostMapping("forgot-password")
+    public ResponseEntity<APIResponse<ForgotPasswordResponse>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        ForgotPasswordResponse response = authenticationService.forgotPassword(request);
+        return ResponseEntity.status(200)
+                .body(
+                        APIResponse.response(
+                                200, "Send OTP to email successfully", response
+                        ));
+    }
+
+    @PostMapping("forgot-password/reset")
+    public ResponseEntity<APIResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authenticationService.resetPassword(request);
+        return ResponseEntity.status(200)
+                .body(
+                        APIResponse.response(
+                                200, "Change Password Successfully", null
+                        ));
+    }
+
+    @PostMapping("resend-otp")
+    public ResponseEntity<APIResponse<ResendOtpResponse>> resendOtp(@Valid @RequestBody ResendOtpRequest request) {
+        ResendOtpResponse response = authenticationService.resendOtp(request);
+        return ResponseEntity.status(200)
+                .body(
+                        APIResponse.response(
+                                200, "Resend OTP successfully", response
+                        ));
     }
 }

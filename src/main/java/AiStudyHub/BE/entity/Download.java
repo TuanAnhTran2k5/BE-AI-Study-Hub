@@ -29,6 +29,7 @@ public class Download {
     User user;
 
     LocalDateTime downloadedAt;
+    @Builder.Default
     Boolean scoreAwarded = false;
 
     @PrePersist

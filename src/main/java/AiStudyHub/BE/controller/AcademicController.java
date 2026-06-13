@@ -58,8 +58,10 @@ public class AcademicController {
             @PathVariable Long semesterId,
             @PathVariable Long comboId
     ) {
-        List<SubjectResponse> result = subjectRepo.findSubjectsBySemesterAndCombo(semesterId, comboId)
-                                                  .stream()
+        List<Subject> baseSubjects = subjectRepo.findBySemester_SemesterIdAndComboSubjectIsNull(semesterId);
+        List<Subject> comboSubjects = subjectRepo.findBySemester_SemesterIdAndComboSubject_ComboId(semesterId, comboId);
+        
+        List<SubjectResponse> result = java.util.stream.Stream.concat(baseSubjects.stream(), comboSubjects.stream())
                                                   .map(this::toSubjectResponse)
                                                   .toList();
 
