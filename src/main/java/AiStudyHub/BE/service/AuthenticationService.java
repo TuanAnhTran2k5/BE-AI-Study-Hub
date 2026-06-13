@@ -5,6 +5,11 @@ import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.constraint.OtpPurpose;
 import AiStudyHub.BE.constraint.UserRole;
 import AiStudyHub.BE.constraint.UserStatus;
+import AiStudyHub.BE.dto.Request.ForgotPasswordRequest;
+import AiStudyHub.BE.dto.Request.ResetPasswordRequest;
+import AiStudyHub.BE.dto.Request.ResendOtpRequest;
+import AiStudyHub.BE.dto.Response.ForgotPasswordResponse;
+import AiStudyHub.BE.dto.Response.ResendOtpResponse;
 import AiStudyHub.BE.dto.Request.GoogleLoginRequest;
 import AiStudyHub.BE.dto.Request.LoginRequest;
 import AiStudyHub.BE.dto.Request.LogoutRequest;
@@ -17,6 +22,7 @@ import AiStudyHub.BE.entity.OtpVerification;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.mapper.UserMapper;
+import AiStudyHub.BE.mapper.OtpMapper;
 import AiStudyHub.BE.repository.OtpVerificationRepo;
 import AiStudyHub.BE.repository.UserRepo;
 import AiStudyHub.BE.service.impl.IAuthentication;
@@ -47,6 +53,8 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     private UserRepo userRepo;
     @Autowired
     private UserMapper userMapper;
+    @Autowired
+    private OtpMapper otpMapper;
     @Autowired
     private PasswordEncoder passwordEncoder;
     @Autowired
@@ -267,5 +275,113 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         // Do nothing on backend for stateless JWT.
         // Frontend is responsible for discarding the token.
         return true;
+    }
+
+    @Override
+    public ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request) {
+        String email = request.getEmail();
+        User user = userRepo.findByEmail(email)
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
+        if (user.getStatus() == UserStatus.BANNED) {
+            throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+        }
+
+        // Invalidate old OTPs
+        List<OtpVerification> oldOtps =
+                otpVerificationRepo.findByUserAndPurposeAndIsUseFalse(user, OtpPurpose.FORGOT_PASSWORD);
+        if (!oldOtps.isEmpty()) {
+            oldOtps.forEach(o -> o.setIsUse(true));
+            otpVerificationRepo.saveAll(oldOtps);
+        }
+
+        String otpCode = String.valueOf(secureRandom.nextInt(900000) + 100000);
+
+        OtpVerification otpVerification = OtpVerification.builder()
+                .user(user)
+                .email(email)
+                .otpCode(otpCode)
+                .purpose(OtpPurpose.FORGOT_PASSWORD)
+                .expiredAt(LocalDateTime.now().plusMinutes(5))
+                .isUse(false)
+                .build();
+        otpVerificationRepo.save(otpVerification);
+
+        emailService.sendOtpEmail(email, otpCode);
+
+        return otpMapper.toForgotPasswordResponse(otpVerification);
+    }
+
+    @Override
+    public void resetPassword(ResetPasswordRequest request) {
+        String email = request.getEmail();
+        User user = userRepo.findByEmail(email)
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
+        if (user.getStatus() == UserStatus.BANNED) {
+            throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+        }
+
+        OtpVerification otp = otpVerificationRepo
+                .findByUserAndOtpCodeAndPurposeAndIsUseFalse(
+                        user,
+                        request.getOtpCode(),
+                        OtpPurpose.FORGOT_PASSWORD
+                )
+                .orElseThrow(() -> new GlobalException(ErrorCode.INVALID_OTP));
+
+        if (otp.getExpiredAt().isBefore(LocalDateTime.now())) {
+            throw new GlobalException(ErrorCode.OTP_EXPIRED);
+        }
+
+        // Update password
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        userRepo.save(user);
+
+        // Mark OTP as used
+        otp.setIsUse(true);
+        otp.setVerifiedAt(LocalDateTime.now());
+        otpVerificationRepo.save(otp);
+    }
+
+    @Override
+    public ResendOtpResponse resendOtp(ResendOtpRequest request) {
+        String email = request.getEmail();
+        User user = userRepo.findByEmail(email)
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
+        if (user.getStatus() == UserStatus.BANNED) {
+            throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+        }
+
+        OtpPurpose purpose = request.getPurpose();
+
+        if (purpose == OtpPurpose.REGISTER && user.getStatus() != UserStatus.PENDING) {
+            throw new GlobalException(ErrorCode.EMAIL_ALREADY_VERIFIED);
+        }
+
+        // Invalidate old OTPs for the requested purpose
+        List<OtpVerification> oldOtps =
+                otpVerificationRepo.findByUserAndPurposeAndIsUseFalse(user, purpose);
+        if (!oldOtps.isEmpty()) {
+            oldOtps.forEach(o -> o.setIsUse(true));
+            otpVerificationRepo.saveAll(oldOtps);
+        }
+
+        String otpCode = String.valueOf(secureRandom.nextInt(900000) + 100000);
+
+        OtpVerification otpVerification = OtpVerification.builder()
+                .user(user)
+                .email(email)
+                .otpCode(otpCode)
+                .purpose(purpose)
+                .expiredAt(LocalDateTime.now().plusMinutes(5))
+                .isUse(false)
+                .build();
+        otpVerificationRepo.save(otpVerification);
+
+        emailService.sendOtpEmail(email, otpCode);
+
+        return otpMapper.toResendOtpResponse(otpVerification);
     }
 }
