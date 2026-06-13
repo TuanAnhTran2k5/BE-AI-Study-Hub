@@ -2,6 +2,7 @@ package AiStudyHub.BE.mapper;
 
 import AiStudyHub.BE.dto.Request.RegisterRequest;
 import AiStudyHub.BE.dto.Request.UpdateProfileRequest;
+import AiStudyHub.BE.dto.Response.GoogleUserInfo;
 import AiStudyHub.BE.dto.Response.UpdateProfileResponse;
 import AiStudyHub.BE.dto.Response.UserResponse;
 import AiStudyHub.BE.entity.User;
@@ -20,4 +21,9 @@ public interface UserMapper {
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     User updateUserFromRequest(UpdateProfileRequest request, @MappingTarget User user);
+
+    @Mapping(target = "googleId", source = "sub")
+    @Mapping(target = "fullName", source = "name")
+    @Mapping(target = "avatarUrl", source = "picture")
+    User toUser(GoogleUserInfo googleUserInfo);
 }

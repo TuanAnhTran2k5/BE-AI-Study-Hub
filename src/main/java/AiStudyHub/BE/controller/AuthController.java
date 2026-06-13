@@ -1,5 +1,6 @@
 package AiStudyHub.BE.controller;
 
+import AiStudyHub.BE.dto.Request.GoogleLoginRequest;
 import AiStudyHub.BE.dto.Request.LoginRequest;
 import AiStudyHub.BE.dto.Request.LogoutRequest;
 import AiStudyHub.BE.dto.Request.RegisterRequest;
@@ -50,6 +51,16 @@ public class AuthController {
                 .body(
                         APIResponse.response(
                                 201,"Login Successfully",userResponse
+                        ));
+    }
+
+    @PostMapping("google-login")
+    public ResponseEntity<APIResponse<UserResponse>> googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
+        UserResponse userResponse = authenticationService.googleLogin(request);
+        return ResponseEntity.status(200)
+                .body(
+                        APIResponse.response(
+                                200, "Login Google Successfully", userResponse
                         ));
     }
 

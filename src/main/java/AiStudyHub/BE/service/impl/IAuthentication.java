@@ -13,5 +13,7 @@ public interface IAuthentication {
 
     UserResponse verifyEmail(VerifyOtpRequest request);
 
+    UserResponse googleLogin(AiStudyHub.BE.dto.Request.GoogleLoginRequest request);
+
     boolean logout(AiStudyHub.BE.dto.Request.LogoutRequest request);
 }

@@ -5,10 +5,12 @@ import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.constraint.OtpPurpose;
 import AiStudyHub.BE.constraint.UserRole;
 import AiStudyHub.BE.constraint.UserStatus;
+import AiStudyHub.BE.dto.Request.GoogleLoginRequest;
 import AiStudyHub.BE.dto.Request.LoginRequest;
 import AiStudyHub.BE.dto.Request.LogoutRequest;
 import AiStudyHub.BE.dto.Request.RegisterRequest;
 import AiStudyHub.BE.dto.Request.VerifyOtpRequest;
+import AiStudyHub.BE.dto.Response.GoogleUserInfo;
 import AiStudyHub.BE.dto.Response.RegisterResponse;
 import AiStudyHub.BE.dto.Response.UserResponse;
 import AiStudyHub.BE.entity.OtpVerification;
@@ -28,6 +30,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -189,6 +192,66 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         userRepo.save(user);
 
         return userMapper.toUserResponse(user);
+    }
+
+    @Override
+    public UserResponse googleLogin(GoogleLoginRequest request) {
+        WebClient webClient = WebClient.create();
+        GoogleUserInfo googleUserInfo;
+        try {
+            googleUserInfo = webClient.get()
+                    .uri("https://oauth2.googleapis.com/tokeninfo?id_token=" + request.getToken())
+                    .retrieve()
+                    .bodyToMono(GoogleUserInfo.class)
+                    .block();
+        } catch (Exception e) {
+            log.error("Error verifying Google ID token, trying as access token: {}", e.getMessage());
+            try {
+                googleUserInfo = webClient.get()
+                        .uri("https://www.googleapis.com/oauth2/v3/userinfo")
+                        .headers(h -> h.setBearerAuth(request.getToken()))
+                        .retrieve()
+                        .bodyToMono(GoogleUserInfo.class)
+                        .block();
+            } catch (Exception ex) {
+                log.error("Error verifying Google access token: {}", ex.getMessage());
+                throw new GlobalException(ErrorCode.UNAUTHORIZED);
+            }
+        }
+
+        if (googleUserInfo == null || googleUserInfo.getEmail() == null) {
+            throw new GlobalException(ErrorCode.UNAUTHORIZED);
+        }
+
+        User user = userRepo.findByEmail(googleUserInfo.getEmail())
+                .map(existingUser -> {
+                    existingUser.setGoogleId(googleUserInfo.getSub());
+                    
+                    if (existingUser.getStatus() == UserStatus.PENDING) {
+                        existingUser.setStatus(UserStatus.ACTIVE);
+                    }
+                    
+                    if (existingUser.getAvatarUrl() == null || existingUser.getAvatarUrl().isBlank()) {
+                        existingUser.setAvatarUrl(googleUserInfo.getPicture());
+                    }
+                    
+                    return userRepo.save(existingUser);
+                })
+                .orElseGet(() -> {
+                    User newUser = userMapper.toUser(googleUserInfo);
+                    newUser.setAuthProvider(AuthProvider.GOOGLE);
+                    newUser.setRole(UserRole.US);
+                    newUser.setStatus(UserStatus.ACTIVE);
+                    return userRepo.save(newUser);
+                });
+
+        String accessToken = tokenService.generateAccessToken(user);
+        
+        UserResponse userResponse = userMapper.toUserResponse(user);
+        userResponse.setAccessToken(accessToken);
+        userResponse.setRole(user.getRole());
+
+        return userResponse;
     }
 
     @Override

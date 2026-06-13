@@ -37,9 +37,6 @@ public class SecurityConfig {
     @Autowired
     Filter filter;
 
-    @Autowired
-    OAuth2LoginConfig oAuth2LoginConfig;
-
     public static final String[] SWAGGER = {
             "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml", "/v3/api-docs", "/error"
     };
@@ -66,10 +63,7 @@ public class SecurityConfig {
                         .requestMatchers(publicEndpoints.toArray(new String[0])).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("AD")
                         .requestMatchers("/api/user/**").hasAnyRole("US", "AD")
-                        .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .anyRequest().authenticated()
-                ).oauth2Login(oauth2 -> oauth2
-                        .successHandler(oAuth2LoginConfig)
                 )
                 // 401 Unauthorized: chưa xác thực (không có / sai token)
                 .exceptionHandling(ex -> ex
