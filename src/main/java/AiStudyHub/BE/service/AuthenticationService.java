@@ -215,30 +215,32 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                         .block();
             } catch (Exception ex) {
                 log.error("Error verifying Google access token: {}", ex.getMessage());
-                throw new GlobalException(ErrorCode.UNAUTHORIZED);
+                throw new GlobalException(ErrorCode.UNAUTHENTICATED);
             }
         }
 
         if (googleUserInfo == null || googleUserInfo.getEmail() == null) {
-            throw new GlobalException(ErrorCode.UNAUTHORIZED);
+            throw new GlobalException(ErrorCode.UNAUTHENTICATED);
         }
 
-        User user = userRepo.findByEmail(googleUserInfo.getEmail())
+        final GoogleUserInfo finalUserInfo = googleUserInfo;
+
+        User user = userRepo.findByEmail(finalUserInfo.getEmail())
                 .map(existingUser -> {
-                    existingUser.setGoogleId(googleUserInfo.getSub());
+                    existingUser.setGoogleId(finalUserInfo.getSub());
                     
                     if (existingUser.getStatus() == UserStatus.PENDING) {
                         existingUser.setStatus(UserStatus.ACTIVE);
                     }
                     
                     if (existingUser.getAvatarUrl() == null || existingUser.getAvatarUrl().isBlank()) {
-                        existingUser.setAvatarUrl(googleUserInfo.getPicture());
+                        existingUser.setAvatarUrl(finalUserInfo.getPicture());
                     }
                     
                     return userRepo.save(existingUser);
                 })
                 .orElseGet(() -> {
-                    User newUser = userMapper.toUser(googleUserInfo);
+                    User newUser = userMapper.toUser(finalUserInfo);
                     newUser.setAuthProvider(AuthProvider.GOOGLE);
                     newUser.setRole(UserRole.US);
                     newUser.setStatus(UserStatus.ACTIVE);
