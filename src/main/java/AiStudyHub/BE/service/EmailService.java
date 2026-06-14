@@ -21,15 +21,21 @@ public class EmailService implements IEmail {
     @Override
     @Async
     public CompletableFuture<Boolean> sendOtpEmail(String toEmail, String otpCode) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(toEmail);
-        message.setSubject("Verify your AI Study Hub account");
-        message.setText(
-                "Your OTP code is: " + otpCode +
-                        "\nThis code will expire in 5 minutes."
-        );
-        mailSender.send(message);
-        return CompletableFuture.completedFuture(true);
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(toEmail);
+            message.setSubject("Verify your AI Study Hub account");
+            message.setText(
+                    "Your OTP code is: " + otpCode +
+                            "\nThis code will expire in 5 minutes."
+            );
+            mailSender.send(message);
+            return CompletableFuture.completedFuture(true);
+        } catch (Exception e) {
+            // Runs on an async thread: log the failure instead of silently swallowing it.
+            log.error("Failed to send OTP email to {}: {}", toEmail, e.getMessage());
+            return CompletableFuture.completedFuture(false);
+        }
     }
 
 }

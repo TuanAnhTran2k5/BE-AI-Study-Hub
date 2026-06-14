@@ -11,9 +11,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.constraint.ModerationStatus;
 import AiStudyHub.BE.constraint.VisibilityStatus;
+import AiStudyHub.BE.dto.Request.DocumentUpdateRequest;
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
 import AiStudyHub.BE.dto.Response.DocumentDeleteResponse;
 import AiStudyHub.BE.dto.Response.DocumentDownloadResponse;
+import AiStudyHub.BE.dto.Response.DocumentUpdateResponse;
 import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
 import AiStudyHub.BE.dto.Response.FileUploadResponse;
 
@@ -34,6 +36,7 @@ import AiStudyHub.BE.mapper.DocumentMapper;
 import AiStudyHub.BE.service.impl.IDocument;
 import AiStudyHub.BE.service.impl.IStorageService;
 import AiStudyHub.BE.service.impl.ISupabaseStorage;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +46,7 @@ import java.time.LocalDateTime;
 import java.util.HexFormat;
 
 @Service
+@Slf4j
 public class DocumentService implements IDocument {
 
     @Autowired
@@ -66,6 +70,7 @@ public class DocumentService implements IDocument {
     private IStorageService storageService;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public DocumentUploadResponse uploadDocument(DocumentUploadRequest request) throws Exception {
 
         User owner = userRepo.findById(request.getOwnerId())
@@ -83,40 +88,47 @@ public class DocumentService implements IDocument {
 
         FileUploadResponse fileMetadata = supabaseStorageService.uploadFile(request.getFile(), null);
 
+        // File is already on Supabase. If any later DB step fails, the file would
+        // become an orphan, so clean it up before propagating the error.
+        try {
+            VisibilityStatus visibilityStatus =
+                    request.getVisibilityStatus() == null
+                            ? VisibilityStatus.PRIVATE
+                            : request.getVisibilityStatus();
 
-        VisibilityStatus visibilityStatus =
-                request.getVisibilityStatus() == null
-                        ? VisibilityStatus.PRIVATE
-                        : request.getVisibilityStatus();
+            Document document = documentMapper.toDocument(request);
+            document.setOwner(owner);
+            document.setSubject(subject);
+            document.setFileName(fileMetadata.getOriginalFileName());
+            document.setFileUrl(fileMetadata.getPublicUrl());
+            document.setFileType(fileMetadata.getContentType());
+            document.setFileSize(fileMetadata.getFileSize());
+            document.setContentHashSha256(hashSha256(fileBytes));
+            document.setVisibilityStatus(visibilityStatus);
+            document.setModerationStatus(ModerationStatus.NORMAL);
+            document.setAverageRating(0.0);
+            document.setRatingCount(0);
+            document.setDownloadCount(0);
+            document.setBookmarkCount(0);
+            document.setReportCount(0);
 
-        Document document = documentMapper.toDocument(request);
-        document.setOwner(owner);
-        document.setSubject(subject);
-        document.setFileName(fileMetadata.getOriginalFileName());
-        document.setFileUrl(fileMetadata.getPublicUrl());
-        document.setFileType(fileMetadata.getContentType());
-        document.setFileSize(fileMetadata.getFileSize());
-        document.setContentHashSha256(hashSha256(fileBytes));
-        document.setVisibilityStatus(visibilityStatus);
-        document.setModerationStatus(ModerationStatus.NORMAL);
-        document.setAverageRating(0.0);
-        document.setRatingCount(0);
-        document.setDownloadCount(0);
-        document.setBookmarkCount(0);
-        document.setReportCount(0);
+            document = documentRepo.save(document);
 
-        document = documentRepo.save(document);
+            // After uploading + saving the document, add the capacity
+            storageService.increaseStorage(owner, fileSize);
+            userRepo.save(owner);
 
+            return documentMapper.toDocumentUploadResponse(document);
 
-        // After uploading + saving the document, add the capacity
-        storageService.increaseStorage(owner, fileSize);
-        userRepo.save(owner);
-
-        return documentMapper.toDocumentUploadResponse(document);
+        } catch (Exception ex) {
+            // Compensating action: remove the orphaned file from storage.
+            safeDeleteFile(fileMetadata.getPublicUrl());
+            throw ex;
+        }
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public DocumentDeleteResponse deleteDocument(Long documentId) throws Exception {
         Document document = documentRepo.findById(documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
@@ -129,9 +141,9 @@ public class DocumentService implements IDocument {
         Long fileSize = document.getFileSize() == null ? 0L : document.getFileSize();
 
         User owner = document.getOwner();
+        String fileUrl = document.getFileUrl();
 
-        supabaseStorageService.deleteFile(document.getFileUrl());
-
+        // Do all DB work first so the transaction can roll back cleanly if anything fails.
         long deletedRows = documentRepo.deleteByDocumentId(documentId);
 
         if (deletedRows == 0) {
@@ -139,11 +151,17 @@ public class DocumentService implements IDocument {
         }
 
         storageService.decreaseStorage(owner, fileSize);
+        userRepo.save(owner);
+
+        // External storage deletion happens LAST: if it throws, the DB transaction
+        // rolls back and the document row + file both remain (consistent state).
+        supabaseStorageService.deleteFile(fileUrl);
 
         return response;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public DocumentDownloadResponse downloadPublicDocument(Long documentId) throws Exception {
         Document publicDocument = documentRepo.findById(documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
@@ -173,80 +191,91 @@ public class DocumentService implements IDocument {
                 publicDocument.getFileType()
         );
 
-        Document privateDocument = Document.builder()
-                .owner(currentUser)
-                .subject(publicDocument.getSubject())
-                .title(publicDocument.getTitle())
-                .visibilityStatus(VisibilityStatus.PRIVATE)
-                .moderationStatus(publicDocument.getModerationStatus())
-                .averageRating(0.0)
-                .fileName(uploadResponse.getStoredFileName())
-                .fileUrl(uploadResponse.getPublicUrl())
-                .fileType(uploadResponse.getContentType())
-                .fileSize(uploadResponse.getFileSize())
-                .build();
+        // The copy already exists in storage. If any DB step below fails, the
+        // transaction rolls back but the copied file would be orphaned, so we
+        // remove it in the compensating catch block.
+        try {
+            Document privateDocument = Document.builder()
+                    .owner(currentUser)
+                    .subject(publicDocument.getSubject())
+                    .title(publicDocument.getTitle())
+                    .visibilityStatus(VisibilityStatus.PRIVATE)
+                    .moderationStatus(publicDocument.getModerationStatus())
+                    .averageRating(0.0)
+                    .fileName(uploadResponse.getStoredFileName())
+                    .fileUrl(uploadResponse.getPublicUrl())
+                    .fileType(uploadResponse.getContentType())
+                    .fileSize(uploadResponse.getFileSize())
+                    .build();
 
-        privateDocument = documentRepo.save(privateDocument);
-        storageService.increaseStorage(currentUser, uploadResponse.getFileSize());
+            privateDocument = documentRepo.save(privateDocument);
+            storageService.increaseStorage(currentUser, uploadResponse.getFileSize());
+            userRepo.save(currentUser);
 
-        boolean firstDownload = !downloadRepo.existsByUserAndDocument(currentUser, publicDocument);
-        Integer addedPoint = 0;
+            boolean firstDownload = !downloadRepo.existsByUserAndDocument(currentUser, publicDocument);
+            Integer addedPoint = 0;
 
-        publicDocument.setDownloadCount(
-                publicDocument.getDownloadCount() == null ? 1 : publicDocument.getDownloadCount() + 1
-        );
-        documentRepo.save(publicDocument);
+            publicDocument.setDownloadCount(
+                    publicDocument.getDownloadCount() == null ? 1 : publicDocument.getDownloadCount() + 1
+            );
+            documentRepo.save(publicDocument);
 
-        Download download = Download.builder()
-                .user(currentUser)
-                .document(publicDocument)
-                .scoreAwarded(false)
-                .build();
+            Download download = Download.builder()
+                    .user(currentUser)
+                    .document(publicDocument)
+                    .scoreAwarded(false)
+                    .build();
 
-        if (firstDownload) {
-            if (!publicOwner.getUserId().equals(currentUser.getUserId())) {
-                ScoreType scoreType = scoreTypeRepo.findByTypeCode("DOC_DOWNLOAD")
-                        .orElseGet(() -> {
-                            ScoreType newType = ScoreType.builder()
-                                    .typeCode("DOC_DOWNLOAD")
-                                    .typeName("Document Download")
-                                    .defaultPoint(5)
-                                    .description("Score awarded when another user downloads your document")
-                                    .build();
-                            return scoreTypeRepo.save(newType);
-                        });
+            if (firstDownload) {
+                if (!publicOwner.getUserId().equals(currentUser.getUserId())) {
+                    ScoreType scoreType = scoreTypeRepo.findByTypeCode("DOC_DOWNLOAD")
+                            .orElseGet(() -> {
+                                ScoreType newType = ScoreType.builder()
+                                        .typeCode("DOC_DOWNLOAD")
+                                        .typeName("Document Download")
+                                        .defaultPoint(5)
+                                        .description("Score awarded when another user downloads your document")
+                                        .build();
+                                return scoreTypeRepo.save(newType);
+                            });
 
-                Long currentScore = publicOwner.getTotalScore() == null ? 0L : publicOwner.getTotalScore();
-                addedPoint = scoreType.getDefaultPoint();
-                publicOwner.setTotalScore(currentScore + addedPoint);
-                userRepo.save(publicOwner);
+                    Long currentScore = publicOwner.getTotalScore() == null ? 0L : publicOwner.getTotalScore();
+                    addedPoint = scoreType.getDefaultPoint();
+                    publicOwner.setTotalScore(currentScore + addedPoint);
+                    userRepo.save(publicOwner);
 
-                ScoreLog scoreLog = ScoreLog.builder()
-                        .user(publicOwner)
-                        .document(publicDocument)
-                        .scoreType(scoreType)
-                        .scoreChange(addedPoint)
-                        .description("Awarded " + addedPoint + " points because " + currentUser.getFullName() + " downloaded your document: " + publicDocument.getTitle())
-                        .build();
-                scoreLogRepo.save(scoreLog);
+                    ScoreLog scoreLog = ScoreLog.builder()
+                            .user(publicOwner)
+                            .document(publicDocument)
+                            .scoreType(scoreType)
+                            .scoreChange(addedPoint)
+                            .description("Awarded " + addedPoint + " points because " + currentUser.getFullName() + " downloaded your document: " + publicDocument.getTitle())
+                            .build();
+                    scoreLogRepo.save(scoreLog);
 
-                download.setScoreAwarded(true);
+                    download.setScoreAwarded(true);
+                }
             }
+
+            downloadRepo.save(download);
+
+            DocumentDownloadResponse response = documentMapper.toDocumentDownloadResponse(
+                    privateDocument,
+                    firstDownload,
+                    addedPoint,
+                    publicOwner.getTotalScore(),
+                    LocalDateTime.now()
+            );
+
+            response.setPublicOwnerName(publicOwnerName);
+
+            return response;
+
+        } catch (Exception ex) {
+            // Compensating action: remove the orphaned copied file from storage.
+            safeDeleteFile(uploadResponse.getPublicUrl());
+            throw ex;
         }
-        
-        downloadRepo.save(download);
-
-        DocumentDownloadResponse response = documentMapper.toDocumentDownloadResponse(
-                privateDocument,
-                firstDownload,
-                addedPoint,
-                publicOwner.getTotalScore(),
-                LocalDateTime.now()
-        );
-
-        response.setPublicOwnerName(publicOwnerName);
-
-        return response;
     }
 
     @Override
@@ -287,10 +316,67 @@ public class DocumentService implements IDocument {
     }
 
 
-    // ----------------------------------------------------------------------
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentUpdateResponse updateDocument(Long documentId, DocumentUpdateRequest request) {
+        User currentUser = getCurrentUser();                       // 401 if not authenticated
+
+        Document document = documentRepo.findById(documentId)      // 404 if not found
+                .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (!document.getOwner().getUserId().equals(currentUser.getUserId())) { // 403 if not owner
+            throw new GlobalException(ErrorCode.FORBIDDEN_UPDATE_DOCUMENT);
+        }
+
+        applyPartialUpdate(document, request);
+
+        Document saved = documentRepo.save(document);              // @PreUpdate
+
+        return documentMapper.toDocumentUpdateResponse(saved);
+    }
+
+
+    // --------------------------------------------------------------------------------------------
+
+    private boolean applyPartialUpdate(Document document, DocumentUpdateRequest request) {
+        // title
+        if (request.getTitle() != null) {
+            if (request.getTitle().trim().isEmpty()) {
+                throw new GlobalException(ErrorCode.FIELD_REQUIRED);
+            }
+            document.setTitle(request.getTitle().trim());
+        } // else: keep current
+
+        // subjectId
+        if (request.getSubjectId() != null) {
+            Subject subject = subjectRepo.findById(request.getSubjectId())
+                    .orElseThrow(() -> new GlobalException(ErrorCode.SUBJECT_NOT_FOUND));
+            document.setSubject(subject);
+        } // else: keep current
+
+        // visibilityStatus
+        if (request.getVisibilityStatus() != null) {               // handled at deserialization
+            document.setVisibilityStatus(request.getVisibilityStatus());
+        } // else: keep current
+        return true;
+    }
+
     private String hashSha256(byte[] data) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         return HexFormat.of().formatHex(digest.digest(data));
+    }
+
+    private boolean safeDeleteFile(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return true;
+        }
+        try {
+            supabaseStorageService.deleteFile(fileUrl);
+        } catch (Exception cleanupError) {
+            log.error("Failed to clean up orphaned file after rollback: url={}, reason={}",
+                    fileUrl, cleanupError.getMessage());
+        }
+        return true;
     }
 
     private User getCurrentUser() {

@@ -3,10 +3,12 @@ package AiStudyHub.BE.controller;
 import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.constraint.VisibilityStatus;
 
+import AiStudyHub.BE.dto.Request.DocumentUpdateRequest;
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.DocumentDeleteResponse;
 import AiStudyHub.BE.dto.Response.DocumentDownloadResponse;
+import AiStudyHub.BE.dto.Response.DocumentUpdateResponse;
 import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
@@ -88,6 +90,16 @@ public class DocumentController {
         );
     }
 
-
+    @Operation(summary = "Update Document (partial)")
+    @PatchMapping(value = "/{documentId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<APIResponse<DocumentUpdateResponse>> updateDocument(
+            @PathVariable Long documentId,
+            @org.springframework.web.bind.annotation.RequestBody DocumentUpdateRequest request
+    ) {
+        DocumentUpdateResponse response = documentService.updateDocument(documentId, request);
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Update document successfully", response)
+        );
+    }
 
 }

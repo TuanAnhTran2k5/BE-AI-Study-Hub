@@ -140,9 +140,15 @@ WHERE subject_type = 'COMBO';
 INSERT INTO score_type (type_code, type_name, default_point)
 VALUES
     ('UPLOAD_PUBLIC', 'Upload public document', 5),
-    ('DOWNLOAD', 'Document downloaded', 2),
+-- typeCode must match DocumentService.downloadPublicDocument (find-or-create 'DOC_DOWNLOAD', +5)
+    ('DOC_DOWNLOAD', 'Document downloaded', 5),
     ('BOOKMARK', 'Document bookmarked', 3),
     ('GOOD_RATING', 'Good rating received', 5),
+
+-- Rating reputation (daily job; actual score is computed dynamically from the
+-- average-rating threshold table: +10/+8/+5/+2/+1/-5 when ratingCount >= 10,
+-- so default_point here is nominal/unused by the job logic).
+    ('RATING_REPUTATION', 'Daily rating reputation (computed by average-rating threshold)', 0),
 
 -- Report Management - Level 1
     ('REPORT_MINOR_FIRST_PENALTY', 'Minor report first penalty', -5),
