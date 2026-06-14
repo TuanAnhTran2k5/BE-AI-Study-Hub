@@ -59,6 +59,18 @@ public class RankingBadgeController {
                 .build());
     }
 
+    @GetMapping("/top-weekly")
+    public ResponseEntity<APIResponse<List<WeeklyScoreResponse>>> getTopWeeklyContributors(
+            @RequestParam(defaultValue = "10") int limit) {
+        List<WeeklyScoreResponse> responses = rankingBadgeService.getTopWeeklyContributors(limit);
+
+        return ResponseEntity.ok(APIResponse.<List<WeeklyScoreResponse>>builder()
+                .code(200)
+                .message("Fetched top weekly contributors successfully")
+                .result(responses)
+                .build());
+    }
+
     @GetMapping("/users/{userId}/badges")
     public ResponseEntity<APIResponse<List<UserBadgeResponse>>> getUserBadges(@PathVariable Long userId) {
         List<UserBadgeResponse> responses = rankingBadgeService.getUserBadges(userId);

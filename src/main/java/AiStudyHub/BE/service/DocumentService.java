@@ -263,6 +263,7 @@ public class DocumentService implements IDocument {
 
                     // Re-evaluate rank due to score change
                     rankingBadgeService.updateUserRank(publicOwner.getUserId());
+                    rankingBadgeService.addWeeklyScore(publicOwner.getUserId(), addedPoint);
                 }
             }
 

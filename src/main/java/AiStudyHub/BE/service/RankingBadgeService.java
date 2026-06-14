@@ -4,6 +4,7 @@ import AiStudyHub.BE.dto.Response.BadgeResponse;
 import AiStudyHub.BE.dto.Response.RankingResponse;
 import AiStudyHub.BE.dto.Response.UserBadgeResponse;
 import AiStudyHub.BE.dto.Response.UserRankResponse;
+import AiStudyHub.BE.dto.Response.WeeklyScoreResponse;
 import AiStudyHub.BE.entity.*;
 import AiStudyHub.BE.repository.*;
 import AiStudyHub.BE.service.impl.IRankingBadgeService;
@@ -225,6 +226,25 @@ public class RankingBadgeService implements IRankingBadgeService {
                                 .build())
                         .build()
         ).toList();
+    }
+
+    @Override
+    public List<WeeklyScoreResponse> getTopWeeklyContributors(int limit) {
+        LocalDate currentWeekStart = calculateWeekStart(LocalDate.now());
+        
+        return weeklyScoreRepo.findByWeekStart(currentWeekStart).stream()
+                .filter(ws -> ws.getScore() != null && ws.getScore() > 0)
+                .sorted(Comparator.comparingInt(WeeklyScore::getScore).reversed())
+                .limit(limit)
+                .map(ws -> WeeklyScoreResponse.builder()
+                        .userId(ws.getUser().getUserId())
+                        .fullName(ws.getUser().getFullName())
+                        .avatarUrl(ws.getUser().getAvatarUrl())
+                        .email(ws.getUser().getEmail())
+                        .score(ws.getScore())
+                        .weekStart(ws.getWeekStart())
+                        .build())
+                .toList();
     }
 
     // ==========================================

@@ -5,6 +5,8 @@ import AiStudyHub.BE.dto.Response.RankingResponse;
 import AiStudyHub.BE.dto.Response.UserBadgeResponse;
 import AiStudyHub.BE.dto.Response.UserRankResponse;
 
+import AiStudyHub.BE.dto.Response.WeeklyScoreResponse;
+
 import java.util.List;
 
 public interface IRankingBadgeService {
@@ -17,4 +19,5 @@ public interface IRankingBadgeService {
     List<BadgeResponse> getAllBadges();
     UserRankResponse getUserRank(Long userId);
     List<UserBadgeResponse> getUserBadges(Long userId);
+    List<WeeklyScoreResponse> getTopWeeklyContributors(int limit);
 }
