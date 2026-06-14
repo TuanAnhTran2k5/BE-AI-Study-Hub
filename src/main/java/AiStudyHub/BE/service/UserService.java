@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
+
 @Service
 @Slf4j
 public class UserService implements IUser {
@@ -36,7 +38,9 @@ public class UserService implements IUser {
 
         UpdateProfileResponse response = userMapper.toUpdateProfileResponse(user);
         
-        response.setRank(userRankRepo.findByUser(user).map(ur ->
+        response.setRank(userRankRepo.findByUser(user).stream()
+                .max(Comparator.comparing(AiStudyHub.BE.entity.UserRank::getAchievedAt))
+                .map(ur ->
                 UserRankResponse.builder()
                         .userRankId(ur.getUserRankId())
                         .userId(user.getUserId())

@@ -18,16 +18,13 @@ public class UpdateProfileResponse {
 
     String fullName;
     String avatarUrl;
-    @Builder.Default
-    Long totalScore = 0L;
+    Long totalScore;
     String email;
 
     UserRole role;
 
-    @Builder.Default
-    Long storageUsed = 0L;
-    @Builder.Default
-    Long storageLimit = 0L;
+    Long storageUsed;
+    Long storageLimit;
 
     UserRankResponse rank;
     List<UserBadgeResponse> badges;

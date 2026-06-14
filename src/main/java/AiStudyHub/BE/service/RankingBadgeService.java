@@ -19,10 +19,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
-import static java.util.stream.Collectors.toList;
 
 @Service
 @RequiredArgsConstructor
@@ -48,19 +48,19 @@ public class RankingBadgeService implements IRankingBadgeService {
 
         // 1. First Upload
         if (!userDocs.isEmpty()) {
-            awardBadgeIfNotExist(user, "First Upload");
+            awardBadgeNotExist(user, "First Upload");
         }
 
         // 2. Helpful Student
         boolean hasHelpfulDoc = userDocs.stream().anyMatch(doc -> doc.getDownloadCount() != null && doc.getDownloadCount() >= 50);
         if (hasHelpfulDoc) {
-            awardBadgeIfNotExist(user, "Helpful Student");
+            awardBadgeNotExist(user, "Helpful Student");
         }
 
         // 3. Trusted Author
         int totalDownloads = userDocs.stream().mapToInt(doc -> doc.getDownloadCount() == null ? 0 : doc.getDownloadCount()).sum();
         if (totalDownloads >= 500) {
-            awardBadgeIfNotExist(user, "Trusted Author");
+            awardBadgeNotExist(user, "Trusted Author");
         }
         
         return true;
@@ -69,35 +69,38 @@ public class RankingBadgeService implements IRankingBadgeService {
     @Override
     @Transactional
     public boolean updateUserRank(Long userId) {
+        // Find User
         User user = userRepo.findById(userId).orElse(null);
         if (user == null) return false;
-
+        // Get total score of User
         int score = user.getTotalScore() == null ? 0 : user.getTotalScore().intValue();
         
         // Find highest rank qualified
         List<Ranking> allRanks = rankingRepo.findAll();
         Optional<Ranking> qualifiedRankOpt = allRanks.stream()
                 .filter(r -> r.getMinScore() <= score)
-                .max(java.util.Comparator.comparingInt(Ranking::getMinScore));
+                .max(Comparator.comparingInt(Ranking::getMinScore));
         if (qualifiedRankOpt.isEmpty()) return false;
 
+        // Get the new rank after find
         Ranking newRank = qualifiedRankOpt.get();
         
         List<UserRank> history = userRankRepo.findByUser(user);
         Optional<UserRank> currentUserRankOpt = history.stream()
-                .max(java.util.Comparator.comparing(UserRank::getAchievedAt));
+                .max(Comparator.comparing(UserRank::getAchievedAt));
         
         if (currentUserRankOpt.isPresent()) {
             UserRank current = currentUserRankOpt.get();
             // Compare priority to see if it's an upgrade
             int currentPriority = Integer.parseInt(current.getRank().getDisplayPriority());
             int newPriority = Integer.parseInt(newRank.getDisplayPriority());
+            // If rank has changed save data rank in DB
             if (newPriority != currentPriority) {
                 userRankRepo.save(UserRank.builder()
                         .user(user)
                         .rank(newRank)
                         .build());
-                
+                // if user have condition to upgrade rank
                 if (newPriority > currentPriority) {
                     updateUserStorageLimit(user, newRank);
                     log.info("Upgraded user {} to rank {}", user.getEmail(), newRank.getRankName());
@@ -128,11 +131,11 @@ public class RankingBadgeService implements IRankingBadgeService {
         List<WeeklyScore> top3 = weeklyScoreRepo.findByWeekStart(currentWeekStart).stream()
                 .sorted(java.util.Comparator.comparingInt(WeeklyScore::getScore).reversed())
                 .limit(3)
-                .collect(toList());
+                .toList();
         
         for (WeeklyScore ws : top3) {
             if (ws.getScore() != null && ws.getScore() > 0) {
-                awardBadgeIfNotExist(ws.getUser(), "Top Weekly Contributor");
+                awardBadgeNotExist(ws.getUser(), "Top Weekly Contributor");
             }
         }
         log.info("Top Weekly Contributor job finished.");
@@ -163,7 +166,7 @@ public class RankingBadgeService implements IRankingBadgeService {
                         .storageBonus(rank.getStorageBonus())
                         .displayPriority(rank.getDisplayPriority())
                         .build()
-        ).collect(toList());
+        ).toList();
     }
 
     @Override
@@ -176,7 +179,7 @@ public class RankingBadgeService implements IRankingBadgeService {
                         .conditionText(badge.getConditionText())
                         .iconUrl(badge.getIconUrl())
                         .build()
-        ).collect(toList());
+        ).toList();
     }
 
     @Override
@@ -221,14 +224,14 @@ public class RankingBadgeService implements IRankingBadgeService {
                                 .iconUrl(ub.getBadge().getIconUrl())
                                 .build())
                         .build()
-        ).collect(toList());
+        ).toList();
     }
 
     // ==========================================
     //          PRIVATE HELPER METHODS
     // ==========================================
 
-    private boolean awardBadgeIfNotExist(User user, String badgeName) {
+    private boolean awardBadgeNotExist(User user, String badgeName) {
         Optional<Badge> badgeOpt = badgeRepo.findByBadgeName(badgeName);
         if (badgeOpt.isEmpty()) return false;
         

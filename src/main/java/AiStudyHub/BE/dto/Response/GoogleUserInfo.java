@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Data
 @Builder
@@ -17,10 +18,13 @@ public class GoogleUserInfo {
     String aud;
     String sub;
     String email;
-    String email_verified;
+    @JsonProperty("email_verified")
+    String emailVerified;
     String name;
     String picture;
-    String given_name;
-    String family_name;
+    @JsonProperty("given_name")
+    String givenName;
+    @JsonProperty("family_name")
+    String familyName;
     String locale;
 }

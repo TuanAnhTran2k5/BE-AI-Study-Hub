@@ -42,7 +42,7 @@ public class BookmarkService implements IBookmark {
                 .orElseThrow(() -> new GlobalException(ErrorCode.NOT_FOUND));
 
         // Check if already bookmarked to prevent duplicate insertions
-        if (bookmarkRepo.existsByUser_UserIdAndDocument_DocumentId(userId, request.getDocumentId())) {
+        if (bookmarkRepo.existsByUserUserIdAndDocumentDocumentId(userId, request.getDocumentId())) {
             throw new GlobalException(400, "Document already bookmarked");
         }
 
@@ -63,23 +63,20 @@ public class BookmarkService implements IBookmark {
 
     @Override
     @Transactional
-    public void removeBookmark(Long userId, Long documentId) {
-        if (!bookmarkRepo.existsByUser_UserIdAndDocument_DocumentId(userId, documentId)) {
-            throw new GlobalException(ErrorCode.NOT_FOUND);
-        }
+    public boolean removeBookmark(Long userId, Long documentId) {
+        Bookmark bookmark = bookmarkRepo.findByUserUserIdAndDocumentDocumentId(userId, documentId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.NOT_FOUND));
 
-        // Single DB DELETE query (transactional/modifying)
-        bookmarkRepo.deleteByUser_UserIdAndDocument_DocumentId(userId, documentId);
+        bookmarkRepo.delete(bookmark);
 
         // Update the document's bookmarkCount cache
-        Document document = documentRepo.findById(documentId)
-                .orElseThrow(() -> new GlobalException(ErrorCode.NOT_FOUND));
-        
+        Document document = bookmark.getDocument();
         int currentCount = document.getBookmarkCount() != null ? document.getBookmarkCount() : 0;
         if (currentCount > 0) {
             document.setBookmarkCount(currentCount - 1);
             documentRepo.save(document);
         }
+        return true;
     }
 
     @Override
@@ -89,8 +86,7 @@ public class BookmarkService implements IBookmark {
             throw new GlobalException(ErrorCode.USER_NOT_FOUND);
         }
 
-        // JOIN FETCH avoids N+1 queries during response mapping
-        List<Bookmark> bookmarks = bookmarkRepo.findByUser_UserIdWithDocument(userId);
+        List<Bookmark> bookmarks = bookmarkRepo.findByUserUserId(userId);
         return bookmarks.stream()
                 .map(bookmarkMapper::toResponse)
                 .toList();
@@ -99,6 +95,6 @@ public class BookmarkService implements IBookmark {
     @Override
     @Transactional(readOnly = true)
     public boolean isBookmarked(Long userId, Long documentId) {
-        return bookmarkRepo.existsByUser_UserIdAndDocument_DocumentId(userId, documentId);
+        return bookmarkRepo.existsByUserUserIdAndDocumentDocumentId(userId, documentId);
     }
 }
