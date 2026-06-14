@@ -36,6 +36,7 @@ import AiStudyHub.BE.mapper.DocumentMapper;
 import AiStudyHub.BE.service.impl.IDocument;
 import AiStudyHub.BE.service.impl.IStorageService;
 import AiStudyHub.BE.service.impl.ISupabaseStorage;
+import AiStudyHub.BE.service.impl.IRankingBadgeService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -68,6 +69,9 @@ public class DocumentService implements IDocument {
 
     @Autowired
     private IStorageService storageService;
+
+    @Autowired
+    private IRankingBadgeService rankingBadgeService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -117,6 +121,8 @@ public class DocumentService implements IDocument {
             // After uploading + saving the document, add the capacity
             storageService.increaseStorage(owner, fileSize);
             userRepo.save(owner);
+
+            rankingBadgeService.checkAndAwardBadges(owner.getUserId());
 
             return documentMapper.toDocumentUploadResponse(document);
 
@@ -254,10 +260,16 @@ public class DocumentService implements IDocument {
                     scoreLogRepo.save(scoreLog);
 
                     download.setScoreAwarded(true);
+
+                    // Re-evaluate rank due to score change
+                    rankingBadgeService.updateUserRank(publicOwner.getUserId());
                 }
             }
 
             downloadRepo.save(download);
+
+            // Re-evaluate badges due to download count increase
+            rankingBadgeService.checkAndAwardBadges(publicOwner.getUserId());
 
             DocumentDownloadResponse response = documentMapper.toDocumentDownloadResponse(
                     privateDocument,

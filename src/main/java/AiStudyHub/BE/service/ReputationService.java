@@ -41,6 +41,9 @@ public class ReputationService implements IReputation {
     @Autowired
     private RatingRepo ratingRepo;
 
+    @Autowired
+    private AiStudyHub.BE.service.impl.IRankingBadgeService rankingBadgeService;
+
     // Self-reference so that applyReputation(Document) is invoked through the Spring proxy.
     // This keeps each per-document call inside its own @Transactional boundary, giving the
     // fault isolation required (a failed document does not roll back already-committed
@@ -116,6 +119,9 @@ public class ReputationService implements IReputation {
                 .description("Reputation " + (change >= 0 ? "+" : "") + change
                         + " for avg=" + avg + ", count=" + count)
                 .build());
+
+        rankingBadgeService.updateUserRank(owner.getUserId());
+        rankingBadgeService.addWeeklyScore(owner.getUserId(), change);
 
         return true;
     }

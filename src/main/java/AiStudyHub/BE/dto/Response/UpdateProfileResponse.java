@@ -5,6 +5,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.util.List;
+
 @Data
 @Builder
 @AllArgsConstructor
@@ -26,4 +28,7 @@ public class UpdateProfileResponse {
     Long storageUsed = 0L;
     @Builder.Default
     Long storageLimit = 0L;
+
+    UserRankResponse rank;
+    List<UserBadgeResponse> badges;
 }
