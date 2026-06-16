@@ -15,4 +15,8 @@ public interface DocumentRepo extends JpaRepository<Document, Long> {
     List<Document> findByVisibilityStatusAndRatingCountGreaterThanEqual(VisibilityStatus visibilityStatus, Integer minCount);
 
     List<Document> findByVisibilityStatus(VisibilityStatus visibilityStatus);
+
+    List<Document> findByVisibilityStatusAndSimHashContentIsNotNull(VisibilityStatus visibilityStatus);
+
+    List<Document> findByOwner(AiStudyHub.BE.entity.User owner);
 }

@@ -1,10 +1,7 @@
 package AiStudyHub.BE.service;
 
 import AiStudyHub.BE.constraint.VisibilityStatus;
-import AiStudyHub.BE.entity.Document;
-import AiStudyHub.BE.entity.ScoreLog;
-import AiStudyHub.BE.entity.ScoreType;
-import AiStudyHub.BE.entity.User;
+import AiStudyHub.BE.entity.*;
 import AiStudyHub.BE.repository.DocumentRepo;
 import AiStudyHub.BE.repository.RatingRepo;
 import AiStudyHub.BE.repository.ScoreLogRepo;
@@ -41,16 +38,13 @@ public class ReputationService implements IReputation {
     @Autowired
     private RatingRepo ratingRepo;
 
-    // Self-reference so that applyReputation(Document) is invoked through the Spring proxy.
-    // This keeps each per-document call inside its own @Transactional boundary, giving the
-    // fault isolation required (a failed document does not roll back already-committed
-    // documents).
+    @Autowired
+    private AiStudyHub.BE.service.impl.IRankingBadgeService rankingBadgeService;
+
     @Autowired
     @Lazy
     private IReputation self;
 
-    // Scheduled entry point. Processes each eligible document, isolating failures per document so a
-    // single failure does not stop the job. Returns the number of documents processed successfully.
     @Override
     @Scheduled(cron = "${reputation.job.cron:0 0 2 * * *}")
     public int runDailyReputation() {
@@ -75,9 +69,6 @@ public class ReputationService implements IReputation {
         return processed;
     }
 
-    // Applies the reputation threshold table for a single document inside its own transaction.
-    // Loads the document by id within the transaction so its lazy owner can be initialized.
-    // Returns true if a reputation change was applied, false if the document did not qualify.
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean applyReputation(Long documentId) {
@@ -117,6 +108,9 @@ public class ReputationService implements IReputation {
                         + " for avg=" + avg + ", count=" + count)
                 .build());
 
+        rankingBadgeService.updateUserRank(owner.getUserId());
+        rankingBadgeService.addWeeklyScore(owner.getUserId(), change);
+
         return true;
     }
 
@@ -125,13 +119,13 @@ public class ReputationService implements IReputation {
     public boolean recomputeAllAggregates() {
         List<Document> docsWithRatings = documentRepo.findByVisibilityStatus(VisibilityStatus.PUBLIC);
         for (Document doc : docsWithRatings) {
-            List<AiStudyHub.BE.entity.Rating> ratings = ratingRepo.findByDocument(doc);
+            List<Rating> ratings = ratingRepo.findByDocument(doc);
             int count = ratings.size();
             if (count == 0) {
                 doc.setRatingCount(0);
                 doc.setAverageRating(0.0);
             } else {
-                double avg = ratings.stream().mapToDouble(AiStudyHub.BE.entity.Rating::getRatingValue).average().orElse(0.0);
+                double avg = ratings.stream().mapToDouble(Rating::getRatingValue).average().orElse(0.0);
                 doc.setRatingCount(count);
                 doc.setAverageRating(round2(avg));
             }

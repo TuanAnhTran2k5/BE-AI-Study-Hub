@@ -36,14 +36,13 @@ import AiStudyHub.BE.mapper.DocumentMapper;
 import AiStudyHub.BE.service.impl.IDocument;
 import AiStudyHub.BE.service.impl.IStorageService;
 import AiStudyHub.BE.service.impl.ISupabaseStorage;
+import AiStudyHub.BE.service.impl.IRankingBadgeService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.MessageDigest;
 import java.time.LocalDateTime;
-import java.util.HexFormat;
 
 @Service
 @Slf4j
@@ -68,6 +67,12 @@ public class DocumentService implements IDocument {
 
     @Autowired
     private IStorageService storageService;
+
+    @Autowired
+    private IRankingBadgeService rankingBadgeService;
+
+    @Autowired
+    private DuplicateCheckService duplicateCheckService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -103,7 +108,6 @@ public class DocumentService implements IDocument {
             document.setFileUrl(fileMetadata.getPublicUrl());
             document.setFileType(fileMetadata.getContentType());
             document.setFileSize(fileMetadata.getFileSize());
-            document.setContentHashSha256(hashSha256(fileBytes));
             document.setVisibilityStatus(visibilityStatus);
             document.setModerationStatus(ModerationStatus.NORMAL);
             document.setAverageRating(0.0);
@@ -114,11 +118,22 @@ public class DocumentService implements IDocument {
 
             document = documentRepo.save(document);
 
+            // Trigger Synchronous Duplicate Check
+            Document duplicatedDoc = duplicateCheckService.performDuplicateCheck(document.getDocumentId(), fileBytes);
+
             // After uploading + saving the document, add the capacity
             storageService.increaseStorage(owner, fileSize);
             userRepo.save(owner);
 
-            return documentMapper.toDocumentUploadResponse(document);
+            rankingBadgeService.checkAndAwardBadges(owner.getUserId());
+
+            DocumentUploadResponse response = documentMapper.toDocumentUploadResponse(document);
+            if (duplicatedDoc != null) {
+                response.setVisibilityStatus(VisibilityStatus.PRIVATE);
+                response.setMessage(String.format("Your file is uploaded successfully, but it is set to private mode due to duplication with document '%s' (File: %s).", 
+                        duplicatedDoc.getTitle(), duplicatedDoc.getFileName()));
+            }
+            return response;
 
         } catch (Exception ex) {
             // Compensating action: remove the orphaned file from storage.
@@ -206,6 +221,7 @@ public class DocumentService implements IDocument {
                     .fileUrl(uploadResponse.getPublicUrl())
                     .fileType(uploadResponse.getContentType())
                     .fileSize(uploadResponse.getFileSize())
+                    .simHashContent(publicDocument.getSimHashContent())
                     .build();
 
             privateDocument = documentRepo.save(privateDocument);
@@ -254,10 +270,17 @@ public class DocumentService implements IDocument {
                     scoreLogRepo.save(scoreLog);
 
                     download.setScoreAwarded(true);
+
+                    // Re-evaluate rank due to score change
+                    rankingBadgeService.updateUserRank(publicOwner.getUserId());
+                    rankingBadgeService.addWeeklyScore(publicOwner.getUserId(), addedPoint);
                 }
             }
 
             downloadRepo.save(download);
+
+            // Re-evaluate badges due to download count increase
+            rankingBadgeService.checkAndAwardBadges(publicOwner.getUserId());
 
             DocumentDownloadResponse response = documentMapper.toDocumentDownloadResponse(
                     privateDocument,
@@ -359,11 +382,6 @@ public class DocumentService implements IDocument {
             document.setVisibilityStatus(request.getVisibilityStatus());
         } // else: keep current
         return true;
-    }
-
-    private String hashSha256(byte[] data) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        return HexFormat.of().formatHex(digest.digest(data));
     }
 
     private boolean safeDeleteFile(String fileUrl) {

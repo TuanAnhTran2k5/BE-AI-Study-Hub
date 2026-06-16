@@ -51,7 +51,7 @@ public class Document {
     Long fileSize;
 
     @Column(columnDefinition = "TEXT")
-    String contentHashSha256;
+    String simHashContent;
 
     @Builder.Default
     Integer ratingCount = 0;
