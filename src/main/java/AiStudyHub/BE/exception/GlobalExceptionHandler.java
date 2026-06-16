@@ -20,26 +20,27 @@ public class GlobalExceptionHandler {
                 ? exception.getCode() // HTTP status code value
                 : HttpStatus.INTERNAL_SERVER_ERROR.value();
 
-        return ResponseEntity.status(status).body(APIResponse.response(status, exception.getMessage(),null));
+        return ResponseEntity.status(status).body(APIResponse.response(status, exception.getMessage(), null));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    // Catches validation exceptions from the Bean Validation library and returns errors to the client
+    // Catches validation exceptions from the Bean Validation library and returns
+    // errors to the client
     public ResponseEntity<APIResponse<Object>> handleValidation(MethodArgumentNotValidException exception) {
         List<String> errors = exception
                 .getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(error ->{
+                .map(error -> {
                     String enumKey = error.getDefaultMessage();
                     ErrorCode errorCode;
                     try {
                         errorCode = ErrorCode.valueOf(enumKey);
-                    }catch (IllegalArgumentException e) {
+                    } catch (IllegalArgumentException e) {
                         errorCode = ErrorCode.FIELD_REQUIRED;
                     }
                     return error.getField() + " " + errorCode.getMessage();
                 }).toList();
-        return ResponseEntity.badRequest().body(APIResponse.response(400,"validation error",errors));
+        return ResponseEntity.badRequest().body(APIResponse.response(400, "validation error", errors));
     }
 }

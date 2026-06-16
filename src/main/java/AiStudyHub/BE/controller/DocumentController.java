@@ -34,16 +34,10 @@ public class DocumentController {
     private DocumentService documentService;
 
     @Operation(summary = "Upload Document")
-    @RequestBody(
-            content = @Content(
-                    mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
-                    schema = @Schema(implementation = DocumentUploadRequest.class)
-            )
-    )
+    @RequestBody(content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE, schema = @Schema(implementation = DocumentUploadRequest.class)))
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<APIResponse<DocumentUploadResponse>> uploadFile(
-            @Valid @ModelAttribute DocumentUploadRequest request
-    ) throws Exception {
+            @Valid @ModelAttribute DocumentUploadRequest request) throws Exception {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof User currentUser)) {
@@ -58,8 +52,21 @@ public class DocumentController {
         DocumentUploadResponse response = documentService.uploadDocument(request);
 
         return ResponseEntity.ok(
-                APIResponse.response(200, "Upload document successfully", response)
-        );
+                APIResponse.response(200, "Upload document successfully", response));
+    }
+
+    @Operation(summary = "Delete Document")
+    @DeleteMapping("/{documentId}")
+    public ResponseEntity<APIResponse<Void>> deleteDocument(@PathVariable Long documentId) throws Exception {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof User currentUser)) {
+            throw new GlobalException(ErrorCode.INVALID_TOKEN);
+        }
+
+        documentService.deleteDocument(documentId, currentUser);
+
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Delete document successfully", null));
     }
 
 }
