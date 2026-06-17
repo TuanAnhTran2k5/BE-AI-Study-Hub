@@ -38,10 +38,10 @@ public class GlobalExceptionHandler {
                 ));
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ExceptionHandler(org.springframework.validation.BindException.class)
     // Catches validation exceptions from the Bean Validation library and returns
-    // errors to the client
-    public ResponseEntity<APIResponse<Object>> handleValidation(MethodArgumentNotValidException exception) {
+    // errors to the client (handles both @RequestBody and @ModelAttribute validations)
+    public ResponseEntity<APIResponse<Object>> handleValidation(org.springframework.validation.BindException exception) {
         List<String> errors = exception
                 .getBindingResult()
                 .getFieldErrors()
