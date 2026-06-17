@@ -38,16 +38,10 @@ public class DocumentController {
     private RatingService ratingService;
 
     @Operation(summary = "Upload Document")
-    @RequestBody(
-            content = @Content(
-                    mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
-                    schema = @Schema(implementation = DocumentUploadRequest.class)
-            )
-    )
+    @RequestBody(content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE, schema = @Schema(implementation = DocumentUploadRequest.class)))
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<APIResponse<DocumentUploadResponse>> uploadFile(
-            @Valid @ModelAttribute DocumentUploadRequest request
-    ) throws Exception {
+            @Valid @ModelAttribute DocumentUploadRequest request) throws Exception {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !(authentication.getPrincipal() instanceof User currentUser)) {
@@ -62,10 +56,10 @@ public class DocumentController {
         DocumentUploadResponse response = documentService.uploadDocument(request);
 
         return ResponseEntity.ok(
-                APIResponse.response(200, "Upload document successfully", response)
-        );
+                APIResponse.response(200, "Upload document successfully", response));
     }
 
+    @Operation(summary = "Delete Document")
     @DeleteMapping("/{documentId}")
     public ResponseEntity<APIResponse<DocumentDeleteResponse>> deleteDocument(@PathVariable Long documentId) throws Exception {
         DocumentDeleteResponse response = documentService.deleteDocument(documentId);
