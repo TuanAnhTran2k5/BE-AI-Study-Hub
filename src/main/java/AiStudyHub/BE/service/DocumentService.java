@@ -138,14 +138,16 @@ public class DocumentService implements IDocument {
 
             // Auto-index in RAG system if it's a supported format (PDF, DOCX, TXT)
             String contentType = fileMetadata.getContentType();
-            if (contentType != null && (
-                    contentType.equals("application/pdf") ||
-                    contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document") ||
-                    contentType.equals("text/plain") ||
-                    fileMetadata.getOriginalFileName().endsWith(".pdf") ||
-                    fileMetadata.getOriginalFileName().endsWith(".docx") ||
-                    fileMetadata.getOriginalFileName().endsWith(".txt")
-            )) {
+            String originalFileName = fileMetadata.getOriginalFileName();
+            String lowerFileName = originalFileName != null ? originalFileName.toLowerCase() : "";
+            if ((contentType != null && (
+                    contentType.equalsIgnoreCase("application/pdf") ||
+                    contentType.equalsIgnoreCase("application/vnd.openxmlformats-officedocument.wordprocessingml.document") ||
+                    contentType.equalsIgnoreCase("text/plain")
+            )) || 
+            lowerFileName.endsWith(".pdf") ||
+            lowerFileName.endsWith(".docx") ||
+            lowerFileName.endsWith(".txt")) {
                 try {
                     logger.info("Auto-indexing document '{}' in RAG system...", document.getFileName());
                     RagDocument ragDoc = RagDocument.builder()

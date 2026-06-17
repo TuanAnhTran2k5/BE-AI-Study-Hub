@@ -144,7 +144,7 @@ public class RagChatServiceImpl implements RagChatService {
                     .toList();
 
             FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
-            Filter.Expression filterExpression = filterBuilder.in("documentId", accessibleIdStrings).build();
+            Filter.Expression filterExpression = filterBuilder.in("documentId", accessibleIdStrings.toArray()).build();
 
             SearchRequest searchRequest = SearchRequest.builder()
                     .query(question)

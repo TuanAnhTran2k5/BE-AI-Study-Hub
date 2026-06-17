@@ -18,7 +18,7 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
-    
+
 @Service
 public class SupabaseStoreService implements ISupabaseStorage {
 
@@ -47,7 +47,7 @@ public class SupabaseStoreService implements ISupabaseStorage {
     public FileUploadResponse uploadFile(MultipartFile file, String folder) throws Exception {
         String originalFileName = file.getOriginalFilename();
         String sanitizedFileName = sanitizeFileName(originalFileName);
-        String storedFileName    = UUID.randomUUID() + "_" + sanitizedFileName;
+        String storedFileName = UUID.randomUUID() + "_" + sanitizedFileName;
 
         // Build the storage path inside the bucket
         String storagePath = (folder != null && !folder.isBlank())
@@ -82,8 +82,7 @@ public class SupabaseStoreService implements ISupabaseStorage {
                 "%s/storage/v1/object/%s/%s",
                 supabaseUrl,
                 supabaseBucket,
-                storagePath
-        );
+                storagePath);
 
         try {
             logger.info("Deleting Supabase file: path={}, url={}", storagePath, deleteUrl);
@@ -105,8 +104,18 @@ public class SupabaseStoreService implements ISupabaseStorage {
                     storagePath,
                     deleteUrl,
                     e.getStatusCode(),
-                    e.getResponseBodyAsString()
-            );
+                    e.getResponseBodyAsString());
+
+            // Handle the case where the file is already deleted or missing
+            int statusCode = e.getStatusCode().value();
+            String responseBody = e.getResponseBodyAsString();
+            if (statusCode == 404 ||
+                    (statusCode == 400 && responseBody != null
+                            && (responseBody.contains("not_found") || responseBody.contains("Object not found")))) {
+                logger.warn("File already missing from Supabase storage, treating deletion as successful: path={}",
+                        storagePath);
+                return "Deleted file successfully (file was already missing): " + storagePath;
+            }
 
             throw new GlobalException(ErrorCode.FILE_DELETE_FAILED);
         }
@@ -120,8 +129,7 @@ public class SupabaseStoreService implements ISupabaseStorage {
                 "%s/storage/v1/object/%s/%s",
                 supabaseUrl,
                 supabaseBucket,
-                storagePath
-        );
+                storagePath);
 
         try {
             logger.info("Downloading Supabase file: path={}, url={}", storagePath, downloadUrl);
@@ -139,15 +147,15 @@ public class SupabaseStoreService implements ISupabaseStorage {
                     storagePath,
                     downloadUrl,
                     e.getStatusCode(),
-                    e.getResponseBodyAsString()
-            );
+                    e.getResponseBodyAsString());
 
             throw new GlobalException(ErrorCode.FILE_DOWNLOAD_FAILED);
         }
     }
 
     @Override
-    public FileUploadResponse uploadBytes(byte[] data, String originalFileName, String folder, String contentType) throws Exception {
+    public FileUploadResponse uploadBytes(byte[] data, String originalFileName, String folder, String contentType)
+            throws Exception {
         String sanitizedFileName = sanitizeFileName(originalFileName);
         String storedFileName = UUID.randomUUID() + "_" + sanitizedFileName;
 
@@ -163,8 +171,7 @@ public class SupabaseStoreService implements ISupabaseStorage {
                 "%s/storage/v1/object/%s/%s",
                 supabaseUrl,
                 supabaseBucket,
-                storagePath
-        );
+                storagePath);
 
         try {
             webClient.post()
@@ -194,36 +201,33 @@ public class SupabaseStoreService implements ISupabaseStorage {
                     storagePath,
                     uploadUrl,
                     e.getStatusCode(),
-                    e.getResponseBodyAsString()
-            );
+                    e.getResponseBodyAsString());
 
             throw new GlobalException(ErrorCode.FILE_UPLOAD_FAILED);
         }
     }
 
-
-    //-----------------------------------------------------------------------------
+    // -----------------------------------------------------------------------------
     private boolean doUpload(String storagePath, byte[] fileBytes, String contentType) {
         String uploadUrl = String.format(
                 "%s/storage/v1/object/%s/%s",
                 supabaseUrl,
                 supabaseBucket,
-                storagePath
-        );
+                storagePath);
 
         logger.info("Uploading on Supabase: {}", uploadUrl);
 
         try {
             webClient.post()
-                     .uri(uploadUrl)
-                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + supabaseKey)
-                     .header("apikey", supabaseKey)
-                     .header("x-upsert", "false")
-                     .header(HttpHeaders.CONTENT_TYPE, contentType)
-                     .bodyValue(fileBytes)
-                     .retrieve()
-                     .bodyToMono(String.class)
-                     .block();
+                    .uri(uploadUrl)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + supabaseKey)
+                    .header("apikey", supabaseKey)
+                    .header("x-upsert", "false")
+                    .header(HttpHeaders.CONTENT_TYPE, contentType)
+                    .bodyValue(fileBytes)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
 
         } catch (WebClientResponseException e) {
             logger.error("Upload Fail: path={}, status={}, body={}",
@@ -235,22 +239,22 @@ public class SupabaseStoreService implements ISupabaseStorage {
 
     private String buildPublicUrl(String storagePath) {
         String encodedPath = URLEncoder.encode(storagePath, StandardCharsets.UTF_8)
-                                       .replace("+", "%20")
-                                       .replace("%2F", "/"); // keep the slash character as-is
+                .replace("+", "%20")
+                .replace("%2F", "/"); // keep the slash character as-is
 
         return String.format(
                 "%s/storage/v1/object/public/%s/%s",
                 supabaseUrl,
                 supabaseBucket,
-                encodedPath
-        );
+                encodedPath);
     }
+
     private String sanitizeFileName(String fileName) {
         if (fileName == null || fileName.isBlank()) {
             return "file";
         }
         String sanitized = fileName.replaceAll("\\s+", "_")
-                                   .replaceAll("[^a-zA-Z0-9._-]", "");
+                .replaceAll("[^a-zA-Z0-9._-]", "");
         return sanitized.isBlank() ? "file" : sanitized;
     }
 

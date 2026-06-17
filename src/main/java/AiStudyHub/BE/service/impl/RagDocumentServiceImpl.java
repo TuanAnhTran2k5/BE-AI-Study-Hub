@@ -48,6 +48,7 @@ public class RagDocumentServiceImpl implements RagDocumentService {
     private final VectorStore vectorStore;
     private final TokenTextSplitter textSplitter;
     private final RagDocumentMapper ragDocumentMapper;
+    private final ISupabaseStorage supabaseStorageService;
 
     private void checkAuthorization(Document mainDoc, String action) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -91,8 +92,8 @@ public class RagDocumentServiceImpl implements RagDocumentService {
         }
 
         try {
-            log.info("Downloading document content from URL: {}", mainDoc.getFileUrl());
-            byte[] fileBytes = URI.create(mainDoc.getFileUrl()).toURL().openStream().readAllBytes();
+            log.info("Downloading document content via Supabase Storage service from URL: {}", mainDoc.getFileUrl());
+            byte[] fileBytes = supabaseStorageService.downloadFile(mainDoc.getFileUrl());
             
             // Clean up existing RAG resources before re-indexing
             cleanExistingRagResources(ragDoc);
