@@ -74,6 +74,7 @@ public class TokenService implements IToken {
         try {
             // 1. Decode Token
             Jwt jwt = jwtDecoder.decode(token);
+            
             String subject = jwt.getSubject();
             if (subject == null) {
                 throw new GlobalException(ErrorCode.INVALID_TOKEN_SUBJECT);

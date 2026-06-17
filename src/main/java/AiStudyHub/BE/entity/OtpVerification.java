@@ -34,6 +34,7 @@ public class OtpVerification {
 
     LocalDateTime expiredAt;
     LocalDateTime verifiedAt;
+    @Builder.Default
     Boolean isUse = false;
     LocalDateTime createdAt;
 

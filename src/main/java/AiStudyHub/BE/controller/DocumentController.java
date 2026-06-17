@@ -3,12 +3,14 @@ package AiStudyHub.BE.controller;
 import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.constraint.VisibilityStatus;
 
+import AiStudyHub.BE.dto.Request.DocumentUpdateRequest;
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
-import AiStudyHub.BE.dto.Response.APIResponse;
-import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
+import AiStudyHub.BE.dto.Request.RatingRequest;
+import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.service.DocumentService;
+import AiStudyHub.BE.service.RatingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -32,6 +34,8 @@ public class DocumentController {
 
     @Autowired
     private DocumentService documentService;
+    @Autowired
+    private RatingService ratingService;
 
     @Operation(summary = "Upload Document")
     @RequestBody(
@@ -62,4 +66,52 @@ public class DocumentController {
         );
     }
 
+    @DeleteMapping("/{documentId}")
+    public ResponseEntity<APIResponse<DocumentDeleteResponse>> deleteDocument(@PathVariable Long documentId) throws Exception {
+        DocumentDeleteResponse response = documentService.deleteDocument(documentId);
+
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Delete document successfully", response));
+    }
+
+    @PostMapping("/{documentId}/download/public")
+    public ResponseEntity<APIResponse<DocumentDownloadResponse>> downloadPublicDocument(
+            @PathVariable Long documentId
+    ) throws Exception {
+
+        DocumentDownloadResponse response = documentService.downloadPublicDocument(documentId);
+
+        return ResponseEntity.ok(
+                APIResponse.response(
+                        200,
+                        "Download public document successfully",
+                        response
+                )
+        );
+    }
+
+    @Operation(summary = "Update Document (partial)")
+    @PatchMapping(value = "/{documentId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<APIResponse<DocumentUpdateResponse>> updateDocument(
+            @PathVariable Long documentId,
+            @org.springframework.web.bind.annotation.RequestBody DocumentUpdateRequest request
+    ) {
+        DocumentUpdateResponse response = documentService.updateDocument(documentId, request);
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Update document successfully", response)
+        );
+    }
+
+
+    @Operation(summary = "Submit or update a rating for a public document")
+    @PostMapping(value = "/{documentId}/rating", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<APIResponse<RatingResponse>> submitRating(
+            @PathVariable Long documentId,
+            @org.springframework.web.bind.annotation.RequestBody RatingRequest request
+    ) {
+        RatingResponse response = ratingService.submitRating(documentId, request);
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Submit rating successfully", response)
+        );
+    }
 }

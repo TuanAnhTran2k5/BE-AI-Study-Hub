@@ -5,6 +5,7 @@ import AiStudyHub.BE.dto.Response.APIResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,6 +22,20 @@ public class GlobalExceptionHandler {
                 : HttpStatus.INTERNAL_SERVER_ERROR.value();
 
         return ResponseEntity.status(status).body(APIResponse.response(status, exception.getMessage(),null));
+    }
+
+    // Catch-all: any unhandled exception returns a generic 500 instead of leaking
+    // a stack trace / Spring's default error page to the client.
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<APIResponse<Object>> handleUnexpected(Exception exception) {
+        log.error("Unhandled exception", exception);
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(APIResponse.response(
+                        HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                        "Internal server error",
+                        null
+                ));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -41,5 +56,12 @@ public class GlobalExceptionHandler {
                     return error.getField() + " " + errorCode.getMessage();
                 }).toList();
         return ResponseEntity.badRequest().body(APIResponse.response(400,"validation error",errors));
+    }
+
+    // Handles malformed request bodies (e.g. invalid enum values or bad JSON) that
+    // Jackson cannot deserialize, returning a 400 instead of the catch-all 500.
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<APIResponse<Object>> handleNotReadable(HttpMessageNotReadableException exception) {
+        return ResponseEntity.badRequest().body(APIResponse.response(400, "Invalid request body", null));
     }
 }
