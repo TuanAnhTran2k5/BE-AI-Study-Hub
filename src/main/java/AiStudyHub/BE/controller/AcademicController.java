@@ -43,7 +43,7 @@ public class AcademicController {
     public ResponseEntity<APIResponse<List<SubjectResponse>>> getSubjectsBySemester(
             @PathVariable Long semesterId
     ) {
-        List<SubjectResponse> result = subjectRepo.findBySemester_SemesterId(semesterId)
+        List<SubjectResponse> result = subjectRepo.findBySemesterSemesterId(semesterId)
                                                   .stream()
                                                   .map(this::toSubjectResponse)
                                                   .toList();
@@ -58,8 +58,10 @@ public class AcademicController {
             @PathVariable Long semesterId,
             @PathVariable Long comboId
     ) {
-        List<SubjectResponse> result = subjectRepo.findSubjectsBySemesterAndCombo(semesterId, comboId)
-                                                  .stream()
+        List<Subject> baseSubjects = subjectRepo.findBySemesterSemesterIdAndComboSubjectIsNull(semesterId);
+        List<Subject> comboSubjects = subjectRepo.findBySemesterSemesterIdAndComboSubjectComboId(semesterId, comboId);
+        
+        List<SubjectResponse> result = java.util.stream.Stream.concat(baseSubjects.stream(), comboSubjects.stream())
                                                   .map(this::toSubjectResponse)
                                                   .toList();
 

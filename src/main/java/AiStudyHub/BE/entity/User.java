@@ -52,11 +52,14 @@ public class User implements UserDetails {
     UserRole role;
 
     //Limit Storage
+    @Builder.Default
     @Column(nullable = false)
     Long storageUsed = 0L;
+    @Builder.Default
     @Column(nullable = false)
     Long storageLimit = 2L * 1024 * 1024 * 1024; //2GB
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     UserStatus status = UserStatus.ACTIVE;

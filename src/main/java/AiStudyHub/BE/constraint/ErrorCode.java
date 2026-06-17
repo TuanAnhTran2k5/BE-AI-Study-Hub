@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.HttpStatus;
 
+
 @Getter
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @AllArgsConstructor
@@ -24,6 +25,7 @@ public enum ErrorCode {
     ),
 
     // Token
+    UNAUTHENTICATED("Unauthenticated", HttpStatus.UNAUTHORIZED),
     INVALID_TOKEN("Invalid token", HttpStatus.UNAUTHORIZED),
     INVALID_TOKEN_SUBJECT("Invalid token subject", HttpStatus.UNAUTHORIZED),
 
@@ -36,6 +38,12 @@ public enum ErrorCode {
     SUBJECT_NOT_FOUND("Subject not found", HttpStatus.NOT_FOUND),
     FILE_UPLOAD_FAILED("File upload to storage failed", HttpStatus.INTERNAL_SERVER_ERROR),
     FILE_DELETE_FAILED("File delete from storage failed", HttpStatus.INTERNAL_SERVER_ERROR),
+    DOCUMENT_NOT_FOUND("Document not found", HttpStatus.NOT_FOUND),
+    DOCUMENT_DELETE_FAILED("Delete document failed",  HttpStatus.INTERNAL_SERVER_ERROR),
+    FILE_DOWNLOAD_FAILED("Fail to download file", HttpStatus.INTERNAL_SERVER_ERROR),
+    DOCUMENT_NOT_PUBLIC("Document is not public", HttpStatus.FORBIDDEN),
+    FORBIDDEN_DOWNLOAD_CLOUD_DOCUMENT( "You can only download documents from your own cloud storage", HttpStatus.FORBIDDEN),
+    FORBIDDEN_UPDATE_DOCUMENT("You can only update your own documents", HttpStatus.FORBIDDEN),
 
     // Authentication
     EMAIL_ALREADY_EXISTS("Email already exists", HttpStatus.BAD_REQUEST),
@@ -51,6 +59,10 @@ public enum ErrorCode {
     // File storage
     FILE_TOO_LARGE("File exceeds 20MB", HttpStatus.BAD_REQUEST),
     STORAGE_LIMIT_EXCEEDED("2GB storage capacity exceeded", HttpStatus.BAD_REQUEST),
+
+    // Rating
+    INVALID_RATING_VALUE("Rating value must be an integer between 1 and 5", HttpStatus.BAD_REQUEST),
+    CANNOT_RATE_OWN_DOCUMENT("You cannot rate your own document", HttpStatus.FORBIDDEN),
     ;
 
 

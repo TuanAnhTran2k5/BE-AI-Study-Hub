@@ -20,8 +20,8 @@ public class UserRank {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long userRankId;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "userId", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "userId", nullable = false)
     User user;
 
     @ManyToOne(fetch = FetchType.LAZY)

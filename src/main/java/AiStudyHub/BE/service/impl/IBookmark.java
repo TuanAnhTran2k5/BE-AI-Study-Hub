@@ -9,7 +9,7 @@ public interface IBookmark {
 
     BookmarkResponse addBookmark(Long userId, BookmarkRequest request);
 
-    void removeBookmark(Long userId, Long documentId);
+    boolean removeBookmark(Long userId, Long documentId);
 
     List<BookmarkResponse> getBookmarksByUser(Long userId);
 
