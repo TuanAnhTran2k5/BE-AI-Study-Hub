@@ -2,7 +2,7 @@ package AiStudyHub.BE.controller;
 
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.RagDocumentResponse;
-import AiStudyHub.BE.service.RagDocumentService;
+import AiStudyHub.BE.service.impl.IRagDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class RagDocumentController {
 
-    private final RagDocumentService ragDocumentService;
+    private final IRagDocument ragDocumentService;
 
     /**
      * Manually triggers indexing of an existing document.
