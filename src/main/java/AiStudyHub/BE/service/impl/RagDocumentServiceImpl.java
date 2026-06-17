@@ -1,13 +1,17 @@
 package AiStudyHub.BE.service.impl;
 
-import AiStudyHub.BE.dto.Response.UploadDocumentResponse;
+import AiStudyHub.BE.dto.Response.RagDocumentResponse;
 import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.RagChunk;
 import AiStudyHub.BE.entity.RagDocument;
+import AiStudyHub.BE.entity.User;
+import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.exception.InvalidFileException;
 import AiStudyHub.BE.exception.RagProcessingException;
 import AiStudyHub.BE.exception.ResourceNotFoundException;
 import AiStudyHub.BE.exception.VectorStoreException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import AiStudyHub.BE.mapper.RagDocumentMapper;
 import AiStudyHub.BE.repository.DocumentRepo;
 import AiStudyHub.BE.repository.RagChunkRepository;
@@ -45,19 +49,32 @@ public class RagDocumentServiceImpl implements RagDocumentService {
     private final TokenTextSplitter textSplitter;
     private final RagDocumentMapper ragDocumentMapper;
 
+    private void checkAuthorization(Document mainDoc, String action) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof User currentUser)) {
+            throw new GlobalException(401, "Unauthorized - valid login required");
+        }
+        boolean isAdmin = currentUser.getRole().name().equals("AD");
+        boolean isOwner = mainDoc.getOwner().getUserId().equals(currentUser.getUserId());
+        if (!isAdmin && !isOwner) {
+            throw new GlobalException(403, "You do not have permission to " + action + " this document");
+        }
+    }
+
     @Override
     @Transactional
-    public UploadDocumentResponse indexDocument(Long documentId) {
+    public RagDocumentResponse indexDocument(Long documentId) {
         log.info("Triggering manual indexing for document ID: {}", documentId);
 
-        RagDocument ragDoc = ragDocumentRepository.findById(documentId)
+        Document mainDoc = documentRepo.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found with ID: " + documentId));
+
+        checkAuthorization(mainDoc, "index");
+
+        RagDocument ragDoc = ragDocumentRepository.findByDocumentId(documentId)
                 .orElse(null);
 
         if (ragDoc == null) {
-            // Check if it exists in main document database
-            Document mainDoc = documentRepo.findById(documentId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Document not found with ID: " + documentId));
-
             ragDoc = RagDocument.builder()
                     .documentId(mainDoc.getDocumentId())
                     .originalFileName(mainDoc.getFileName())
@@ -68,10 +85,6 @@ public class RagDocumentServiceImpl implements RagDocumentService {
                     .build();
             ragDoc = ragDocumentRepository.save(ragDoc);
         }
-
-        Long mainDocId = ragDoc.getDocumentId() != null ? ragDoc.getDocumentId() : documentId;
-        Document mainDoc = documentRepo.findById(mainDocId)
-                .orElseThrow(() -> new ResourceNotFoundException("Main document not found with ID: " + mainDocId));
 
         if (mainDoc.getFileUrl() == null || mainDoc.getFileUrl().isEmpty()) {
             throw new InvalidFileException("Main document file URL is empty");
@@ -94,15 +107,21 @@ public class RagDocumentServiceImpl implements RagDocumentService {
             throw new RagProcessingException("Failed to index document contents", e);
         }
 
-        return ragDocumentMapper.toUploadDocumentResponse(ragDoc);
+        return ragDocumentMapper.toRagDocumentResponse(ragDoc);
     }
 
     @Override
     @Transactional
     public void deleteDocument(Long documentId) {
-        log.info("Deleting RAG document with ID: {}", documentId);
-        RagDocument document = ragDocumentRepository.findById(documentId)
-                .orElseThrow(() -> new ResourceNotFoundException("RagDocument not found with ID: " + documentId));
+        log.info("Deleting RAG resources for document ID: {}", documentId);
+        
+        Document mainDoc = documentRepo.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found with ID: " + documentId));
+
+        checkAuthorization(mainDoc, "delete RAG index for");
+
+        RagDocument document = ragDocumentRepository.findByDocumentId(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("RagDocument not found with document ID: " + documentId));
 
         cleanExistingRagResources(document);
         ragDocumentRepository.delete(document);
@@ -110,10 +129,21 @@ public class RagDocumentServiceImpl implements RagDocumentService {
     }
 
     @Override
-    public UploadDocumentResponse getDocument(Long documentId) {
-        RagDocument document = ragDocumentRepository.findById(documentId)
-                .orElseThrow(() -> new ResourceNotFoundException("RagDocument not found with ID: " + documentId));
-        return ragDocumentMapper.toUploadDocumentResponse(document);
+    public RagDocumentResponse getDocument(Long documentId) {
+        log.info("Retrieving RAG document info for ID: {}", documentId);
+
+        Document mainDoc = documentRepo.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found with ID: " + documentId));
+
+        // Visibility check: anyone can view public, owner or admin can view private
+        boolean isPublic = mainDoc.getVisibilityStatus() == AiStudyHub.BE.constraint.VisibilityStatus.PUBLIC;
+        if (!isPublic) {
+            checkAuthorization(mainDoc, "view");
+        }
+
+        RagDocument document = ragDocumentRepository.findByDocumentId(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("RagDocument not found with document ID: " + documentId));
+        return ragDocumentMapper.toRagDocumentResponse(document);
     }
 
     @Transactional

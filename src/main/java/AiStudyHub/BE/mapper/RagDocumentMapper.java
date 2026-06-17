@@ -1,6 +1,6 @@
 package AiStudyHub.BE.mapper;
 
-import AiStudyHub.BE.dto.Response.UploadDocumentResponse;
+import AiStudyHub.BE.dto.Response.RagDocumentResponse;
 import AiStudyHub.BE.entity.RagDocument;
 import org.mapstruct.Mapper;
 
@@ -12,7 +12,7 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface RagDocumentMapper {
 
-    UploadDocumentResponse toUploadDocumentResponse(RagDocument document);
+    RagDocumentResponse toRagDocumentResponse(RagDocument document);
 
-    List<UploadDocumentResponse> toUploadDocumentResponseList(List<RagDocument> documents);
+    List<RagDocumentResponse> toRagDocumentResponseList(List<RagDocument> documents);
 }

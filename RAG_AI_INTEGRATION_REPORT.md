@@ -102,7 +102,7 @@ Tất cả code được triển khai dựa trên nguyên tắc **SOLID**, kiế
 10. **[RagChatService.java](file:///d:/BE-AI-Study-Hub/src/main/java/AiStudyHub/BE/service/RagChatService.java)** & **[RagChatServiceImpl.java](file:///d:/BE-AI-Study-Hub/src/main/java/AiStudyHub/BE/service/impl/RagChatServiceImpl.java)**
     * *Tác dụng:* Triển khai nghiệp vụ Core của chatbot thông minh (tìm kiếm vector tương đồng, dựng prompt context, lấy câu trả lời từ OpenAI và gắn nguồn đính kèm).
 11. **[RagChatController.java](file:///d:/BE-AI-Study-Hub/src/main/java/AiStudyHub/BE/controller/RagChatController.java)**
-    * *Tác dụng:* REST Controller expose API hỏi đáp tài liệu thông minh `/api/v1/rag/chat/ask` cho giao diện người dùng.
+     * *Tác dụng:* REST Controller expose API hỏi đáp tài liệu thông minh `/api/user/rag/chat/ask` cho giao diện người dùng.
 12. **[RagDocumentController.java](file:///d:/BE-AI-Study-Hub/src/main/java/AiStudyHub/BE/controller/RagDocumentController.java)**
     * *Tác dụng:* REST Controller quản lý trạng thái lập chỉ mục RAG (tra cứu trạng thái index, kích hoạt thủ công, xóa metadata).
 13. **DTOs:** `ChatRequest`, `ChatResponse`, `UploadDocumentResponse`, `RagChunkResponse`, `PaginatedResponse`.
@@ -151,7 +151,7 @@ Tải lên một tài liệu hợp lệ trong định dạng PDF, DOCX, hoặc T
 ### Bước 3: Hỏi đáp RAG thông minh
 Thực hiện truy vấn câu hỏi liên quan đến nội dung tài liệu vừa tải lên.
 * **Method:** `POST`
-* **URL:** `http://localhost:8080/api/v1/rag/chat/ask`
+* **URL:** `http://localhost:8080/api/user/rag/chat/ask`
 * **Headers:**
   * Key: `Authorization` | Value: `Bearer <MÃ_TOKEN_BƯỚC_1>`
   * Key: `Content-Type` | Value: `application/json`

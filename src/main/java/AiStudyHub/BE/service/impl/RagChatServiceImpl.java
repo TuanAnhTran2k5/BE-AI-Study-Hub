@@ -7,11 +7,17 @@ import AiStudyHub.BE.exception.VectorStoreException;
 import AiStudyHub.BE.service.RagChatService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import AiStudyHub.BE.entity.User;
+import AiStudyHub.BE.repository.DocumentRepo;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -31,6 +37,7 @@ public class RagChatServiceImpl implements RagChatService {
 
     private final VectorStore vectorStore;
     private final ChatClient chatClient;
+    private final DocumentRepo documentRepo;
 
     private static final String RAG_PROMPT_TEMPLATE = """
             You are an AI assistant.
@@ -112,8 +119,30 @@ public class RagChatServiceImpl implements RagChatService {
     public List<Document> retrieveRelevantChunks(String question) {
         try {
             log.info("Searching vector store for query: {}", question);
+
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            List<Long> accessibleIds;
+            if (auth != null && auth.getPrincipal() instanceof User currentUser) {
+                accessibleIds = documentRepo.findAccessibleDocumentIds(currentUser.getUserId());
+            } else {
+                accessibleIds = documentRepo.findPublicDocumentIds();
+            }
+
+            if (accessibleIds.isEmpty()) {
+                log.info("No documents are accessible to the user. Returning empty chunks.");
+                return List.of();
+            }
+
+            List<String> accessibleIdStrings = accessibleIds.stream()
+                    .map(Object::toString)
+                    .toList();
+
+            FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
+            Filter.Expression filterExpression = filterBuilder.in("documentId", accessibleIdStrings).build();
+
             SearchRequest searchRequest = SearchRequest.builder()
                     .query(question)
+                    .filterExpression(filterExpression)
                     .topK(5)
                     .build();
             return vectorStore.similaritySearch(searchRequest);

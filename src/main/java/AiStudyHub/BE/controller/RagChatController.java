@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
  * sourced from context extracted from uploaded documents.
  */
 @RestController
-@RequestMapping("/api/v1/rag/chat")
+@RequestMapping("/api/user/rag/chat")
 @RequiredArgsConstructor
 @Slf4j
 public class RagChatController {

@@ -154,7 +154,7 @@ public class DocumentService implements IDocument {
         if (ragDoc != null) {
             try {
                 logger.info("Deleting RAG resources for document ID: {}", documentId);
-                ragDocumentService.deleteDocument(ragDoc.getId());
+                ragDocumentService.deleteDocument(documentId);
             } catch (Exception e) {
                 logger.error("Error cleaning up RAG resources for document ID: {}", documentId, e);
             }

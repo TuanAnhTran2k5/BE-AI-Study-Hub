@@ -7,7 +7,7 @@ import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 /**
- * Response DTO containing the details of an uploaded document.
+ * Response DTO containing the RAG indexing details of a document.
  */
 @Data
 @Builder
@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class UploadDocumentResponse {
+public class RagDocumentResponse {
 
     Long id;
     String originalFileName;

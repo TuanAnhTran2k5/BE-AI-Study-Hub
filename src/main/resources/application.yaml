@@ -65,7 +65,7 @@ spring:
       qdrant:
         host: localhost
         port: 6334
-        collection-name: product-vectors
+        collection-name: studyhub-vectors
         use-tls: false
         initialize-schema: true
 

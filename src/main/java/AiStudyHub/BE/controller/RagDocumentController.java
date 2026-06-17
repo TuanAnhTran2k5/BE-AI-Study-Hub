@@ -1,7 +1,7 @@
 package AiStudyHub.BE.controller;
 
 import AiStudyHub.BE.dto.Response.APIResponse;
-import AiStudyHub.BE.dto.Response.UploadDocumentResponse;
+import AiStudyHub.BE.dto.Response.RagDocumentResponse;
 import AiStudyHub.BE.service.RagDocumentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
  * All endpoints are secured by default and require a valid JWT token.
  */
 @RestController
-@RequestMapping("/api/v1/rag/documents")
+@RequestMapping("/api/user/rag/documents")
 @RequiredArgsConstructor
 @Validated
 @Slf4j
@@ -29,9 +29,9 @@ public class RagDocumentController {
      * @return the updated metadata details of the document
      */
     @PostMapping("/{id}/index")
-    public ResponseEntity<APIResponse<UploadDocumentResponse>> indexDocument(@PathVariable Long id) {
+    public ResponseEntity<APIResponse<RagDocumentResponse>> indexDocument(@PathVariable Long id) {
         log.info("API Request: Trigger indexing for document ID {}", id);
-        UploadDocumentResponse response = ragDocumentService.indexDocument(id);
+        RagDocumentResponse response = ragDocumentService.indexDocument(id);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Document index triggered successfully", response)
         );
@@ -59,9 +59,9 @@ public class RagDocumentController {
      * @return details of the document
      */
     @GetMapping("/{id}")
-    public ResponseEntity<APIResponse<UploadDocumentResponse>> getDocument(@PathVariable Long id) {
+    public ResponseEntity<APIResponse<RagDocumentResponse>> getDocument(@PathVariable Long id) {
         log.info("API Request: Get document ID {}", id);
-        UploadDocumentResponse response = ragDocumentService.getDocument(id);
+        RagDocumentResponse response = ragDocumentService.getDocument(id);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Document retrieved successfully", response)
         );

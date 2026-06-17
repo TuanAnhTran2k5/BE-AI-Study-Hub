@@ -1,6 +1,6 @@
 package AiStudyHub.BE.service;
 
-import AiStudyHub.BE.dto.Response.UploadDocumentResponse;
+import AiStudyHub.BE.dto.Response.RagDocumentResponse;
 import AiStudyHub.BE.entity.RagDocument;
 
 /**
@@ -14,7 +14,7 @@ public interface RagDocumentService {
      * @param documentId the ID of the document to index
      * @return response DTO showing updated document status
      */
-    UploadDocumentResponse indexDocument(Long documentId);
+    RagDocumentResponse indexDocument(Long documentId);
 
     /**
      * Deletes a document, its metadata, database chunks, and corresponding vectors from Qdrant.
@@ -29,7 +29,7 @@ public interface RagDocumentService {
      * @param documentId the ID of the document
      * @return response DTO containing document details
      */
-    UploadDocumentResponse getDocument(Long documentId);
+    RagDocumentResponse getDocument(Long documentId);
 
     /**
      * Extracts text, chunks, embeds, and indexes document content from raw file bytes.
