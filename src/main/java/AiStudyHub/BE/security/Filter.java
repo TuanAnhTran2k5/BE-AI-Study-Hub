@@ -70,7 +70,6 @@ public class Filter extends OncePerRequestFilter {
         }
         if (token != null) {
             try{
-                log.info(token);
                 User user = tokenService.verifyAccessToken(token);
                 UsernamePasswordAuthenticationToken authentication
                         = new UsernamePasswordAuthenticationToken(user,null, user.getAuthorities());

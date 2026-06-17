@@ -34,8 +34,10 @@ public class ReportCase {
     @Column(nullable = false, length = 30)
     ReportSeverity caseLevel;
 
+    @Builder.Default
     Integer reportCount = 0;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     CaseStatus caseStatus = CaseStatus.OPEN;

@@ -29,5 +29,6 @@ public class DocumentUploadRequest {
     @NotNull(message = "FIELD_REQUIRED")
     Long subjectId;
 
+    @Builder.Default
     VisibilityStatus visibilityStatus = VisibilityStatus.PRIVATE;
 }

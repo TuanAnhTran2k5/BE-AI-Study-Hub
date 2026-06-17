@@ -51,6 +51,7 @@ public class Report {
 
     String evidenceUrl;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     ReportStatus status = ReportStatus.PENDING;

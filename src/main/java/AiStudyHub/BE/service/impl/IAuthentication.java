@@ -1,5 +1,10 @@
 package AiStudyHub.BE.service.impl;
 
+import AiStudyHub.BE.dto.Request.ForgotPasswordRequest;
+import AiStudyHub.BE.dto.Request.ResetPasswordRequest;
+import AiStudyHub.BE.dto.Request.ResendOtpRequest;
+import AiStudyHub.BE.dto.Response.ForgotPasswordResponse;
+import AiStudyHub.BE.dto.Response.ResendOtpResponse;
 import AiStudyHub.BE.dto.Request.LoginRequest;
 import AiStudyHub.BE.dto.Request.RegisterRequest;
 import AiStudyHub.BE.dto.Request.VerifyOtpRequest;
@@ -12,4 +17,14 @@ public interface IAuthentication {
     UserResponse login(LoginRequest loginRequest);
 
     UserResponse verifyEmail(VerifyOtpRequest request);
+
+    UserResponse googleLogin(AiStudyHub.BE.dto.Request.GoogleLoginRequest request);
+
+    boolean logout(AiStudyHub.BE.dto.Request.LogoutRequest request);
+
+    ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request);
+
+    void resetPassword(ResetPasswordRequest request);
+
+    ResendOtpResponse resendOtp(ResendOtpRequest request);
 }
