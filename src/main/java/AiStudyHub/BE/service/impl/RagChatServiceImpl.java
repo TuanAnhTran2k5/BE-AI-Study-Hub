@@ -123,9 +123,15 @@ public class RagChatServiceImpl implements RagChatService {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             List<Long> accessibleIds;
             if (auth != null && auth.getPrincipal() instanceof User currentUser) {
-                accessibleIds = documentRepo.findAccessibleDocumentIds(currentUser.getUserId());
+                accessibleIds = documentRepo.findByOwner_UserIdOrVisibilityStatus(currentUser.getUserId(), AiStudyHub.BE.constraint.VisibilityStatus.PUBLIC)
+                        .stream()
+                        .map(AiStudyHub.BE.entity.Document::getDocumentId)
+                        .toList();
             } else {
-                accessibleIds = documentRepo.findPublicDocumentIds();
+                accessibleIds = documentRepo.findByVisibilityStatus(AiStudyHub.BE.constraint.VisibilityStatus.PUBLIC)
+                        .stream()
+                        .map(AiStudyHub.BE.entity.Document::getDocumentId)
+                        .toList();
             }
 
             if (accessibleIds.isEmpty()) {
