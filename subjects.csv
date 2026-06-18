@@ -1,0 +1,67 @@
+SemesterNo,ComboCode,SubjectCode,SubjectName,SubjectType
+1,,CSI106,Introduction to Computer Science,CORE
+1,,SSL101c,Academic Skills for University Success,CORE
+1,,PRF192,Programming Fundamentals,CORE
+1,,MAE101,Mathematics for Engineering,CORE
+1,,CEA201,Computer Organization and Architecture,CORE
+2,,PRO192,Object-Oriented Programming,CORE
+2,,MAD101,Discrete Mathematics,CORE
+2,,OSG202,Operating Systems,CORE
+2,,WED201c,Web Design,CORE
+2,,NWC204,Computer Networking,CORE
+3,,JPD113,Elementary Japanese 1 - A1.1,CORE
+3,,CSD201,Data Structures and Algorithms,CORE
+3,,DBI202,Database Systems,CORE
+3,,MAS291,Statistics & Probability,CORE
+3,,LAB211,OOP with Java Lab,CORE
+4,,JPD123,Elementary Japanese 1 - A1.2,CORE
+4,,IOT102,Internet of Things,CORE
+4,,PRJ301,Java Web Application Development,CORE
+4,,SSG104,Communication and In-Group Working Skills,CORE
+4,,SWE202c,Introduction to Software Engineering,CORE
+5,,SWP391,Software Development Project,CORE
+5,,WDU203c,The UI/UX Design,CORE
+5,,SWR302,Software Requirements,CORE
+5,,SWT301,Software Testing,CORE
+6,,OJT202,On The Job Training,CORE
+6,,ENW493c,Research Methods & Academic Writing Skills,CORE
+7,,SWD392,Software Architecture and Design,CORE
+7,,EXE101,Experiential Entrepreneurship 1,CORE
+7,,PMG201c,Project Management,CORE
+8,,EXE201,Experiential Entrepreneurship 2,CORE
+8,,ITE302c,Ethics in IT,CORE
+8,,MLN122,Political Economics of Marxism - Leninism,CORE
+8,,MLN111,Philosophy of Marxism - Leninism,CORE
+8,,PRM393,Mobile Programming,CORE
+9,,MLN131,Scientific Socialism,CORE
+9,,VNR202,History of Vietnam Communist Party,CORE
+9,,HCM202,Ho Chi Minh Ideology,CORE
+9,,SEP490,SE Capstone Project,CORE
+5,SPRING_REACT,HSF302,Working with Spring Framework,COMBO
+7,SPRING_REACT,SBA301,Integrate Single Page Application with Spring Boot,COMBO
+8,SPRING_REACT,MSS301,Microservices with Spring Cloud,COMBO
+5,DOTNET,PRN212,Basic Cross-Platform Application Programming With .NET,COMBO
+7,DOTNET,PRN222,Advanced Cross-Platform Application Programming With .NET,COMBO
+7,DOTNET,PRU213,Game Programming with C#,COMBO
+8,DOTNET,PRN232,Building Cross-Platform Back-End Application With .NET,COMBO
+5,REACT_NODEJS,FER202,Front-End Web Development with React,COMBO
+7,REACT_NODEJS,SDN302,"Server-Side Development with NodeJS, Express, and MongoDB",COMBO
+8,REACT_NODEJS,WDP301,Web Development Project,COMBO
+5,JS,JPD133,Elementary Japanese 1 - A1/A2,COMBO
+7,JS,JPD316,Japanese Intermediate 1 - B1/B2,COMBO
+8,JS,JPD326,Japanese Intermediate 2 - B2.1,COMBO
+5,KS,KOR311,Korean 1,COMBO
+7,KS,KOR321,Korean 2,COMBO
+8,KS,KOR411,Korean 3,COMBO
+5,SAP,SAP341,SAP Introduction,COMBO
+7,SAP,SAP311,SAP Business Process,COMBO
+7,SAP,SAP331,SAP Configuration,COMBO
+8,SAP,SAP321,SAP Project,COMBO
+5,DS,DMS301m,Data Management System,COMBO
+7,DS,ADS301m,Applied Data Science,COMBO
+7,DS,DAT301m,Data Analytics,COMBO
+8,DS,DSS301,Data Science Specialization,COMBO
+5,SECURITY,CRY303c,Cryptography,COMBO
+7,SECURITY,ISC301,Information Security,COMBO
+7,SECURITY,ISC302,Advanced Information Security,COMBO
+8,SECURITY,CPV301,Cybersecurity Practice,COMBO

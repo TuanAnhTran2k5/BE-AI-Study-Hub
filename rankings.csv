@@ -1,0 +1,5 @@
+RankName,MinScore,MaxScore,StorageBonus,DisplayPriority
+Bronze,0,100,0,1
+Silver,101,300,524288000,2
+Gold,301,700,1073741824,3
+Elite Scholar,701,2147483647,2147483647,4

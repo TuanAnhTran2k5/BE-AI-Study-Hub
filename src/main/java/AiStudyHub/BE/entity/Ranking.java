@@ -22,6 +22,6 @@ public class Ranking {
     Integer minScore;
     Integer maxScore;
     @Builder.Default
-    Integer storageBonus = 0;
+    Long storageBonus = 0L;
     String displayPriority;
 }

@@ -8,13 +8,15 @@ import java.time.LocalDateTime;
 
 @Data
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class DocumentDeleteResponse {
-    Long documentId;
-    String title;
-    String fileName;
+public class DeleteResponse {
+    boolean success;
+    String message;
+    Long deletedId;
+    String entityName;
+    String entityIdentifier;
     LocalDateTime deletedAt;
 }

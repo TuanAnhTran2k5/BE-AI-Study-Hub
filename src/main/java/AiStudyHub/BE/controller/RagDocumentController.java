@@ -1,8 +1,9 @@
 package AiStudyHub.BE.controller;
 
 import AiStudyHub.BE.dto.Response.APIResponse;
+import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.RagDocumentResponse;
-import AiStudyHub.BE.service.RagDocumentService;
+import AiStudyHub.BE.service.impl.IRagDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class RagDocumentController {
 
-    private final RagDocumentService ragDocumentService;
+    private final IRagDocument ragDocumentService;
 
     /**
      * Manually triggers indexing of an existing document.
@@ -44,11 +45,11 @@ public class RagDocumentController {
      * @return clean response
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<APIResponse<Void>> deleteDocument(@PathVariable Long id) {
+    public ResponseEntity<APIResponse<DeleteResponse>> deleteDocument(@PathVariable Long id) {
         log.info("API Request: Delete document ID {}", id);
-        ragDocumentService.deleteDocument(id);
+        DeleteResponse deleteResponse = ragDocumentService.deleteDocument(id);
         return ResponseEntity.ok(
-                APIResponse.response(200, "Document deleted successfully from RAG pipeline", null)
+                APIResponse.response(200, "Document deleted successfully from RAG pipeline", deleteResponse)
         );
     }
 

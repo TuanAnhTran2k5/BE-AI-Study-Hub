@@ -3,7 +3,7 @@ package AiStudyHub.BE.controller;
 import AiStudyHub.BE.dto.Request.ChatRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.ChatResponse;
-import AiStudyHub.BE.service.RagChatService;
+import AiStudyHub.BE.service.impl.IRagChat;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class RagChatController {
 
-    private final RagChatService ragChatService;
+    private final IRagChat ragChatService;
 
     /**
      * Answers a question based on uploaded documents context.

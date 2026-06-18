@@ -1,6 +1,5 @@
-package AiStudyHub.BE.constraint;
+package AiStudyHub.BE.constraint.validator;
 
-import AiStudyHub.BE.constraint.validator.MaxFileSizeValidator;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
@@ -11,15 +10,19 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Custom validation constraint for validating uploaded file size limits.
+ * Custom validation constraint for validating uploaded file content types.
  */
 @Documented
-@Constraint(validatedBy = MaxFileSizeValidator.class)
+@Constraint(validatedBy = FileTypeValidator.class)
 @Target({ElementType.METHOD, ElementType.FIELD, ElementType.PARAMETER})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface MaxFileSize {
-    String message() default "FILE_TOO_LARGE";
+public @interface ValidFileType {
+    String message() default "INVALID_FORMAT";
     Class<?>[] groups() default {};
     Class<? extends Payload>[] payload() default {};
-    long maxBytes() default 20 * 1024 * 1024; // Default to 20MB
+    String[] allowedTypes() default {
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/plain"
+    };
 }

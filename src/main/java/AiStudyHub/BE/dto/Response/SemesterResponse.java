@@ -8,11 +8,8 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class RankingResponse {
-    Long rankId;
-    String rankName;
-    Integer minScore;
-    Integer maxScore;
-    Long storageBonus;
-    String displayPriority;
+public class SemesterResponse {
+    Long semesterId;
+    String semesterNo;
+    String description;
 }

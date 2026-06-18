@@ -1,6 +1,5 @@
 package AiStudyHub.BE.constraint.validator;
 
-import AiStudyHub.BE.constraint.MaxFileSize;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import org.springframework.web.multipart.MultipartFile;

@@ -20,11 +20,13 @@ public interface IAuthentication {
 
     UserResponse googleLogin(AiStudyHub.BE.dto.Request.GoogleLoginRequest request);
 
+    UserResponse verifyToken(AiStudyHub.BE.dto.Request.VerifyTokenRequest request);
+
     boolean logout(AiStudyHub.BE.dto.Request.LogoutRequest request);
 
     ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request);
 
-    void resetPassword(ResetPasswordRequest request);
+    boolean resetPassword(ResetPasswordRequest request);
 
     ResendOtpResponse resendOtp(ResendOtpRequest request);
 }
