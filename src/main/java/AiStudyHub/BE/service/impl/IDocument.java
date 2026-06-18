@@ -6,7 +6,6 @@ import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.DocumentDownloadResponse;
 import AiStudyHub.BE.dto.Response.DocumentUpdateResponse;
 import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
-
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 
