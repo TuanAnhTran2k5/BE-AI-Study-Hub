@@ -15,6 +15,7 @@ import AiStudyHub.BE.dto.Request.LoginRequest;
 import AiStudyHub.BE.dto.Request.LogoutRequest;
 import AiStudyHub.BE.dto.Request.RegisterRequest;
 import AiStudyHub.BE.dto.Request.VerifyOtpRequest;
+import AiStudyHub.BE.dto.Request.VerifyTokenRequest;
 import AiStudyHub.BE.dto.Response.GoogleUserInfo;
 import AiStudyHub.BE.dto.Response.RegisterResponse;
 import AiStudyHub.BE.dto.Response.UserResponse;
@@ -265,6 +266,20 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     }
 
     @Override
+    public UserResponse verifyToken(VerifyTokenRequest request) {
+        User user = tokenService.verifyAccessToken(request.getToken());
+        
+        if (user.getStatus() == UserStatus.BANNED) {
+            throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+        }
+
+        UserResponse userResponse = userMapper.toUserResponse(user);
+        userResponse.setAccessToken(request.getToken());
+        userResponse.setRole(user.getRole());
+        return userResponse;
+    }
+
+    @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         return userRepo.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
@@ -313,7 +328,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     }
 
     @Override
-    public void resetPassword(ResetPasswordRequest request) {
+    public boolean resetPassword(ResetPasswordRequest request) {
         String email = request.getEmail();
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
@@ -342,6 +357,8 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         otp.setIsUse(true);
         otp.setVerifiedAt(LocalDateTime.now());
         otpVerificationRepo.save(otp);
+        
+        return true;
     }
 
     @Override

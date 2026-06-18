@@ -1,12 +1,11 @@
 package AiStudyHub.BE.mapper;
 
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
-import AiStudyHub.BE.dto.Response.DocumentDeleteResponse;
+import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.DocumentDownloadResponse;
 import AiStudyHub.BE.dto.Response.DocumentUpdateResponse;
 import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
 import AiStudyHub.BE.entity.Document;
-import org.mapstruct.Context;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -24,10 +23,7 @@ public interface DocumentMapper {
     @Mapping(target = "message",   constant = "File uploaded and metadata saved successfully")
     DocumentUploadResponse toDocumentUploadResponse(Document document);
 
-    DocumentDeleteResponse toDocumentDeleteResponse(
-            Document document,
-            LocalDateTime deletedAt
-    );
+
 
     @Mapping(source = "document.documentId", target = "documentId")
     @Mapping(source = "document.title", target = "title")
@@ -46,6 +42,17 @@ public interface DocumentMapper {
             Integer addedPoint,
             Long ownerTotalScore,
             LocalDateTime downloadedAt
+    );
+
+    @Mapping(target = "success", constant = "true")
+    @Mapping(target = "message", constant = "Document deleted successfully")
+    @Mapping(source = "document.documentId", target = "deletedId")
+    @Mapping(target = "entityName", constant = "Document")
+    @Mapping(target = "entityIdentifier", expression = "java(document.getTitle() != null ? document.getTitle() : document.getFileName())")
+    @Mapping(source = "deletedAt", target = "deletedAt")
+    DeleteResponse toDeleteResponse(
+            Document document,
+            LocalDateTime deletedAt
     );
 
     @Mapping(source = "documentId", target = "documentId")

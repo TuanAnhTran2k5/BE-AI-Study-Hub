@@ -13,7 +13,7 @@ import AiStudyHub.BE.constraint.ModerationStatus;
 import AiStudyHub.BE.constraint.VisibilityStatus;
 import AiStudyHub.BE.dto.Request.DocumentUpdateRequest;
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
-import AiStudyHub.BE.dto.Response.DocumentDeleteResponse;
+import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.DocumentDownloadResponse;
 import AiStudyHub.BE.dto.Response.DocumentUpdateResponse;
 import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
@@ -79,6 +79,7 @@ public class DocumentService implements IDocument {
     private RagDocumentRepository ragDocumentRepository;
     @Autowired
     private IRagDocument ragDocumentService;
+
     @Autowired
     private IRankingBadgeService rankingBadgeService;
     @Autowired
@@ -186,7 +187,7 @@ public class DocumentService implements IDocument {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public DocumentDeleteResponse deleteDocument(Long documentId) throws Exception {
+    public DeleteResponse deleteDocument(Long documentId) throws Exception {
         Document document = documentRepo.findById(documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
 
@@ -198,10 +199,7 @@ public class DocumentService implements IDocument {
             throw new GlobalException(403, "You do not have permission to delete this document");
         }
 
-        DocumentDeleteResponse response = documentMapper.toDocumentDeleteResponse(
-                document,
-                LocalDateTime.now()
-        );
+        DeleteResponse response = documentMapper.toDeleteResponse(document, LocalDateTime.now());
 
         Long fileSize = document.getFileSize() == null ? 0L : document.getFileSize();
 

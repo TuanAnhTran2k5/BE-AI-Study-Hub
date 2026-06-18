@@ -10,6 +10,7 @@ import AiStudyHub.BE.exception.InvalidFileException;
 import AiStudyHub.BE.exception.RagProcessingException;
 import AiStudyHub.BE.exception.ResourceNotFoundException;
 import AiStudyHub.BE.exception.VectorStoreException;
+import AiStudyHub.BE.service.impl.ISupabaseStorage;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import AiStudyHub.BE.mapper.RagDocumentMapper;
@@ -17,7 +18,6 @@ import AiStudyHub.BE.repository.DocumentRepo;
 import AiStudyHub.BE.repository.RagChunkRepository;
 import AiStudyHub.BE.repository.RagDocumentRepository;
 import AiStudyHub.BE.service.impl.IRagDocument;
-import AiStudyHub.BE.service.impl.ISupabaseStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.reader.tika.TikaDocumentReader;
@@ -26,6 +26,7 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import AiStudyHub.BE.dto.Response.DeleteResponse;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
@@ -33,11 +34,7 @@ import java.net.URI;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Service implementation for {@link IRagDocument}.
- * Handles file reading, parsing, splitting into chunks, embedding generation,
- * vector database persistence in Qdrant, and relational storage in MySQL.
- */
+// Handle file ETL: read, chunk, embed, & save to Qdrant/MySQL
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -114,7 +111,7 @@ public class RagDocumentService implements IRagDocument {
 
     @Override
     @Transactional
-    public void deleteDocument(Long documentId) {
+    public DeleteResponse deleteDocument(Long documentId) {
         log.info("Deleting RAG resources for document ID: {}", documentId);
         
         Document mainDoc = documentRepo.findById(documentId)
@@ -128,6 +125,7 @@ public class RagDocumentService implements IRagDocument {
         cleanExistingRagResources(document);
         ragDocumentRepository.delete(document);
         log.info("Deleted RagDocument metadata");
+        return ragDocumentMapper.toDeleteResponse(document, java.time.LocalDateTime.now());
     }
 
     @Override
@@ -149,7 +147,7 @@ public class RagDocumentService implements IRagDocument {
     }
 
     @Transactional
-    public void indexDocumentContent(RagDocument document, byte[] fileBytes) {
+    public boolean indexDocumentContent(RagDocument document, byte[] fileBytes) {
         log.info("Extracting and indexing text for RagDocument ID: {}", document.getId());
 
         try {
@@ -160,7 +158,7 @@ public class RagDocumentService implements IRagDocument {
 
             if (documents.isEmpty()) {
                 log.warn("No text extracted from document ID: {}", document.getId());
-                return;
+                return false;
             }
 
             // Combine all text segments
@@ -209,6 +207,7 @@ public class RagDocumentService implements IRagDocument {
             log.info("Sending chunks to Qdrant vector store...");
             vectorStore.add(docsToVectorStore);
             log.info("Successfully indexed chunks in Qdrant.");
+            return true;
 
         } catch (Exception e) {
             log.error("Error during ETL index process for document ID {}", document.getId(), e);

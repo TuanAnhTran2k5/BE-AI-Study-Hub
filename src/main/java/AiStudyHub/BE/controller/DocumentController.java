@@ -61,8 +61,8 @@ public class DocumentController {
 
     @Operation(summary = "Delete Document")
     @DeleteMapping("/{documentId}")
-    public ResponseEntity<APIResponse<DocumentDeleteResponse>> deleteDocument(@PathVariable Long documentId) throws Exception {
-        DocumentDeleteResponse response = documentService.deleteDocument(documentId);
+    public ResponseEntity<APIResponse<DeleteResponse>> deleteDocument(@PathVariable Long documentId) throws Exception {
+        DeleteResponse response = documentService.deleteDocument(documentId);
 
         return ResponseEntity.ok(
                 APIResponse.response(200, "Delete document successfully", response));

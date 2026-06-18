@@ -25,11 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Service implementation for {@link IRagChat}.
- * Executes the similarity query search in Qdrant, frames the RAG prompt context,
- * and handles completion requests to OpenAI.
- */
+// Exec similarity search in Qdrant, frame RAG prompt context, & handle OpenAI requests
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -40,11 +36,16 @@ public class RagChatService implements IRagChat {
     private final DocumentRepo documentRepo;
 
     private static final String RAG_PROMPT_TEMPLATE = """
-            You are an AI assistant.
+            You are a helpful AI study assistant.
             
-            Answer only using the provided context.
+            The user is asking a question or making a request (e.g., summarize, explain) regarding their uploaded documents.
+            The following 'Context' contains the extracted content from those documents.
             
-            If the answer is not found in the context, clearly state that the information is unavailable.
+            Instructions:
+            1. Treat the provided Context as the actual content of the user's files.
+            2. If the user asks to summarize the file, summarize the information present in the Context.
+            3. Answer ONLY based on the provided Context. Do not use external knowledge.
+            4. If the Context does not contain relevant information to answer the question, clearly state that the information is not available in the provided documents.
             
             Context:
             {context}
@@ -94,6 +95,9 @@ public class RagChatService implements IRagChat {
             promptParameters.put("question", question);
             org.springframework.ai.chat.prompt.Prompt prompt = promptTemplate.create(promptParameters);
 
+            log.info("Compiled RAG Context length: {} characters", context.length());
+            log.debug("Compiled RAG Context:\n{}", context);
+
             log.info("Calling OpenAI chat model...");
             String answer = chatClient.prompt(prompt).call().content();
             log.info("Received answer from OpenAI");
@@ -111,8 +115,14 @@ public class RagChatService implements IRagChat {
     @Override
     public String buildContext(List<Document> documents) {
         return documents.stream()
-                .map(Document::getText)
-                .collect(Collectors.joining("\n\n"));
+                .map(doc -> {
+                    String fileName = "Unknown File";
+                    if (doc.getMetadata() != null && doc.getMetadata().containsKey("originalFileName")) {
+                        fileName = (String) doc.getMetadata().get("originalFileName");
+                    }
+                    return "[Source File: " + fileName + "]\n" + doc.getText();
+                })
+                .collect(Collectors.joining("\n\n---\n\n"));
     }
 
     @Override
