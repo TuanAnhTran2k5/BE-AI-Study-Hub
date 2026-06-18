@@ -6,14 +6,6 @@ import AiStudyHub.BE.dto.Response.DocumentDeleteResponse;
 import AiStudyHub.BE.dto.Response.DocumentDownloadResponse;
 import AiStudyHub.BE.dto.Response.DocumentUpdateResponse;
 import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
-<<<<<<< HEAD
-=======
-import AiStudyHub.BE.entity.User;
-
-public interface IDocument {
-    DocumentUploadResponse uploadDocument(DocumentUploadRequest request) throws Exception;
-    void deleteDocument(Long documentId, User currentUser) throws Exception;
->>>>>>> acdf6998a5aa3079e23570c32029962e37b4cc40
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 
