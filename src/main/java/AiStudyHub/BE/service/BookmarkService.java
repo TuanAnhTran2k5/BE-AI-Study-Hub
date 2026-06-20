@@ -3,6 +3,7 @@ package AiStudyHub.BE.service;
 import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.dto.Request.BookmarkRequest;
 import AiStudyHub.BE.dto.Response.BookmarkResponse;
+import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.entity.Bookmark;
 import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.User;
@@ -63,7 +64,7 @@ public class BookmarkService implements IBookmark {
 
     @Override
     @Transactional
-    public boolean removeBookmark(Long userId, Long documentId) {
+    public DeleteResponse removeBookmark(Long userId, Long documentId) {
         Bookmark bookmark = bookmarkRepo.findByUserUserIdAndDocumentDocumentId(userId, documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.NOT_FOUND));
 
@@ -76,7 +77,7 @@ public class BookmarkService implements IBookmark {
             document.setBookmarkCount(currentCount - 1);
             documentRepo.save(document);
         }
-        return true;
+        return bookmarkMapper.toDeleteResponse(bookmark, java.time.LocalDateTime.now());
     }
 
     @Override

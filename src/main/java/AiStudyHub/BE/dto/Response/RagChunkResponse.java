@@ -6,15 +6,21 @@ import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
 
+/**
+ * Response DTO for a single document chunk's metadata and content.
+ */
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class DocumentDeleteResponse {
+public class RagChunkResponse {
+
+    Long id;
     Long documentId;
-    String title;
-    String fileName;
-    LocalDateTime deletedAt;
+    Integer chunkIndex;
+    String content;
+    Boolean embeddingCreated;
+    LocalDateTime createdAt;
 }

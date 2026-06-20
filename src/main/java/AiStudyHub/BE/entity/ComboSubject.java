@@ -23,4 +23,8 @@ public class ComboSubject {
 
     @Column(nullable = false)
     String comboName;
+
+    @Builder.Default
+    @Column(nullable = false)
+    Boolean isDeleted = false;
 }

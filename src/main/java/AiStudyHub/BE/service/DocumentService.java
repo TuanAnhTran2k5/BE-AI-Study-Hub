@@ -13,13 +13,14 @@ import AiStudyHub.BE.constraint.ModerationStatus;
 import AiStudyHub.BE.constraint.VisibilityStatus;
 import AiStudyHub.BE.dto.Request.DocumentUpdateRequest;
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
-import AiStudyHub.BE.dto.Response.DocumentDeleteResponse;
+import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.DocumentDownloadResponse;
 import AiStudyHub.BE.dto.Response.DocumentUpdateResponse;
 import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
 import AiStudyHub.BE.dto.Response.FileUploadResponse;
 
 import AiStudyHub.BE.entity.Document;
+import AiStudyHub.BE.entity.RagDocument;
 import AiStudyHub.BE.entity.Download;
 import AiStudyHub.BE.entity.ScoreLog;
 import AiStudyHub.BE.entity.ScoreType;
@@ -27,6 +28,7 @@ import AiStudyHub.BE.entity.Subject;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.repository.DocumentRepo;
+import AiStudyHub.BE.repository.RagDocumentRepository;
 import AiStudyHub.BE.repository.SubjectRepo;
 import AiStudyHub.BE.repository.UserRepo;
 import AiStudyHub.BE.repository.DownloadRepo;
@@ -34,8 +36,11 @@ import AiStudyHub.BE.repository.ScoreLogRepo;
 import AiStudyHub.BE.repository.ScoreTypeRepo;
 import AiStudyHub.BE.mapper.DocumentMapper;
 import AiStudyHub.BE.service.impl.IDocument;
+import AiStudyHub.BE.service.impl.IRagDocument;
 import AiStudyHub.BE.service.impl.IStorageService;
 import AiStudyHub.BE.service.impl.ISupabaseStorage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import AiStudyHub.BE.service.impl.IRankingBadgeService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +52,8 @@ import java.time.LocalDateTime;
 @Service
 @Slf4j
 public class DocumentService implements IDocument {
+
+    private static final Logger logger = LoggerFactory.getLogger(DocumentService.class);
 
     @Autowired
     private DocumentRepo documentRepo;
@@ -69,8 +76,12 @@ public class DocumentService implements IDocument {
     private IStorageService storageService;
 
     @Autowired
-    private IRankingBadgeService rankingBadgeService;
+    private RagDocumentRepository ragDocumentRepository;
+    @Autowired
+    private IRagDocument ragDocumentService;
 
+    @Autowired
+    private IRankingBadgeService rankingBadgeService;
     @Autowired
     private DuplicateCheckService duplicateCheckService;
 
@@ -127,6 +138,38 @@ public class DocumentService implements IDocument {
 
             rankingBadgeService.checkAndAwardBadges(owner.getUserId());
 
+            // Auto-index in RAG system if it's a supported format (PDF, DOCX, TXT)
+            String contentType = fileMetadata.getContentType();
+            String originalFileName = fileMetadata.getOriginalFileName();
+            String lowerFileName = originalFileName != null ? originalFileName.toLowerCase() : "";
+            if ((contentType != null && (
+                    contentType.equalsIgnoreCase("application/pdf") ||
+                    contentType.equalsIgnoreCase("application/vnd.openxmlformats-officedocument.wordprocessingml.document") ||
+                    contentType.equalsIgnoreCase("text/plain")
+            )) || 
+            lowerFileName.endsWith(".pdf") ||
+            lowerFileName.endsWith(".docx") ||
+            lowerFileName.endsWith(".txt")) {
+                try {
+                    logger.info("Auto-indexing document '{}' in RAG system...", document.getFileName());
+                    RagDocument ragDoc = RagDocument.builder()
+                            .documentId(document.getDocumentId())
+                            .originalFileName(document.getFileName())
+                            .contentType(document.getFileType())
+                            .fileSize(document.getFileSize())
+                            .uploadedBy(owner.getEmail())
+                            .status("PENDING")
+                            .build();
+                    ragDoc = ragDocumentRepository.save(ragDoc);
+                    ragDocumentService.indexDocumentContent(ragDoc, fileBytes);
+                    ragDoc.setStatus("INDEXED");
+                    ragDocumentRepository.save(ragDoc);
+                    logger.info("Successfully auto-indexed document ID: {}", document.getDocumentId());
+                } catch (Exception e) {
+                    logger.error("Auto-indexing failed for document ID: {}. Document upload remains valid.", document.getDocumentId(), e);
+                }
+            }
+
             DocumentUploadResponse response = documentMapper.toDocumentUploadResponse(document);
             if (duplicatedDoc != null) {
                 response.setVisibilityStatus(VisibilityStatus.PRIVATE);
@@ -144,19 +187,36 @@ public class DocumentService implements IDocument {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public DocumentDeleteResponse deleteDocument(Long documentId) throws Exception {
+    public DeleteResponse deleteDocument(Long documentId) throws Exception {
         Document document = documentRepo.findById(documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
 
-        DocumentDeleteResponse response = documentMapper.toDocumentDeleteResponse(
-                document,
-                LocalDateTime.now()
-        );
+        // Authorize: Only the owner or an administrator can delete the document
+        User currentUser = getCurrentUser();
+        boolean isAdmin = currentUser.getRole().name().equals("AD");
+        boolean isOwner = document.getOwner().getUserId().equals(currentUser.getUserId());
+        if (!isAdmin && !isOwner) {
+            throw new GlobalException(403, "You do not have permission to delete this document");
+        }
+
+        DeleteResponse response = documentMapper.toDeleteResponse(document, LocalDateTime.now());
 
         Long fileSize = document.getFileSize() == null ? 0L : document.getFileSize();
 
         User owner = document.getOwner();
         String fileUrl = document.getFileUrl();
+
+        // 1. Delete associated RAG resources (vectors from Qdrant, chunks from MySQL, RAG metadata)
+        RagDocument ragDoc = ragDocumentRepository.findByDocumentId(documentId)
+                .orElse(null);
+        if (ragDoc != null) {
+            try {
+                logger.info("Deleting RAG resources for document ID: {}", documentId);
+                ragDocumentService.deleteDocument(documentId);
+            } catch (Exception e) {
+                logger.error("Error cleaning up RAG resources for document ID: {}", documentId, e);
+            }
+        }
 
         // Do all DB work first so the transaction can roll back cleanly if anything fails.
         long deletedRows = documentRepo.deleteByDocumentId(documentId);

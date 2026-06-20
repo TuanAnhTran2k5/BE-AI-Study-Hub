@@ -5,11 +5,13 @@ import AiStudyHub.BE.dto.Response.BookmarkResponse;
 
 import java.util.List;
 
+import AiStudyHub.BE.dto.Response.DeleteResponse;
+
 public interface IBookmark {
 
     BookmarkResponse addBookmark(Long userId, BookmarkRequest request);
 
-    boolean removeBookmark(Long userId, Long documentId);
+    DeleteResponse removeBookmark(Long userId, Long documentId);
 
     List<BookmarkResponse> getBookmarksByUser(Long userId);
 

@@ -21,7 +21,7 @@ public class GlobalExceptionHandler {
                 ? exception.getCode() // HTTP status code value
                 : HttpStatus.INTERNAL_SERVER_ERROR.value();
 
-        return ResponseEntity.status(status).body(APIResponse.response(status, exception.getMessage(),null));
+        return ResponseEntity.status(status).body(APIResponse.response(status, exception.getMessage(), null));
     }
 
     // Catch-all: any unhandled exception returns a generic 500 instead of leaking
@@ -34,28 +34,30 @@ public class GlobalExceptionHandler {
                 .body(APIResponse.response(
                         HttpStatus.INTERNAL_SERVER_ERROR.value(),
                         "Internal server error",
-                        null
-                ));
+                        null));
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    // Catches validation exceptions from the Bean Validation library and returns errors to the client
-    public ResponseEntity<APIResponse<Object>> handleValidation(MethodArgumentNotValidException exception) {
+    @ExceptionHandler(org.springframework.validation.BindException.class)
+    // Catches validation exceptions from the Bean Validation library and returns
+    // errors to the client (handles both @RequestBody and @ModelAttribute
+    // validations)
+    public ResponseEntity<APIResponse<Object>> handleValidation(
+            org.springframework.validation.BindException exception) {
         List<String> errors = exception
                 .getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(error ->{
+                .map(error -> {
                     String enumKey = error.getDefaultMessage();
                     ErrorCode errorCode;
                     try {
                         errorCode = ErrorCode.valueOf(enumKey);
-                    }catch (IllegalArgumentException e) {
+                    } catch (IllegalArgumentException e) {
                         errorCode = ErrorCode.FIELD_REQUIRED;
                     }
                     return error.getField() + " " + errorCode.getMessage();
                 }).toList();
-        return ResponseEntity.badRequest().body(APIResponse.response(400,"validation error",errors));
+        return ResponseEntity.badRequest().body(APIResponse.response(400, "validation error", errors));
     }
 
     // Handles malformed request bodies (e.g. invalid enum values or bad JSON) that
