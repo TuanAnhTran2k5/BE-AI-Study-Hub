@@ -5,7 +5,9 @@ import AiStudyHub.BE.dto.Response.ChatResponse;
 import AiStudyHub.BE.exception.RagProcessingException;
 import AiStudyHub.BE.exception.VectorStoreException;
 import AiStudyHub.BE.service.impl.IRagChat;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.repository.DocumentRepo;
@@ -28,12 +30,13 @@ import java.util.stream.Collectors;
 // Exec similarity search in Qdrant, frame RAG prompt context, & handle OpenAI requests
 @Service
 @RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 public class RagChatService implements IRagChat {
 
-    private final VectorStore vectorStore;
-    private final ChatClient chatClient;
-    private final DocumentRepo documentRepo;
+    VectorStore vectorStore;
+    ChatClient chatClient;
+    DocumentRepo documentRepo;
 
     private static final String RAG_PROMPT_TEMPLATE = """
             You are a helpful AI study assistant.

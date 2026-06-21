@@ -11,14 +11,14 @@ import AiStudyHub.BE.exception.RagProcessingException;
 import AiStudyHub.BE.exception.ResourceNotFoundException;
 import AiStudyHub.BE.exception.VectorStoreException;
 import AiStudyHub.BE.service.impl.ISupabaseStorage;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import AiStudyHub.BE.mapper.RagDocumentMapper;
 import AiStudyHub.BE.repository.DocumentRepo;
 import AiStudyHub.BE.repository.RagChunkRepository;
 import AiStudyHub.BE.repository.RagDocumentRepository;
 import AiStudyHub.BE.service.impl.IRagDocument;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
@@ -37,22 +37,20 @@ import java.util.stream.Collectors;
 // Handle file ETL: read, chunk, embed, & save to Qdrant/MySQL
 @Service
 @RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 public class RagDocumentService implements IRagDocument {
 
-    private final RagDocumentRepository ragDocumentRepository;
-    private final RagChunkRepository ragChunkRepository;
-    private final DocumentRepo documentRepo;
-    private final VectorStore vectorStore;
-    private final TokenTextSplitter textSplitter;
-    private final RagDocumentMapper ragDocumentMapper;
-    private final ISupabaseStorage supabaseStorageService;
+    RagDocumentRepository ragDocumentRepository;
+    RagChunkRepository ragChunkRepository;
+    DocumentRepo documentRepo;
+    VectorStore vectorStore;
+    TokenTextSplitter textSplitter;
+    RagDocumentMapper ragDocumentMapper;
+    ISupabaseStorage supabaseStorageService;
 
     private void checkAuthorization(Document mainDoc, String action) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof User currentUser)) {
-            throw new GlobalException(401, "Unauthorized - valid login required");
-        }
+        User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
         boolean isAdmin = currentUser.getRole().name().equals("AD");
         boolean isOwner = mainDoc.getOwner().getUserId().equals(currentUser.getUserId());
         if (!isAdmin && !isOwner) {
@@ -70,12 +68,12 @@ public class RagDocumentService implements IRagDocument {
 
         checkAuthorization(mainDoc, "index");
 
-        RagDocument ragDoc = ragDocumentRepository.findByDocumentId(documentId)
+        RagDocument ragDoc = ragDocumentRepository.findByDocument_DocumentId(documentId)
                 .orElse(null);
 
         if (ragDoc == null) {
             ragDoc = RagDocument.builder()
-                    .documentId(mainDoc.getDocumentId())
+                    .document(mainDoc)
                     .originalFileName(mainDoc.getFileName())
                     .contentType(mainDoc.getFileType())
                     .fileSize(mainDoc.getFileSize())
@@ -119,7 +117,7 @@ public class RagDocumentService implements IRagDocument {
 
         checkAuthorization(mainDoc, "delete RAG index for");
 
-        RagDocument document = ragDocumentRepository.findByDocumentId(documentId)
+        RagDocument document = ragDocumentRepository.findByDocument_DocumentId(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("RagDocument not found with document ID: " + documentId));
 
         cleanExistingRagResources(document);
@@ -141,7 +139,7 @@ public class RagDocumentService implements IRagDocument {
             checkAuthorization(mainDoc, "view");
         }
 
-        RagDocument document = ragDocumentRepository.findByDocumentId(documentId)
+        RagDocument document = ragDocumentRepository.findByDocument_DocumentId(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("RagDocument not found with document ID: " + documentId));
         return ragDocumentMapper.toRagDocumentResponse(document);
     }
@@ -188,7 +186,8 @@ public class RagDocumentService implements IRagDocument {
 
                 // Prepare metadata for vector store
                 Map<String, Object> metadata = new HashMap<>();
-                metadata.put("documentId", document.getDocumentId() != null ? document.getDocumentId().toString() : document.getId().toString());
+                Long linkedDocumentId = document.getDocument() != null ? document.getDocument().getDocumentId() : null;
+                metadata.put("documentId", linkedDocumentId != null ? linkedDocumentId.toString() : document.getId().toString());
                 metadata.put("originalFileName", document.getOriginalFileName());
                 metadata.put("uploadedBy", document.getUploadedBy());
                 metadata.put("chunkIndex", i);

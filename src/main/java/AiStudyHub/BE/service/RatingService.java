@@ -15,8 +15,6 @@ import AiStudyHub.BE.repository.UserRepo;
 import AiStudyHub.BE.service.impl.IRating;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -86,20 +84,6 @@ public class RatingService implements IRating {
 
 
     private User getCurrentUser() {
-        Authentication authentication = SecurityContextHolder
-                .getContext()
-                .getAuthentication();
-
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new GlobalException(ErrorCode.UNAUTHENTICATED);
-        }
-
-        Object principal = authentication.getPrincipal();
-
-        if (principal instanceof User user) {
-            return user;
-        }
-
-        throw new GlobalException(ErrorCode.UNAUTHENTICATED);
+        return AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
     }
 }

@@ -9,7 +9,7 @@ import java.util.Optional;
 @Repository
 public interface RagDocumentRepository extends JpaRepository<RagDocument, Long> {
 
-    Optional<RagDocument> findByOriginalFileName(String originalFileName);
-
-    Optional<RagDocument> findByDocumentId(Long documentId);
+    // Looks up the RagDocument by the linked library Document's id (derived query
+    // navigating the document FK relationship: RagDocument.document.documentId).
+    Optional<RagDocument> findByDocument_DocumentId(Long documentId);
 }

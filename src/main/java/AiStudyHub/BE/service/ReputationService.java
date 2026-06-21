@@ -4,10 +4,8 @@ import AiStudyHub.BE.constraint.VisibilityStatus;
 import AiStudyHub.BE.entity.*;
 import AiStudyHub.BE.repository.DocumentRepo;
 import AiStudyHub.BE.repository.RatingRepo;
-import AiStudyHub.BE.repository.ScoreLogRepo;
-import AiStudyHub.BE.repository.ScoreTypeRepo;
-import AiStudyHub.BE.repository.UserRepo;
 import AiStudyHub.BE.service.impl.IReputation;
+import AiStudyHub.BE.service.impl.IScore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -27,16 +25,10 @@ public class ReputationService implements IReputation {
     private DocumentRepo documentRepo;
 
     @Autowired
-    private UserRepo userRepo;
-
-    @Autowired
-    private ScoreTypeRepo scoreTypeRepo;
-
-    @Autowired
-    private ScoreLogRepo scoreLogRepo;
-
-    @Autowired
     private RatingRepo ratingRepo;
+
+    @Autowired
+    private IScore scoreService;
 
     @Autowired
     private AiStudyHub.BE.service.impl.IRankingBadgeService rankingBadgeService;
@@ -87,26 +79,13 @@ public class ReputationService implements IReputation {
         int change = ReputationPolicy.tierScore(avg, count);
 
         User owner = doc.getOwner();
-        long current = owner.getTotalScore() == null ? 0L : owner.getTotalScore();
-        owner.setTotalScore(current + change);            // accumulate
-        userRepo.save(owner);
-
-        ScoreType type = scoreTypeRepo.findByTypeCode(RATING_REPUTATION)
-                .orElseGet(() -> scoreTypeRepo.save(ScoreType.builder()
-                        .typeCode(RATING_REPUTATION)
-                        .typeName("Rating Reputation")
-                        .defaultPoint(0)
-                        .description("Daily reputation score derived from document ratings")
-                        .build()));                       // find-or-create
-
-        scoreLogRepo.save(ScoreLog.builder()
-                .user(owner)
-                .document(doc)
-                .scoreType(type)
-                .scoreChange(change)
-                .description("Reputation " + (change >= 0 ? "+" : "") + change
-                        + " for avg=" + avg + ", count=" + count)
-                .build());
+        scoreService.awardScore(
+                owner,
+                doc,
+                new IScore.ScoreTypeSpec(RATING_REPUTATION, "Rating Reputation", 0,
+                        "Daily reputation score derived from document ratings"),
+                change,
+                "Reputation " + (change >= 0 ? "+" : "") + change + " for avg=" + avg + ", count=" + count);
 
         rankingBadgeService.updateUserRank(owner.getUserId());
         rankingBadgeService.addWeeklyScore(owner.getUserId(), change);

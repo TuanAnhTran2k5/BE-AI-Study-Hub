@@ -128,17 +128,11 @@ public class RankingBadgeService implements IRankingBadgeService {
         log.info("Running Top Weekly Contributor job...");
 
         LocalDate currentWeekStart = calculateWeekStart(LocalDate.now());
-        
-        List<WeeklyScore> top3 = weeklyScoreRepo.findByWeekStart(currentWeekStart).stream()
-                .sorted(java.util.Comparator.comparingInt(WeeklyScore::getScore).reversed())
+
+        topWeeklyScores(currentWeekStart).stream()
                 .limit(3)
-                .toList();
-        
-        for (WeeklyScore ws : top3) {
-            if (ws.getScore() != null && ws.getScore() > 0) {
-                awardBadgeNotExist(ws.getUser(), "Top Weekly Contributor");
-            }
-        }
+                .forEach(ws -> awardBadgeNotExist(ws.getUser(), "Top Weekly Contributor"));
+
         log.info("Top Weekly Contributor job finished.");
         return true;
     }
@@ -231,10 +225,8 @@ public class RankingBadgeService implements IRankingBadgeService {
     @Override
     public List<WeeklyScoreResponse> getTopWeeklyContributors(int limit) {
         LocalDate currentWeekStart = calculateWeekStart(LocalDate.now());
-        
-        return weeklyScoreRepo.findByWeekStart(currentWeekStart).stream()
-                .filter(ws -> ws.getScore() != null && ws.getScore() > 0)
-                .sorted(Comparator.comparingInt(WeeklyScore::getScore).reversed())
+
+        return topWeeklyScores(currentWeekStart).stream()
                 .limit(limit)
                 .map(ws -> WeeklyScoreResponse.builder()
                         .userId(ws.getUser().getUserId())
@@ -250,6 +242,17 @@ public class RankingBadgeService implements IRankingBadgeService {
     // ==========================================
     //          PRIVATE HELPER METHODS
     // ==========================================
+
+    /**
+     * Weekly scores for the given week that are positive, sorted by score descending.
+     * Shared by the leaderboard endpoint and the weekly-contributor award job.
+     */
+    private List<WeeklyScore> topWeeklyScores(LocalDate weekStart) {
+        return weeklyScoreRepo.findByWeekStart(weekStart).stream()
+                .filter(ws -> ws.getScore() != null && ws.getScore() > 0)
+                .sorted(Comparator.comparingInt(WeeklyScore::getScore).reversed())
+                .toList();
+    }
 
     private boolean awardBadgeNotExist(User user, String badgeName) {
         Optional<Badge> badgeOpt = badgeRepo.findByBadgeName(badgeName);

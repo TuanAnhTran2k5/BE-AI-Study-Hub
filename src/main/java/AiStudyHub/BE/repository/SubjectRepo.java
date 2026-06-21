@@ -5,16 +5,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-import java.util.Optional;
-
 public interface SubjectRepo extends JpaRepository<Subject, Long> {
     List<Subject> findByIsDeletedFalse();
-    Optional<Subject> findBySubjectCode(String subjectCode);
     List<Subject> findByComboSubjectComboId(Long comboId);
-
     List<Subject> findBySemesterSemesterId(Long semesterId);
-
     List<Subject> findBySemesterSemesterIdAndComboSubjectIsNull(Long semesterId);
-
     List<Subject> findBySemesterSemesterIdAndComboSubjectComboId(Long semesterId, Long comboId);
+    List<Subject> findBySubjectNameContainingIgnoreCase(String keyword);
 }

@@ -19,7 +19,7 @@ import java.util.List;
 
 @Service
 @Slf4j
-public class DuplicateCheckService {
+public class DuplicateCheckService implements AiStudyHub.BE.service.impl.IDuplicateCheck {
 
     @Autowired
     private TextExtractionUtil textExtractionUtil;
@@ -37,6 +37,7 @@ public class DuplicateCheckService {
     // Synchronously checks if the uploaded document is a duplicate of an existing public document.
     // Uses SimHash to determine >= 90% text similarity.
     
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public Document performDuplicateCheck(Long documentId, byte[] fileBytes) {
         log.info("Starting duplicate check for Document ID: {}", documentId);

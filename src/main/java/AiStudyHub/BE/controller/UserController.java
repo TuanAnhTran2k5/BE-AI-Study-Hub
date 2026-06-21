@@ -1,18 +1,15 @@
 package AiStudyHub.BE.controller;
 
-import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.dto.Request.UpdateProfileRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.UpdateProfileResponse;
 import AiStudyHub.BE.entity.User;
-import AiStudyHub.BE.exception.GlobalException;
+import AiStudyHub.BE.security.SecurityUtils;
 import AiStudyHub.BE.service.UserService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -29,10 +26,7 @@ public class UserController {
     @PutMapping("profile")
     public ResponseEntity<APIResponse<UpdateProfileResponse>> updateProfile(@Valid @RequestBody UpdateProfileRequest updateProfileRequest) {
 
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof User currentUser)) {
-            throw new GlobalException(ErrorCode.INVALID_TOKEN);
-        }
+        User currentUser = SecurityUtils.getCurrentUser();
 
         UpdateProfileResponse response = userService.updateProfile(currentUser.getUserId(), updateProfileRequest);
 

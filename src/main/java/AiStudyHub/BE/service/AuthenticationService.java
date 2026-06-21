@@ -48,7 +48,7 @@ import java.util.Optional;
 @Slf4j
 public class AuthenticationService implements UserDetailsService, IAuthentication {
 
-    private final SecureRandom secureRandom = new SecureRandom();
+    private SecureRandom secureRandom = new SecureRandom();
 
     @Autowired
     private UserRepo userRepo;
@@ -150,6 +150,10 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             }
 
             String accessToken = tokenService.generateAccessToken(user);
+
+            // Verify the freshly issued access token (signature, expiry, subject, user exists)
+            // so we never hand the client a token that wouldn't pass authentication.
+            tokenService.verifyAccessToken(accessToken);
 
             UserResponse userResponse = userMapper.toUserResponse(user);
             userResponse.setAccessToken(accessToken);
@@ -257,7 +261,11 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                 });
 
         String accessToken = tokenService.generateAccessToken(user);
-        
+
+        // Verify the freshly issued access token (signature, expiry, subject, user exists)
+        // so we never hand the client a token that wouldn't pass authentication.
+        tokenService.verifyAccessToken(accessToken);
+
         UserResponse userResponse = userMapper.toUserResponse(user);
         userResponse.setAccessToken(accessToken);
         userResponse.setRole(user.getRole());
@@ -268,7 +276,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     @Override
     public UserResponse verifyToken(VerifyTokenRequest request) {
         User user = tokenService.verifyAccessToken(request.getToken());
-        
+
         if (user.getStatus() == UserStatus.BANNED) {
             throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
         }
