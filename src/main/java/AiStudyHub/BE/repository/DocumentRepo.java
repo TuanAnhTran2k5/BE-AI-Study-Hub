@@ -17,7 +17,8 @@ public interface DocumentRepo extends JpaRepository<Document, Long> {
 
     long deleteByDocumentId(Long documentId);
 
-    List<Document> findByVisibilityStatusAndRatingCountGreaterThanEqual(VisibilityStatus visibilityStatus, Integer minCount);
+    List<Document> findByVisibilityStatusAndRatingCountGreaterThanEqual(VisibilityStatus visibilityStatus,
+            Integer minCount);
 
     List<Document> findByVisibilityStatus(VisibilityStatus visibilityStatus);
 
