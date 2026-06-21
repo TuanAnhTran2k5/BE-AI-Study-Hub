@@ -32,8 +32,8 @@ class BeApplicationTests {
 		List<RagDocument> ragDocs = ragDocumentRepository.findAll();
 		System.out.println("Total RAG Documents: " + ragDocs.size());
 		for (RagDocument rd : ragDocs) {
-			System.out.printf("RAG ID: %d | Doc ID: %d | Status: %s | OriginalName: %s%n",
-					rd.getId(), rd.getDocument().getDocumentId(), rd.getStatus(), rd.getOriginalFileName());
+			System.out.printf("RAG ID: %d | Doc ID: %s | Status: %s | OriginalName: %s%n",
+					rd.getId(), rd.getDocument() != null ? rd.getDocument().getDocumentId() : "null", rd.getStatus(), rd.getOriginalFileName());
 		}
 		System.out.println("=================================");
 	}

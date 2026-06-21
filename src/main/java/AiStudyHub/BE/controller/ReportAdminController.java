@@ -7,9 +7,10 @@ import AiStudyHub.BE.dto.Response.ReportCaseAdminView;
 import AiStudyHub.BE.dto.Response.ReportDetailView;
 import AiStudyHub.BE.entity.Report;
 import AiStudyHub.BE.entity.ReportCase;
+import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.repository.ReportCaseRepo;
 import AiStudyHub.BE.repository.ReportRepo;
-import AiStudyHub.BE.service.impl.IReport;
+import AiStudyHub.BE.service.IReport;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -51,7 +52,7 @@ public class ReportAdminController {
     @GetMapping("/{caseId}/reports")
     public ResponseEntity<APIResponse<List<ReportDetailView>>> getReportsByCase(@PathVariable Long caseId) {
         ReportCase reportCase = reportCaseRepo.findById(caseId)
-                .orElseThrow(() -> new AiStudyHub.BE.exception.ResourceNotFoundException("ReportCase not found"));
+                .orElseThrow(() -> new GlobalException(404, "ReportCase not found"));
 
         List<ReportDetailView> reports = reportRepo.findAllByReportCase(reportCase)
                 .stream()

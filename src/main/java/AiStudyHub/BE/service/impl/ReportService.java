@@ -1,12 +1,12 @@
-package AiStudyHub.BE.service;
+package AiStudyHub.BE.service.impl;
 
 import AiStudyHub.BE.constraint.*;
 import AiStudyHub.BE.entity.*;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.repository.*;
-import AiStudyHub.BE.service.impl.INotification;
-import AiStudyHub.BE.service.impl.IReport;
-import AiStudyHub.BE.service.impl.IRankingBadgeService;
+import AiStudyHub.BE.service.INotification;
+import AiStudyHub.BE.service.IReport;
+import AiStudyHub.BE.service.IGamification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -30,7 +30,7 @@ public class ReportService implements IReport {
     private final ScoreLogRepo scoreLogRepo;
     private final ScoreTypeRepo scoreTypeRepo;
     private final INotification notificationService;
-    private final IRankingBadgeService rankingBadgeService;
+    private final IGamification rankingBadgeService;
 
     @Override
     @Transactional

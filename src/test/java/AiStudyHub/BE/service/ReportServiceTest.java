@@ -4,8 +4,9 @@ import AiStudyHub.BE.constraint.*;
 import AiStudyHub.BE.entity.*;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.repository.*;
-import AiStudyHub.BE.service.impl.IRankingBadgeService;
-import AiStudyHub.BE.service.impl.INotification;
+import AiStudyHub.BE.service.IGamification;
+import AiStudyHub.BE.service.INotification;
+import AiStudyHub.BE.service.impl.ReportService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -39,7 +40,7 @@ class ReportServiceTest {
     @Mock
     private INotification notificationService;
     @Mock
-    private IRankingBadgeService rankingBadgeService;
+    private IGamification rankingBadgeService;
 
     @InjectMocks
     private ReportService reportService;
@@ -130,7 +131,7 @@ class ReportServiceTest {
     }
 
     @Test
-    void createReport_whenUserMuted_shouldThrowForbidden() {
+    void createReportWhenUserMutedShouldThrowForbidden() {
         reporter.setTotalScore(-5L); // negative score
 
         GlobalException exception = assertThrows(GlobalException.class, () -> {
@@ -142,7 +143,7 @@ class ReportServiceTest {
     }
 
     @Test
-    void createReport_whenRateLimitExceeded_shouldThrowTooManyRequests() {
+    void createReportWhenRateLimitExceededShouldThrowTooManyRequests() {
         when(reportRepo.countByReporterAndReasonSeverityLevelAndCreatedAtAfter(any(), eq(ReportSeverity.HIGH), any()))
                 .thenReturn(5L);
 
@@ -155,7 +156,7 @@ class ReportServiceTest {
     }
 
     @Test
-    void createReport_whenDuplicateReport_shouldThrowBadRequest() {
+    void createReportWhenDuplicateReportShouldThrowBadRequest() {
         when(reportRepo.existsByReporterAndDocument(reporter, document)).thenReturn(true);
 
         GlobalException exception = assertThrows(GlobalException.class, () -> {
@@ -167,7 +168,7 @@ class ReportServiceTest {
     }
 
     @Test
-    void createReport_lowSeverity_increasesCountAndTriggersWarning1() {
+    void createReportLowSeverityIncreasesCountAndTriggersWarning1() {
         ReportCase reportCase = ReportCase.builder()
                 .caseId(200L)
                 .document(document)
@@ -194,7 +195,7 @@ class ReportServiceTest {
     }
 
     @Test
-    void createReport_lowSeverity_warning1ToWarning2() {
+    void createReportLowSeverityWarning1ToWarning2() {
         ReportCase reportCase = ReportCase.builder()
                 .caseId(200L)
                 .document(document)
@@ -224,7 +225,7 @@ class ReportServiceTest {
     }
 
     @Test
-    void createReport_highSeverity_triggersImmediatePendingReview() {
+    void createReportHighSeverityTriggersImmediatePendingReview() {
         ReportCase reportCase = ReportCase.builder()
                 .caseId(201L)
                 .document(document)
@@ -249,7 +250,7 @@ class ReportServiceTest {
     }
 
     @Test
-    void adminResolveCase_whenReject_appliesCounterPenalty() {
+    void adminResolveCaseWhenRejectAppliesCounterPenalty() {
         ReportCase reportCase = ReportCase.builder()
                 .caseId(202L)
                 .document(document)
@@ -276,7 +277,7 @@ class ReportServiceTest {
     }
 
     @Test
-    void createReport_whenDocumentNotPublic_shouldThrowBadRequest() {
+    void createReportWhenDocumentNotPublicShouldThrowBadRequest() {
         document.setVisibilityStatus(VisibilityStatus.PRIVATE);
 
         GlobalException exception = assertThrows(GlobalException.class, () -> {
@@ -288,7 +289,7 @@ class ReportServiceTest {
     }
 
     @Test
-    void createReport_whenSelfReport_shouldThrowBadRequest() {
+    void createReportWhenSelfReportShouldThrowBadRequest() {
         document.setOwner(reporter);
 
         GlobalException exception = assertThrows(GlobalException.class, () -> {

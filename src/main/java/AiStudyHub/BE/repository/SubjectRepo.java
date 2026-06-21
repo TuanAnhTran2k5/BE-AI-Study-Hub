@@ -12,4 +12,10 @@ public interface SubjectRepo extends JpaRepository<Subject, Long> {
     List<Subject> findBySemesterSemesterIdAndComboSubjectIsNull(Long semesterId);
 
     List<Subject> findBySemesterSemesterIdAndComboSubjectComboId(Long semesterId, Long comboId);
+
+    List<Subject> findByIsDeletedFalse();
+
+    List<Subject> findBySubjectNameContainingIgnoreCase(String subjectName);
+
+    List<Subject> findByComboSubjectComboId(Long comboId);
 }

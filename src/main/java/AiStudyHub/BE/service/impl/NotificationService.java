@@ -1,9 +1,11 @@
-package AiStudyHub.BE.service;
+package AiStudyHub.BE.service.impl;
 
 import AiStudyHub.BE.entity.Document;
+import AiStudyHub.BE.entity.Notification;
 import AiStudyHub.BE.entity.User;
-import AiStudyHub.BE.service.impl.IEmail;
-import AiStudyHub.BE.service.impl.INotification;
+import AiStudyHub.BE.repository.NotificationRepo;
+import AiStudyHub.BE.service.IEmail;
+import AiStudyHub.BE.service.INotification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,9 +16,10 @@ import org.springframework.stereotype.Service;
 public class NotificationService implements INotification {
 
     private final IEmail emailService;
+    private final NotificationRepo notificationRepo;
 
     @Override
-    public void sendDocumentModerationNotification(
+    public Notification sendDocumentModerationNotification(
             User owner,
             Document document,
             String reasonName,
@@ -44,10 +47,21 @@ public class NotificationService implements INotification {
         );
 
         emailService.sendEmail(owner.getEmail(), subject, content);
+
+        Notification notification = Notification.builder()
+                .user(owner)
+                .document(document)
+                .title(subject)
+                .message(content)
+                .type("SYSTEM")
+                .notificationCase("DOCUMENT_MODERATION")
+                .isRead(false)
+                .build();
+        return notificationRepo.save(notification);
     }
 
     @Override
-    public void sendFalseReportPenaltyNotification(
+    public Notification sendFalseReportPenaltyNotification(
             User reporter,
             Document document,
             int penaltyScore,
@@ -71,5 +85,16 @@ public class NotificationService implements INotification {
         );
 
         emailService.sendEmail(reporter.getEmail(), subject, content);
+
+        Notification notification = Notification.builder()
+                .user(reporter)
+                .document(document)
+                .title(subject)
+                .message(content)
+                .type("SYSTEM")
+                .notificationCase("FALSE_REPORT_PENALTY")
+                .isRead(false)
+                .build();
+        return notificationRepo.save(notification);
     }
 }

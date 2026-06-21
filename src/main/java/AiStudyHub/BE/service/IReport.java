@@ -1,4 +1,4 @@
-package AiStudyHub.BE.service.impl;
+package AiStudyHub.BE.service;
 
 import AiStudyHub.BE.constraint.AdminDecision;
 import AiStudyHub.BE.entity.Report;

@@ -7,7 +7,7 @@ import AiStudyHub.BE.dto.Response.ReportResponse;
 import AiStudyHub.BE.entity.Report;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
-import AiStudyHub.BE.service.impl.IReport;
+import AiStudyHub.BE.service.IReport;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
