@@ -127,6 +127,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         return RegisterResponse.builder()
                 .email(email)
                 .otpExpiredAt(otpVerification.getExpiredAt())
+                .status(user.getStatus())
                 .build();
     }
 
