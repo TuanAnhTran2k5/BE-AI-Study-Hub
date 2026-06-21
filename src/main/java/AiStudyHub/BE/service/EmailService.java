@@ -27,8 +27,7 @@ public class EmailService implements IEmail {
             message.setSubject("Verify your AI Study Hub account");
             message.setText(
                     "Your OTP code is: " + otpCode +
-                            "\nThis code will expire in 5 minutes."
-            );
+                            "\nThis code will expire in 5 minutes.");
             mailSender.send(message);
             return CompletableFuture.completedFuture(true);
         } catch (Exception e) {
@@ -38,4 +37,19 @@ public class EmailService implements IEmail {
         }
     }
 
+    @Override
+    @Async
+    public CompletableFuture<Boolean> sendEmail(String toEmail, String subject, String content) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(toEmail);
+            message.setSubject(subject);
+            message.setText(content);
+            mailSender.send(message);
+            return CompletableFuture.completedFuture(true);
+        } catch (Exception e) {
+            log.error("Failed to send email to {}: {}", toEmail, e.getMessage());
+            return CompletableFuture.completedFuture(false);
+        }
+    }
 }

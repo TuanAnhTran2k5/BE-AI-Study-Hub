@@ -23,8 +23,8 @@ public class ReportCase {
     Long caseId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "userId")
-    User owner;
+    @JoinColumn(name = "documentId")
+    Document document;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reasonId")
@@ -36,6 +36,8 @@ public class ReportCase {
 
     @Builder.Default
     Integer reportCount = 0;
+
+    Integer requiredThreshold;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
@@ -49,6 +51,19 @@ public class ReportCase {
     LocalDateTime secondWarningAt;
 
     LocalDateTime resolvedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "resolvedBy")
+    User resolvedBy;
+
+    LocalDateTime claimedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "claimedBy")
+    User claimedBy;
+
+    @Column(columnDefinition = "TEXT")
+    String adminNote;
 
     @PrePersist
     public void prePersist() {
