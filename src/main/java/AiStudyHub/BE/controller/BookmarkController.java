@@ -7,7 +7,7 @@ import AiStudyHub.BE.dto.Response.BookmarkResponse;
 import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
-import AiStudyHub.BE.service.impl.IBookmark;
+import AiStudyHub.BE.service.IBookmark;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;

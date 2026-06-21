@@ -25,4 +25,6 @@ public interface DocumentRepo extends JpaRepository<Document, Long> {
     List<Document> findByVisibilityStatusAndSimHashContentIsNotNull(VisibilityStatus visibilityStatus);
 
     List<Document> findByOwner(AiStudyHub.BE.entity.User owner);
+
+    List<Document> findByTitleContainingIgnoreCase(String keyword);
 }

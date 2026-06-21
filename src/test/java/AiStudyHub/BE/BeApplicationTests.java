@@ -33,7 +33,7 @@ class BeApplicationTests {
 		System.out.println("Total RAG Documents: " + ragDocs.size());
 		for (RagDocument rd : ragDocs) {
 			System.out.printf("RAG ID: %d | Doc ID: %d | Status: %s | OriginalName: %s%n",
-					rd.getId(), rd.getDocumentId(), rd.getStatus(), rd.getOriginalFileName());
+					rd.getId(), rd.getDocument().getDocumentId(), rd.getStatus(), rd.getOriginalFileName());
 		}
 		System.out.println("=================================");
 	}

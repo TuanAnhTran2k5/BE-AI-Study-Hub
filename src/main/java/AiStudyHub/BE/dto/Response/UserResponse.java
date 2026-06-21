@@ -5,6 +5,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import AiStudyHub.BE.constraint.UserStatus;
+
 @Data
 @Builder
 @AllArgsConstructor
@@ -21,6 +23,7 @@ public class UserResponse {
     Long totalScore = 0L;
     String email;
     UserRole role;
+    UserStatus status;
 
     @Builder.Default
     Long storageUsed = 0L;
