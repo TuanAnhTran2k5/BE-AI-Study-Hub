@@ -29,21 +29,21 @@ public class NotificationService implements INotification {
     ) {
         log.info("Sending moderation notification to document owner {} (ID: {}) for action: {}", owner.getEmail(), owner.getUserId(), actionType);
         
-        String subject = "[AI Study Hub] Cảnh báo kiểm duyệt tài liệu: " + document.getTitle();
+        String subject = "[AI Study Hub] Document Moderation Warning: " + document.getTitle();
         String content = String.format(
-                "Xin chào %s,\n\n" +
-                "Tài liệu của bạn \"%s\" đã bị xử lý kiểm duyệt.\n" +
-                "Lý do: %s\n" +
-                "Biện pháp xử lý: %s\n" +
-                "Điểm uy tín bị trừ: %d\n" +
-                "Chi tiết/Giải trình: %s\n\n" +
-                "Trân trọng,\nBan quản trị AI Study Hub.",
+                "Hello %s,\n\n" +
+                "Your document \"%s\" has undergone moderation.\n" +
+                "Reason: %s\n" +
+                "Action taken: %s\n" +
+                "Reputation points deducted: %d\n" +
+                "Details/Explanation: %s\n\n" +
+                "Best regards,\nAI Study Hub Administrator.",
                 owner.getFullName(),
                 document.getTitle(),
                 reasonName,
                 actionType,
                 penaltyScore,
-                explanation != null ? explanation : "Không có"
+                explanation != null ? explanation : "None"
         );
 
         emailService.sendEmail(owner.getEmail(), subject, content);
@@ -69,19 +69,19 @@ public class NotificationService implements INotification {
     ) {
         log.info("Sending false report penalty notification to reporter {} (ID: {})", reporter.getEmail(), reporter.getUserId());
 
-        String subject = "[AI Study Hub] Phạt cảnh cáo: Gửi báo cáo sai sự thật";
+        String subject = "[AI Study Hub] Warning Penalty: False Reporting";
         String content = String.format(
-                "Xin chào %s,\n\n" +
-                "Báo cáo của bạn về tài liệu \"%s\" đã bị bác bỏ sau khi kiểm duyệt.\n" +
-                "Hành vi này được xác định là gửi báo cáo sai sự thật hoặc spam phá hoại hệ thống.\n" +
-                "Biện pháp xử lý: Trừ %d điểm uy tín vào tài khoản của bạn.\n" +
-                "Lý do từ chối: %s\n\n" +
-                "Vui lòng lưu ý, nếu điểm uy tín của bạn tiếp tục xuống mức âm, tính năng báo cáo của bạn sẽ bị khoá vĩnh viễn.\n\n" +
-                "Trân trọng,\nBan quản trị AI Study Hub.",
+                "Hello %s,\n\n" +
+                "Your report regarding the document \"%s\" has been rejected after review.\n" +
+                "This behavior has been determined as false reporting or spamming to disrupt the system.\n" +
+                "Action taken: Deducted %d reputation points from your account.\n" +
+                "Reason for rejection: %s\n\n" +
+                "Please note that if your reputation score continues to drop to a negative level, your reporting privileges will be permanently locked.\n\n" +
+                "Best regards,\nAI Study Hub Administrator.",
                 reporter.getFullName(),
                 document.getTitle(),
                 penaltyScore,
-                explanation != null ? explanation : "Không có"
+                explanation != null ? explanation : "None"
         );
 
         emailService.sendEmail(reporter.getEmail(), subject, content);

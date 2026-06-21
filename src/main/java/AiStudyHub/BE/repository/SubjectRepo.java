@@ -4,6 +4,7 @@ import AiStudyHub.BE.entity.Subject;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface SubjectRepo extends JpaRepository<Subject, Long> {
 
@@ -18,4 +19,8 @@ public interface SubjectRepo extends JpaRepository<Subject, Long> {
     List<Subject> findBySubjectNameContainingIgnoreCase(String subjectName);
 
     List<Subject> findByComboSubjectComboId(Long comboId);
+
+    Optional<Subject> findBySubjectCode(String subjectCode);
+
+    boolean existsBySubjectCode(String subjectCode);
 }

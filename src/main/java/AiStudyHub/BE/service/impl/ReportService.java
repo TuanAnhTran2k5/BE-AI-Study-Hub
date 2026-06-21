@@ -44,13 +44,13 @@ public class ReportService implements IReport {
 
         // 1. Validations
         if (reporter.getTotalScore() < 0) {
-            throw new GlobalException(403, "Tài khoản của bạn đã bị khóa tính năng gửi báo cáo do điểm uy tín âm.");
+            throw new GlobalException(403, "Your account has been restricted from submitting reports due to a negative reputation score.");
         }
         if (document.getVisibilityStatus() != VisibilityStatus.PUBLIC) {
-            throw new GlobalException(400, "Tài liệu này đang ở chế độ riêng tư, không thể báo cáo.");
+            throw new GlobalException(400, "This document is private and cannot be reported.");
         }
         if (document.getOwner().getUserId().equals(reporter.getUserId())) {
-            throw new GlobalException(400, "Bạn không thể báo cáo tài liệu của chính mình.");
+            throw new GlobalException(400, "You cannot report your own document.");
         }
 
         // 2. Check Rate Limiting for HIGH severity (max 5 reports in 24 hours)
@@ -60,13 +60,13 @@ public class ReportService implements IReport {
                     reporter, ReportSeverity.HIGH, oneDayAgo
             );
             if (highReportCount >= 5) {
-                throw new GlobalException(429, "Bạn đã vượt quá giới hạn gửi 5 báo cáo nghiêm trọng (HIGH) trong vòng 24 giờ. Vui lòng thử lại sau.");
+                throw new GlobalException(429, "You have exceeded the limit of 5 high-severity (HIGH) reports within 24 hours. Please try again later.");
             }
         }
 
         // 3. Check if user has already reported this document
         if (reportRepo.existsByReporterAndDocument(reporter, document)) {
-            throw new GlobalException(400, "Bạn đã gửi báo cáo cho tài liệu này rồi.");
+            throw new GlobalException(400, "You have already submitted a report for this document.");
         }
 
         // 4. Find open case with Pessimistic Lock to prevent concurrency issues
@@ -131,11 +131,11 @@ public class ReportService implements IReport {
             documentRepo.save(document);
 
             int penalty = reason.getPenaltyScore() != null ? reason.getPenaltyScore() : 10;
-            deductPoints(owner, penalty, reportCase, "Phạt vi phạm cấp độ 2 (Tài liệu bị gỡ vĩnh viễn): " + reason.getReasonName());
+            deductPoints(owner, penalty, reportCase, "Level 2 violation penalty (Document permanently removed): " + reason.getReasonName());
 
             notificationService.sendDocumentModerationNotification(
                     owner, document, reason.getReasonName(), penalty, "REMOVED",
-                    "Tài liệu của bạn bị báo cáo vi phạm quá nhiều lần (đạt ngưỡng WARNING_2) và đã bị gỡ bỏ vĩnh viễn."
+                    "Your document was reported multiple times (reached WARNING_2 threshold) and has been permanently removed."
             );
             log.info("ReportCase ID {} set to WARNING_2. Document ID {} is now REMOVED.", reportCase.getCaseId(), document.getDocumentId());
 
@@ -147,11 +147,11 @@ public class ReportService implements IReport {
             documentRepo.save(document);
 
             int penalty = reason.getPenaltyScore() != null ? reason.getPenaltyScore() : 10;
-            deductPoints(owner, penalty, reportCase, "Phạt vi phạm cấp độ 1 (Tài liệu bị ẩn tạm thời): " + reason.getReasonName());
+            deductPoints(owner, penalty, reportCase, "Level 1 violation penalty (Document temporarily hidden): " + reason.getReasonName());
 
             notificationService.sendDocumentModerationNotification(
                     owner, document, reason.getReasonName(), penalty, "HIDDEN",
-                    "Tài liệu của bạn bị ẩn tạm thời do bị báo cáo vi phạm (đạt ngưỡng WARNING_1). Vui lòng điều chỉnh lại nội dung."
+                    "Your document has been temporarily hidden due to reports (reached WARNING_1 threshold). Please adjust the content accordingly."
             );
             log.info("ReportCase ID {} set to WARNING_1. Document ID {} is now HIDDEN.", reportCase.getCaseId(), document.getDocumentId());
         }
@@ -249,7 +249,7 @@ public class ReportService implements IReport {
             documentRepo.save(document);
 
             owner.setStatus(UserStatus.BANNED);
-            owner.setBanReason("Vi phạm nghiêm trọng chính sách nội dung: " + note);
+            owner.setBanReason("Severe violation of content policy: " + note);
             owner.setBannedAt(LocalDateTime.now());
             owner.setBannedBy(admin);
             userRepo.save(owner);
@@ -262,11 +262,11 @@ public class ReportService implements IReport {
             documentRepo.save(document);
 
             int penalty = rc.getReason().getPenaltyScore() != null ? rc.getReason().getPenaltyScore() : 20;
-            deductPoints(owner, penalty, rc, "Admin gỡ tài liệu do vi phạm: " + rc.getReason().getReasonName() + ". Chi tiết: " + note);
+            deductPoints(owner, penalty, rc, "Admin removed document due to violation: " + rc.getReason().getReasonName() + ". Details: " + note);
 
             notificationService.sendDocumentModerationNotification(
                     owner, document, rc.getReason().getReasonName(), penalty, "REMOVED",
-                    "Admin đã duyệt và quyết định gỡ tài liệu của bạn do vi phạm nghiêm trọng. Chi tiết: " + note
+                    "Admin has reviewed and decided to remove your document due to a severe violation. Details: " + note
             );
             log.info("Admin ID {} removed Document ID {}", adminId, document.getDocumentId());
 
@@ -292,7 +292,7 @@ public class ReportService implements IReport {
                         .scoreType(falseReportType)
                         .reportCase(rc)
                         .scoreChange(-10)
-                        .description("Phạt cảnh cáo gửi báo cáo sai sự thật tài liệu: " + document.getTitle())
+                        .description("Penalty for false reporting of document: " + document.getTitle())
                         .build();
                 scoreLogRepo.save(logEntry);
 
