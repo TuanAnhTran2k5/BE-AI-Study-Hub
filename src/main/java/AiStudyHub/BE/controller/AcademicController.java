@@ -1,11 +1,8 @@
 package AiStudyHub.BE.controller;
 
 import AiStudyHub.BE.dto.Response.APIResponse;
-import AiStudyHub.BE.dto.Response.ComboSubjectResponse;
-import AiStudyHub.BE.dto.Response.SemesterResponse;
 import AiStudyHub.BE.dto.Response.SubjectResponse;
 import AiStudyHub.BE.service.ICurriculum;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -15,8 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/user/academic")
-@SecurityRequirement(name = "api")
+@RequestMapping("/api/academic")
 @CrossOrigin("*")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -25,25 +21,16 @@ public class AcademicController {
     ICurriculum curriculumService;
 
     @GetMapping("/semesters")
-    public ResponseEntity<APIResponse<List<SemesterResponse>>> getAllSemesters() {
+    public ResponseEntity<APIResponse<?>> getAllSemesters() {
         return ResponseEntity.ok(
                 APIResponse.response(200, "Get semesters successfully", curriculumService.getAllSemesters())
         );
     }
 
     @GetMapping("/combos")
-    public ResponseEntity<APIResponse<List<ComboSubjectResponse>>> getAllCombos() {
+    public ResponseEntity<APIResponse<?>> getAllCombos() {
         return ResponseEntity.ok(
                 APIResponse.response(200, "Get combos successfully", curriculumService.getAllComboSubjects())
-        );
-    }
-
-    @GetMapping("/combos/search")
-    public ResponseEntity<APIResponse<List<ComboSubjectResponse>>> searchCombos(
-            @RequestParam String keyword
-    ) {
-        return ResponseEntity.ok(
-                APIResponse.response(200, "Search combos successfully", curriculumService.searchComboSubjects(keyword))
         );
     }
 
@@ -52,18 +39,7 @@ public class AcademicController {
             @PathVariable Long semesterId
     ) {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get subjects by semester successfully",
-                        curriculumService.getSubjectsBySemester(semesterId))
-        );
-    }
-
-    @GetMapping("/subjects/search")
-    public ResponseEntity<APIResponse<List<SubjectResponse>>> searchSubjects(
-            @RequestParam String keyword
-    ) {
-        return ResponseEntity.ok(
-                APIResponse.response(200, "Search subjects successfully",
-                        curriculumService.searchSubjects(keyword))
+                APIResponse.response(200, "Get subjects by semester successfully", curriculumService.getSubjectsBySemester(semesterId))
         );
     }
 
@@ -73,8 +49,7 @@ public class AcademicController {
             @PathVariable Long comboId
     ) {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get subjects by semester and combo successfully",
-                        curriculumService.getSubjectsBySemesterAndCombo(semesterId, comboId))
+                APIResponse.response(200, "Get subjects by semester and combo successfully", curriculumService.getSubjectsBySemesterAndCombo(semesterId, comboId))
         );
     }
 }

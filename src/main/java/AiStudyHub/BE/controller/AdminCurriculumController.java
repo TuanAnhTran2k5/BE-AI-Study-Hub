@@ -99,7 +99,7 @@ public class AdminCurriculumController {
 
     @PutMapping("/combos/{id}")
     public ResponseEntity<APIResponse<ComboSubjectResponse>> updateComboSubject(@PathVariable Long id, @RequestBody ComboSubjectRequest request) {
-        return ResponseEntity.ok(APIResponse.response(200, "Update combo subject successfully. Lời khuyên: Vui lòng kiểm tra và cập nhật các môn học thuộc combo này nếu cần thiết.", curriculumService.updateComboSubject(id, request)));
+        return ResponseEntity.ok(APIResponse.response(200, "Update combo subject successfully. Advice: Please check and update the subjects belonging to this combo if necessary.", curriculumService.updateComboSubject(id, request)));
     }
 
     @DeleteMapping("/combos/{id}")

@@ -65,7 +65,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/user/**").hasAnyRole("US", "AD")
                         .anyRequest().authenticated()
                 )
-                // 401 Unauthorized: chưa xác thực (không có / sai token)
+                // 401 Unauthorized: unauthenticated (missing or invalid token)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
