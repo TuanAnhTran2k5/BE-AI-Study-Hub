@@ -4,9 +4,7 @@ import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.ComboSubjectResponse;
 import AiStudyHub.BE.dto.Response.SemesterResponse;
 import AiStudyHub.BE.dto.Response.SubjectResponse;
-import AiStudyHub.BE.service.impl.IComboSubject;
-import AiStudyHub.BE.service.impl.ISemester;
-import AiStudyHub.BE.service.impl.ISubject;
+import AiStudyHub.BE.service.ICurriculum;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -24,21 +22,19 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AcademicController {
 
-    ISemester semesterService;
-    ISubject subjectService;
-    IComboSubject comboSubjectService;
+    ICurriculum curriculumService;
 
     @GetMapping("/semesters")
     public ResponseEntity<APIResponse<List<SemesterResponse>>> getAllSemesters() {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get semesters successfully", semesterService.getAllSemesters())
+                APIResponse.response(200, "Get semesters successfully", curriculumService.getAllSemesters())
         );
     }
 
     @GetMapping("/combos")
     public ResponseEntity<APIResponse<List<ComboSubjectResponse>>> getAllCombos() {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get combos successfully", comboSubjectService.getAllComboSubjects())
+                APIResponse.response(200, "Get combos successfully", curriculumService.getAllComboSubjects())
         );
     }
 
@@ -47,7 +43,7 @@ public class AcademicController {
             @RequestParam String keyword
     ) {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Search combos successfully", comboSubjectService.searchComboSubjects(keyword))
+                APIResponse.response(200, "Search combos successfully", curriculumService.searchComboSubjects(keyword))
         );
     }
 
@@ -57,7 +53,7 @@ public class AcademicController {
     ) {
         return ResponseEntity.ok(
                 APIResponse.response(200, "Get subjects by semester successfully",
-                        subjectService.getSubjectsBySemester(semesterId))
+                        curriculumService.getSubjectsBySemester(semesterId))
         );
     }
 
@@ -67,7 +63,7 @@ public class AcademicController {
     ) {
         return ResponseEntity.ok(
                 APIResponse.response(200, "Search subjects successfully",
-                        subjectService.searchSubjects(keyword))
+                        curriculumService.searchSubjects(keyword))
         );
     }
 
@@ -78,7 +74,7 @@ public class AcademicController {
     ) {
         return ResponseEntity.ok(
                 APIResponse.response(200, "Get subjects by semester and combo successfully",
-                        subjectService.getSubjectsBySemesterAndCombo(semesterId, comboId))
+                        curriculumService.getSubjectsBySemesterAndCombo(semesterId, comboId))
         );
     }
 }

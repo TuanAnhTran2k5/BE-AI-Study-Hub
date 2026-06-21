@@ -7,9 +7,8 @@ import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
 import AiStudyHub.BE.dto.Request.RatingRequest;
 import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.User;
-import AiStudyHub.BE.service.RatingService;
-import AiStudyHub.BE.service.impl.IDocumentCommand;
-import AiStudyHub.BE.service.impl.IDocumentDownload;
+import AiStudyHub.BE.service.IGamification;
+import AiStudyHub.BE.service.IDocument;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -34,9 +33,8 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "document-controller")
 public class DocumentController {
 
-    IDocumentCommand documentCommandService;
-    IDocumentDownload documentDownloadService;
-    RatingService ratingService;
+    IDocument documentService;
+    IGamification gamificationService;
 
     @Operation(summary = "Upload Document")
     @RequestBody(content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE, schema = @Schema(implementation = DocumentUploadRequest.class)))
@@ -51,7 +49,7 @@ public class DocumentController {
             request.setVisibilityStatus(VisibilityStatus.PRIVATE);
         }
 
-        DocumentUploadResponse response = documentCommandService.uploadDocument(request);
+        DocumentUploadResponse response = documentService.uploadDocument(request);
 
         return ResponseEntity.ok(
                 APIResponse.response(200, "Upload document successfully", response));
@@ -60,7 +58,7 @@ public class DocumentController {
     @Operation(summary = "Delete Document")
     @DeleteMapping("/{documentId}")
     public ResponseEntity<APIResponse<DeleteResponse>> deleteDocument(@PathVariable Long documentId) throws Exception {
-        DeleteResponse response = documentCommandService.deleteDocument(documentId);
+        DeleteResponse response = documentService.deleteDocument(documentId);
 
         return ResponseEntity.ok(
                 APIResponse.response(200, "Delete document successfully", response));
@@ -71,7 +69,7 @@ public class DocumentController {
             @PathVariable Long documentId
     ) throws Exception {
 
-        DocumentDownloadResponse response = documentDownloadService.downloadPublicDocument(documentId);
+        DocumentDownloadResponse response = documentService.downloadPublicDocument(documentId);
 
         return ResponseEntity.ok(
                 APIResponse.response(
@@ -88,7 +86,7 @@ public class DocumentController {
             @PathVariable Long documentId,
             @org.springframework.web.bind.annotation.RequestBody DocumentUpdateRequest request
     ) {
-        DocumentUpdateResponse response = documentCommandService.updateDocument(documentId, request);
+        DocumentUpdateResponse response = documentService.updateDocument(documentId, request);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Update document successfully", response)
         );
@@ -98,7 +96,7 @@ public class DocumentController {
     @Operation(summary = "Download my own (cloud) document")
     @GetMapping("/{documentId}/cloud-download")
     public ResponseEntity<Resource> downloadMyCloudDocument(@PathVariable Long documentId) {
-        return documentDownloadService.downloadMyCloudDocument(documentId);
+        return documentService.downloadMyCloudDocument(documentId);
     }
 
     @Operation(summary = "Submit or update a rating for a public document")
@@ -107,7 +105,7 @@ public class DocumentController {
             @PathVariable Long documentId,
             @org.springframework.web.bind.annotation.RequestBody RatingRequest request
     ) {
-        RatingResponse response = ratingService.submitRating(documentId, request);
+        RatingResponse response = gamificationService.submitRating(documentId, request);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Submit rating successfully", response)
         );
@@ -118,7 +116,7 @@ public class DocumentController {
     public ResponseEntity<APIResponse<java.util.List<DocumentUploadResponse>>> searchDocuments(
             @RequestParam String keyword
     ) {
-        java.util.List<DocumentUploadResponse> response = documentCommandService.searchDocumentsByTitle(keyword);
+        java.util.List<DocumentUploadResponse> response = documentService.searchDocumentsByTitle(keyword);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Search documents successfully", response)
         );

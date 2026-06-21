@@ -3,7 +3,7 @@ package AiStudyHub.BE.controller;
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.RagDocumentResponse;
-import AiStudyHub.BE.service.impl.IRagDocument;
+import AiStudyHub.BE.service.IRagSystem;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class RagDocumentController {
 
-    IRagDocument ragDocumentService;
+    IRagSystem ragDocumentService;
 
     @PostMapping("/{id}/index")
     public ResponseEntity<APIResponse<RagDocumentResponse>> indexDocument(@PathVariable Long id) {

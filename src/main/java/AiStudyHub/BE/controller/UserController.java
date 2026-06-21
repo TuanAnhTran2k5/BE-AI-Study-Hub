@@ -5,7 +5,7 @@ import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.UpdateProfileResponse;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.security.SecurityUtils;
-import AiStudyHub.BE.service.UserService;
+import AiStudyHub.BE.service.IUser;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +20,7 @@ public class UserController {
 
 
     @Autowired
-    UserService userService;
+    IUser userService;
 
 
     @PutMapping("profile")

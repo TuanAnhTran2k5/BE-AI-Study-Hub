@@ -3,7 +3,7 @@ package AiStudyHub.BE.controller;
 import AiStudyHub.BE.dto.Request.ChatRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.ChatResponse;
-import AiStudyHub.BE.service.impl.IRagChat;
+import AiStudyHub.BE.service.IRagSystem;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class RagChatController {
 
-    IRagChat ragChatService;
+    IRagSystem ragChatService;
 
     @PostMapping("/ask")
     public ResponseEntity<APIResponse<ChatResponse>> askQuestion(@RequestBody @Valid ChatRequest request) {

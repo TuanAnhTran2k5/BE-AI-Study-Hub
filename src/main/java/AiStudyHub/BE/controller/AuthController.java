@@ -14,7 +14,7 @@ import AiStudyHub.BE.dto.Request.VerifyTokenRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.RegisterResponse;
 import AiStudyHub.BE.dto.Response.UserResponse;
-import AiStudyHub.BE.service.AuthenticationService;
+import AiStudyHub.BE.service.IAuthentication;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.*;
 @SecurityRequirement(name = "api")
 public class AuthController {
     @Autowired
-    AuthenticationService authenticationService;
+    IAuthentication authenticationService;
 
     @PostMapping("register")
     public ResponseEntity<APIResponse<RegisterResponse>> register(@Valid @RequestBody RegisterRequest registerRequest) {
