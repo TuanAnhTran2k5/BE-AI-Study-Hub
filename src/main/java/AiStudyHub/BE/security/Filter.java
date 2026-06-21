@@ -3,7 +3,7 @@ package AiStudyHub.BE.security;
 import AiStudyHub.BE.config.SecurityProperties;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
-import AiStudyHub.BE.service.TokenService;
+import AiStudyHub.BE.service.IToken;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,7 +30,7 @@ public class Filter extends OncePerRequestFilter {
     SecurityProperties securityProperties;
 
     @Autowired
-    TokenService tokenService;
+    IToken tokenService;
 
     @Autowired
     @Qualifier("handlerExceptionResolver")

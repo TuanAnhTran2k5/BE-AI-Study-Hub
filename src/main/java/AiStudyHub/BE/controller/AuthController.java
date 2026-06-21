@@ -10,10 +10,11 @@ import AiStudyHub.BE.dto.Request.LoginRequest;
 import AiStudyHub.BE.dto.Request.LogoutRequest;
 import AiStudyHub.BE.dto.Request.RegisterRequest;
 import AiStudyHub.BE.dto.Request.VerifyOtpRequest;
+import AiStudyHub.BE.dto.Request.VerifyTokenRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.RegisterResponse;
 import AiStudyHub.BE.dto.Response.UserResponse;
-import AiStudyHub.BE.service.AuthenticationService;
+import AiStudyHub.BE.service.IAuthentication;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +27,7 @@ import org.springframework.web.bind.annotation.*;
 @SecurityRequirement(name = "api")
 public class AuthController {
     @Autowired
-    AuthenticationService authenticationService;
+    IAuthentication authenticationService;
 
     @PostMapping("register")
     public ResponseEntity<APIResponse<RegisterResponse>> register(@Valid @RequestBody RegisterRequest registerRequest) {
@@ -69,11 +70,21 @@ public class AuthController {
                         ));
     }
 
+    @PostMapping("verify-token")
+    public ResponseEntity<APIResponse<UserResponse>> verifyToken(@Valid @RequestBody VerifyTokenRequest request) {
+        UserResponse userResponse = authenticationService.verifyToken(request);
+        return ResponseEntity.status(200)
+                .body(
+                        APIResponse.response(
+                                200, "Token is valid", userResponse
+                        ));
+    }
+
     @PostMapping("logout")
-    public ResponseEntity<APIResponse<Void>> logout(@Valid @RequestBody LogoutRequest logoutRequest) {
-        authenticationService.logout(logoutRequest);
+    public ResponseEntity<APIResponse<Boolean>> logout(@Valid @RequestBody LogoutRequest logoutRequest) {
+        boolean result = authenticationService.logout(logoutRequest);
         return ResponseEntity.ok(
-                APIResponse.response(200, "Logout Successfully", null)
+                APIResponse.response(200, "Logout Successfully", result)
         );
     }
 
@@ -88,12 +99,12 @@ public class AuthController {
     }
 
     @PostMapping("forgot-password/reset")
-    public ResponseEntity<APIResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
-        authenticationService.resetPassword(request);
+    public ResponseEntity<APIResponse<Boolean>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        boolean result = authenticationService.resetPassword(request);
         return ResponseEntity.status(200)
                 .body(
                         APIResponse.response(
-                                200, "Change Password Successfully", null
+                                200, "Change Password Successfully", result
                         ));
     }
 

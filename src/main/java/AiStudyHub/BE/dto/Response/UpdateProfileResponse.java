@@ -7,6 +7,8 @@ import lombok.experimental.FieldDefaults;
 
 import java.util.List;
 
+import AiStudyHub.BE.constraint.UserStatus;
+
 @Data
 @Builder
 @AllArgsConstructor
@@ -22,6 +24,7 @@ public class UpdateProfileResponse {
     String email;
 
     UserRole role;
+    UserStatus status;
 
     Long storageUsed;
     Long storageLimit;

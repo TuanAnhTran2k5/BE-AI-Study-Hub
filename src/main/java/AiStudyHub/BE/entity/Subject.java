@@ -44,4 +44,8 @@ public class Subject {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     SubjectType subjectType;
+
+    @Builder.Default
+    @Column(nullable = false)
+    Boolean isDeleted = false;
 }

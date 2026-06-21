@@ -7,6 +7,8 @@ import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
 
+import AiStudyHub.BE.constraint.UserStatus;
+
 @Data
 @Builder
 @AllArgsConstructor
@@ -19,4 +21,6 @@ public class RegisterResponse {
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     LocalDateTime otpExpiredAt;
+
+    UserStatus status;
 }

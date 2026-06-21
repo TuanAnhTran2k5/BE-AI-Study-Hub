@@ -6,19 +6,10 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
-/**
- * Repository interface for {@link RagDocument} entity.
- */
 @Repository
 public interface RagDocumentRepository extends JpaRepository<RagDocument, Long> {
 
-    /**
-     * Finds a document by its original filename.
-     *
-     * @param originalFileName the original name of the file
-     * @return an Optional holding the matching RagDocument
-     */
-    Optional<RagDocument> findByOriginalFileName(String originalFileName);
-
-    Optional<RagDocument> findByDocumentId(Long documentId);
+    // Looks up the RagDocument by the linked library Document's id (derived query
+    // navigating the document FK relationship: RagDocument.document.documentId).
+    Optional<RagDocument> findByDocument_DocumentId(Long documentId);
 }

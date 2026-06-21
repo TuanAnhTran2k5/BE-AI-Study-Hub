@@ -41,8 +41,10 @@ public class RagDocument {
     @Column(name = "status", nullable = false, length = 30)
     String status; // e.g. PENDING, INDEXED, FAILED
 
-    @Column(name = "document_id")
-    Long documentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "document_id")
+    Document document;
+
 
     @PrePersist
     public void prePersist() {

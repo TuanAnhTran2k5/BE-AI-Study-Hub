@@ -1,6 +1,5 @@
 package AiStudyHub.BE.controller;
 
-import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.constraint.VisibilityStatus;
 
 import AiStudyHub.BE.dto.Request.DocumentUpdateRequest;
@@ -8,9 +7,8 @@ import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
 import AiStudyHub.BE.dto.Request.RatingRequest;
 import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.User;
-import AiStudyHub.BE.exception.GlobalException;
-import AiStudyHub.BE.service.DocumentService;
-import AiStudyHub.BE.service.RatingService;
+import AiStudyHub.BE.service.IGamification;
+import AiStudyHub.BE.service.IDocument;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -18,24 +16,25 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/user/document")
 @SecurityRequirement(name = "api")
 @CrossOrigin("*")
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Tag(name = "document-controller")
 public class DocumentController {
 
-    @Autowired
-    private DocumentService documentService;
-    @Autowired
-    private RatingService ratingService;
+    IDocument documentService;
+    IGamification gamificationService;
 
     @Operation(summary = "Upload Document")
     @RequestBody(content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE, schema = @Schema(implementation = DocumentUploadRequest.class)))
@@ -43,10 +42,7 @@ public class DocumentController {
     public ResponseEntity<APIResponse<DocumentUploadResponse>> uploadFile(
             @Valid @ModelAttribute DocumentUploadRequest request) throws Exception {
 
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof User currentUser)) {
-            throw new GlobalException(ErrorCode.INVALID_TOKEN);
-        }
+        User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
 
         request.setOwnerId(currentUser.getUserId());
         if (request.getVisibilityStatus() == null) {
@@ -61,8 +57,8 @@ public class DocumentController {
 
     @Operation(summary = "Delete Document")
     @DeleteMapping("/{documentId}")
-    public ResponseEntity<APIResponse<DocumentDeleteResponse>> deleteDocument(@PathVariable Long documentId) throws Exception {
-        DocumentDeleteResponse response = documentService.deleteDocument(documentId);
+    public ResponseEntity<APIResponse<DeleteResponse>> deleteDocument(@PathVariable Long documentId) throws Exception {
+        DeleteResponse response = documentService.deleteDocument(documentId);
 
         return ResponseEntity.ok(
                 APIResponse.response(200, "Delete document successfully", response));
@@ -97,15 +93,32 @@ public class DocumentController {
     }
 
 
+    @Operation(summary = "Download my own (cloud) document")
+    @GetMapping("/{documentId}/cloud-download")
+    public ResponseEntity<Resource> downloadMyCloudDocument(@PathVariable Long documentId) {
+        return documentService.downloadMyCloudDocument(documentId);
+    }
+
     @Operation(summary = "Submit or update a rating for a public document")
     @PostMapping(value = "/{documentId}/rating", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<APIResponse<RatingResponse>> submitRating(
             @PathVariable Long documentId,
             @org.springframework.web.bind.annotation.RequestBody RatingRequest request
     ) {
-        RatingResponse response = ratingService.submitRating(documentId, request);
+        RatingResponse response = gamificationService.submitRating(documentId, request);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Submit rating successfully", response)
+        );
+    }
+
+    @Operation(summary = "Search public documents by title")
+    @GetMapping("/search")
+    public ResponseEntity<APIResponse<java.util.List<DocumentUploadResponse>>> searchDocuments(
+            @RequestParam String keyword
+    ) {
+        java.util.List<DocumentUploadResponse> response = documentService.searchDocumentsByTitle(keyword);
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Search documents successfully", response)
         );
     }
 }

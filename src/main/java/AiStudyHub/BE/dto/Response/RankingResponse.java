@@ -13,6 +13,6 @@ public class RankingResponse {
     String rankName;
     Integer minScore;
     Integer maxScore;
-    Integer storageBonus;
+    Long storageBonus;
     String displayPriority;
 }

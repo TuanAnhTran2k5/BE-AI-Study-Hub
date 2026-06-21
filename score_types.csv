@@ -1,0 +1,10 @@
+TypeCode,TypeName,DefaultPoint
+UPLOAD_PUBLIC,Upload public document,5
+DOC_DOWNLOAD,Document downloaded,5
+BOOKMARK,Document bookmarked,3
+GOOD_RATING,Good rating received,5
+RATING_REPUTATION,Daily rating reputation (computed by average-rating threshold),0
+REPORT_MINOR_FIRST_PENALTY,Minor report first penalty,-5
+REPORT_MINOR_FINAL_PENALTY,Minor report final penalty,-10
+ADS_CONTENT_PENALTY,Advertisement content penalty,-15
+DUPLICATE_CONTENT_PENALTY,Duplicate content penalty,-20

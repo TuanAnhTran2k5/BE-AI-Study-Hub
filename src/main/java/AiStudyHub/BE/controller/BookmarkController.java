@@ -4,9 +4,10 @@ import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.dto.Request.BookmarkRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.BookmarkResponse;
+import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
-import AiStudyHub.BE.service.impl.IBookmark;
+import AiStudyHub.BE.service.IBookmark;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -49,7 +50,7 @@ public class BookmarkController {
 
     @DeleteMapping("/{documentId}")
     @Operation(summary = "Remove a bookmark for a document")
-    public ResponseEntity<APIResponse<Void>> deleteBookmark(
+    public ResponseEntity<APIResponse<DeleteResponse>> deleteBookmark(
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long documentId) {
 
@@ -57,9 +58,9 @@ public class BookmarkController {
             throw new GlobalException(ErrorCode.INVALID_TOKEN);
         }
 
-        bookmarkService.removeBookmark(currentUser.getUserId(), documentId);
+        DeleteResponse response = bookmarkService.removeBookmark(currentUser.getUserId(), documentId);
         return ResponseEntity.ok(
-                APIResponse.response(200, "Bookmark removed successfully", null)
+                APIResponse.response(200, "Bookmark removed successfully", response)
         );
     }
 
