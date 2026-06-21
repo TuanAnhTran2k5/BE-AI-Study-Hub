@@ -2,7 +2,7 @@ package AiStudyHub.BE.controller;
 
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.SubjectResponse;
-import AiStudyHub.BE.service.IAcademic;
+import AiStudyHub.BE.service.ICurriculum;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -18,19 +18,19 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AcademicController {
 
-    IAcademic academicService;
+    ICurriculum curriculumService;
 
     @GetMapping("/semesters")
     public ResponseEntity<APIResponse<?>> getAllSemesters() {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get semesters successfully", academicService.getAllSemesters())
+                APIResponse.response(200, "Get semesters successfully", curriculumService.getAllSemesters())
         );
     }
 
     @GetMapping("/combos")
     public ResponseEntity<APIResponse<?>> getAllCombos() {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get combos successfully", academicService.getAllCombos())
+                APIResponse.response(200, "Get combos successfully", curriculumService.getAllComboSubjects())
         );
     }
 
@@ -39,7 +39,7 @@ public class AcademicController {
             @PathVariable Long semesterId
     ) {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get subjects by semester successfully", academicService.getSubjectsBySemester(semesterId))
+                APIResponse.response(200, "Get subjects by semester successfully", curriculumService.getSubjectsBySemester(semesterId))
         );
     }
 
@@ -49,7 +49,7 @@ public class AcademicController {
             @PathVariable Long comboId
     ) {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get subjects by semester and combo successfully", academicService.getSubjectsBySemesterAndCombo(semesterId, comboId))
+                APIResponse.response(200, "Get subjects by semester and combo successfully", curriculumService.getSubjectsBySemesterAndCombo(semesterId, comboId))
         );
     }
 }
