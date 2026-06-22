@@ -17,12 +17,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/report-cases")
 @CrossOrigin("*")
+@SecurityRequirement(name = "api")
 @RequiredArgsConstructor
 public class ReportAdminController {
 

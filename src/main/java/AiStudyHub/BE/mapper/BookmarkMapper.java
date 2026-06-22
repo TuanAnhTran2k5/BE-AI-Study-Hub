@@ -8,12 +8,10 @@ import org.mapstruct.Mapping;
 
 import java.time.LocalDateTime;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = {DocumentMapper.class})
 public interface BookmarkMapper {
 
     @Mapping(source = "user.userId", target = "userId")
-    @Mapping(source = "document.documentId", target = "documentId")
-    @Mapping(source = "document.title", target = "documentTitle")
     BookmarkResponse toResponse(Bookmark bookmark);
 
     @Mapping(target = "success", constant = "true")

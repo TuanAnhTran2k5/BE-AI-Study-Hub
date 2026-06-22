@@ -23,8 +23,8 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/user/bookmarks")
-@SecurityRequirement(name = "api")
 @CrossOrigin("*")
+@SecurityRequirement(name = "api")
 @Tag(name = "bookmark-controller")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)

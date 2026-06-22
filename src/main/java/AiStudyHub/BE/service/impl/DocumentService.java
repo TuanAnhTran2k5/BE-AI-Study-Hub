@@ -5,11 +5,7 @@ import AiStudyHub.BE.constraint.ModerationStatus;
 import AiStudyHub.BE.constraint.VisibilityStatus;
 import AiStudyHub.BE.dto.Request.DocumentUpdateRequest;
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
-import AiStudyHub.BE.dto.Response.DeleteResponse;
-import AiStudyHub.BE.dto.Response.DocumentDownloadResponse;
-import AiStudyHub.BE.dto.Response.DocumentUpdateResponse;
-import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
-import AiStudyHub.BE.dto.Response.FileUploadResponse;
+import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.Download;
 import AiStudyHub.BE.entity.RagDocument;
@@ -204,11 +200,33 @@ public class DocumentService implements IDocument {
     }
 
     @Override
-    public List<DocumentUploadResponse> searchDocumentsByTitle(String keyword) {
+    public List<DocumentResponse> searchDocumentsByTitle(String keyword) {
         return documentRepo.findByTitleContainingIgnoreCase(keyword).stream()
                 .filter(doc -> doc.getVisibilityStatus() == VisibilityStatus.PUBLIC)
-                .map(documentMapper::toDocumentUploadResponse)
+                .map(documentMapper::toDocumentResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DocumentResponse> getMyDocuments(Long userId) {
+        return documentRepo.findByOwnerUserId(userId).stream()
+                .map(documentMapper::toDocumentResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public DocumentResponse getDocumentDetail(Long documentId) {
+        Document document = documentRepo.findById(documentId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (document.getVisibilityStatus() == VisibilityStatus.PRIVATE) {
+            User currentUser = SecurityUtils.getCurrentUser();
+            if (!document.getOwner().getUserId().equals(currentUser.getUserId())) {
+                throw new GlobalException(403, "You do not have permission to view this document");
+            }
+        }
+
+        return documentMapper.toDocumentResponse(document);
     }
 
     // --- DOWNLOAD ---
@@ -353,6 +371,36 @@ public class DocumentService implements IDocument {
                 .contentType(mediaType)
                 .contentLength(fileBytes.length)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .body(resource);
+    }
+
+    @Override
+    public ResponseEntity<Resource> viewDocumentContent(Long documentId) {
+        User currentUser = SecurityUtils.getCurrentUser();
+
+        Document document = documentRepo.findById(documentId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (document.getVisibilityStatus() == VisibilityStatus.PRIVATE) {
+            if (!document.getOwner().getUserId().equals(currentUser.getUserId())) {
+                throw new GlobalException(403, "You do not have permission to view the content of this document");
+            }
+        }
+
+        byte[] fileBytes = supabaseStorageService.downloadFile(document.getFileUrl());
+        Resource resource = new ByteArrayResource(fileBytes);
+
+        String fileName = document.getFileName();
+        if (fileName == null || fileName.isBlank()) {
+            fileName = "document";
+        }
+
+        MediaType mediaType = getMediaType(document.getFileType());
+
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .contentLength(fileBytes.length)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
                 .body(resource);
     }
 
