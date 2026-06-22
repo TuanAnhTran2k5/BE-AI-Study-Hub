@@ -1,5 +1,6 @@
 package AiStudyHub.BE.service.impl;
 
+import AiStudyHub.BE.constraint.VisibilityStatus;
 import AiStudyHub.BE.dto.Request.ChatRequest;
 import AiStudyHub.BE.dto.Response.ChatResponse;
 import AiStudyHub.BE.dto.Response.DeleteResponse;
@@ -152,12 +153,12 @@ public class RagSystemService implements IRagSystem {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             List<Long> accessibleIds;
             if (auth != null && auth.getPrincipal() instanceof User currentUser) {
-                accessibleIds = documentRepo.findByOwner_UserIdOrVisibilityStatus(currentUser.getUserId(), AiStudyHub.BE.constraint.VisibilityStatus.PUBLIC)
+                accessibleIds = documentRepo.findByOwnerUserIdOrVisibilityStatus(currentUser.getUserId(), VisibilityStatus.PUBLIC)
                         .stream()
                         .map(AiStudyHub.BE.entity.Document::getDocumentId)
                         .toList();
             } else {
-                accessibleIds = documentRepo.findByVisibilityStatus(AiStudyHub.BE.constraint.VisibilityStatus.PUBLIC)
+                accessibleIds = documentRepo.findByVisibilityStatus(VisibilityStatus.PUBLIC)
                         .stream()
                         .map(AiStudyHub.BE.entity.Document::getDocumentId)
                         .toList();

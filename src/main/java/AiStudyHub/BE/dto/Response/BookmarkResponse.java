@@ -14,7 +14,6 @@ public class BookmarkResponse {
 
     Long bookmarkId;
     Long userId;
-    Long documentId;
-    String documentTitle;
+    DocumentResponse document;
     LocalDateTime bookmarkedAt;
 }

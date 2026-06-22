@@ -1,10 +1,7 @@
 package AiStudyHub.BE.mapper;
 
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
-import AiStudyHub.BE.dto.Response.DeleteResponse;
-import AiStudyHub.BE.dto.Response.DocumentDownloadResponse;
-import AiStudyHub.BE.dto.Response.DocumentUpdateResponse;
-import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
+import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.Document;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -61,4 +58,12 @@ public interface DocumentMapper {
     @Mapping(source = "visibilityStatus", target = "visibilityStatus")
     @Mapping(source = "updatedAt", target = "updatedAt")
     DocumentUpdateResponse toDocumentUpdateResponse(Document document);
+
+    @Mapping(source = "owner.userId", target = "ownerId")
+    @Mapping(source = "owner.fullName", target = "ownerName")
+    @Mapping(source = "owner.avatarUrl", target = "ownerAvatar")
+    @Mapping(source = "subject.subjectId", target = "subjectId")
+    @Mapping(source = "subject.subjectCode", target = "subjectCode")
+    @Mapping(source = "subject.subjectName", target = "subjectName")
+    DocumentResponse toDocumentResponse(Document document);
 }

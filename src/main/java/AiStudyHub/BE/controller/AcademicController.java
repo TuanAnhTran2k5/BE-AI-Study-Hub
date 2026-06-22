@@ -3,6 +3,7 @@ package AiStudyHub.BE.controller;
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.SubjectResponse;
 import AiStudyHub.BE.service.ICurriculum;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -12,8 +13,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/academic")
+@RequestMapping("/api/user/academic")
 @CrossOrigin("*")
+@SecurityRequirement(name = "api")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AcademicController {
