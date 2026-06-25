@@ -1,19 +1,30 @@
 package AiStudyHub.BE.service.impl;
 
 import AiStudyHub.BE.constraint.VisibilityStatus;
+import AiStudyHub.BE.constraint.UploadStatus;
+import AiStudyHub.BE.constraint.SenderType;
 import AiStudyHub.BE.dto.Request.ChatRequest;
+import AiStudyHub.BE.dto.Request.CreateSessionRequest;
 import AiStudyHub.BE.dto.Response.ChatResponse;
+import AiStudyHub.BE.dto.Response.ChatSessionResponse;
+import AiStudyHub.BE.dto.Response.ChatMessageResponse;
 import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.RagDocumentResponse;
 import AiStudyHub.BE.entity.RagChunk;
 import AiStudyHub.BE.entity.RagDocument;
 import AiStudyHub.BE.entity.User;
+import AiStudyHub.BE.entity.ChatSession;
+import AiStudyHub.BE.entity.ChatMessage;
+import AiStudyHub.BE.entity.ChatSessionDocument;
 import AiStudyHub.BE.exception.GlobalException;
 
 import AiStudyHub.BE.mapper.RagDocumentMapper;
 import AiStudyHub.BE.repository.DocumentRepo;
 import AiStudyHub.BE.repository.RagChunkRepository;
 import AiStudyHub.BE.repository.RagDocumentRepository;
+import AiStudyHub.BE.repository.ChatSessionRepository;
+import AiStudyHub.BE.repository.ChatMessageRepository;
+import AiStudyHub.BE.repository.ChatSessionDocumentRepository;
 import AiStudyHub.BE.service.IRagSystem;
 import AiStudyHub.BE.service.ISupabaseStorage;
 import lombok.AccessLevel;
@@ -31,6 +42,10 @@ import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -54,6 +69,10 @@ public class RagSystemService implements IRagSystem {
     RagDocumentMapper ragDocumentMapper;
     ISupabaseStorage supabaseStorageService;
 
+    ChatSessionRepository chatSessionRepository;
+    ChatMessageRepository chatMessageRepository;
+    ChatSessionDocumentRepository chatSessionDocumentRepository;
+
     private static final String RAG_PROMPT_TEMPLATE = """
             You are a helpful AI study assistant.
             
@@ -74,6 +93,22 @@ public class RagSystemService implements IRagSystem {
             
             Answer:
             """;
+
+    private static final String RAG_WITH_HISTORY_PROMPT_TEMPLATE = """
+            Bạn là một trợ lý học tập AI hữu ích.
+            
+            Lịch sử cuộc hội thoại trước đó:
+            {history}
+            
+            Ngữ cảnh lấy từ tài liệu:
+            {context}
+            
+            Câu hỏi hiện tại của người dùng:
+            {question}
+            
+            Trả lời:
+            """;
+
 
     // ==========================================
     //                   CHAT
@@ -144,6 +179,10 @@ public class RagSystemService implements IRagSystem {
 
     @Override
     public List<Document> retrieveRelevantChunks(String question) {
+        return retrieveRelevantChunksWithFilters(question, null);
+    }
+
+    private List<Document> retrieveRelevantChunksWithFilters(String question, List<Long> sessionDocIds) {
         try {
             log.info("Searching vector store for query: {}", question);
 
@@ -152,11 +191,13 @@ public class RagSystemService implements IRagSystem {
             if (auth != null && auth.getPrincipal() instanceof User currentUser) {
                 accessibleIds = documentRepo.findByOwnerUserIdOrVisibilityStatus(currentUser.getUserId(), VisibilityStatus.PUBLIC)
                         .stream()
+                        .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
                         .map(AiStudyHub.BE.entity.Document::getDocumentId)
                         .toList();
             } else {
                 accessibleIds = documentRepo.findByVisibilityStatus(VisibilityStatus.PUBLIC)
                         .stream()
+                        .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
                         .map(AiStudyHub.BE.entity.Document::getDocumentId)
                         .toList();
             }
@@ -166,12 +207,26 @@ public class RagSystemService implements IRagSystem {
                 return List.of();
             }
 
-            List<String> accessibleIdStrings = accessibleIds.stream()
+            List<Long> targetIds;
+            if (sessionDocIds != null && !sessionDocIds.isEmpty()) {
+                targetIds = sessionDocIds.stream()
+                        .filter(accessibleIds::contains)
+                        .toList();
+            } else {
+                targetIds = accessibleIds;
+            }
+
+            if (targetIds.isEmpty()) {
+                log.info("No matching target documents for similarity search. Returning empty chunks.");
+                return List.of();
+            }
+
+            List<String> targetIdStrings = targetIds.stream()
                     .map(Object::toString)
                     .toList();
 
             FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
-            Filter.Expression filterExpression = filterBuilder.in("documentId", accessibleIdStrings.toArray()).build();
+            Filter.Expression filterExpression = filterBuilder.in("documentId", targetIdStrings.toArray()).build();
 
             SearchRequest searchRequest = SearchRequest.builder()
                     .query(question)
@@ -184,6 +239,215 @@ public class RagSystemService implements IRagSystem {
             throw new GlobalException(500, "Failed to search similar chunks in vector store", e);
         }
     }
+
+    // ==========================================
+    //               SESSION CHAT
+    // ==========================================
+
+    @Override
+    @Transactional
+    public ChatSessionResponse createSession(CreateSessionRequest request) {
+        User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+        log.info("Creating chat session for user: {}", currentUser.getUserId());
+
+        ChatSession session = ChatSession.builder()
+                .user(currentUser)
+                .sessionTitle("Cuộc trò chuyện mới")
+                .build();
+        session = chatSessionRepository.save(session);
+
+        List<Long> documentIds = new ArrayList<>();
+        if (request.getDocumentIds() != null && !request.getDocumentIds().isEmpty()) {
+            for (Long docId : request.getDocumentIds()) {
+                AiStudyHub.BE.entity.Document document = documentRepo.findById(docId)
+                        .orElseThrow(() -> new GlobalException(404, "Document not found with ID: " + docId));
+
+                // Security check: must be public or owned by user
+                boolean isPublic = document.getVisibilityStatus() == VisibilityStatus.PUBLIC;
+                boolean isOwner = document.getOwner().getUserId().equals(currentUser.getUserId());
+                if (!isPublic && !isOwner) {
+                    throw new GlobalException(403, "You do not have permission to access document with ID: " + docId);
+                }
+
+                ChatSessionDocument sessionDoc = ChatSessionDocument.builder()
+                        .session(session)
+                        .document(document)
+                        .build();
+                chatSessionDocumentRepository.save(sessionDoc);
+                documentIds.add(docId);
+            }
+        }
+
+        return ChatSessionResponse.builder()
+                .sessionId(session.getSessionId())
+                .sessionTitle(session.getSessionTitle())
+                .createdAt(session.getCreatedAt())
+                .updatedAt(session.getUpdatedAt())
+                .documentIds(documentIds)
+                .build();
+    }
+
+    @Override
+    public List<ChatSessionResponse> getSessions() {
+        User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+        log.info("Retrieving chat sessions for user: {}", currentUser.getUserId());
+
+        List<ChatSession> sessions = chatSessionRepository.findByUser_UserIdOrderByCreatedAtDesc(currentUser.getUserId());
+
+        return sessions.stream().map(session -> {
+            List<Long> documentIds = chatSessionDocumentRepository.findBySession_SessionId(session.getSessionId())
+                    .stream()
+                    .map(sd -> sd.getDocument().getDocumentId())
+                    .collect(Collectors.toList());
+
+            return ChatSessionResponse.builder()
+                    .sessionId(session.getSessionId())
+                    .sessionTitle(session.getSessionTitle())
+                    .createdAt(session.getCreatedAt())
+                    .updatedAt(session.getUpdatedAt())
+                    .documentIds(documentIds)
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<ChatMessageResponse> getSessionMessages(Long sessionId, int page, int size) {
+        User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+        log.info("Retrieving messages for session: {}", sessionId);
+
+        ChatSession session = chatSessionRepository.findBySessionIdAndUser_UserId(sessionId, currentUser.getUserId())
+                .orElseThrow(() -> new GlobalException(404, "Chat session not found or you don't have access"));
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<ChatMessage> msgPage = chatMessageRepository.findBySession_SessionIdOrderByCreatedAtDesc(sessionId, pageable);
+
+        List<ChatMessageResponse> content = msgPage.getContent().stream()
+                .map(msg -> ChatMessageResponse.builder()
+                        .messageId(msg.getMessageId())
+                        .senderType(msg.getSenderType())
+                        .content(msg.getContent())
+                        .createdAt(msg.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+
+        Collections.reverse(content);
+
+        return new PageImpl<>(content, pageable, msgPage.getTotalElements());
+    }
+
+    @Override
+    @Transactional
+    public void deleteSession(Long sessionId) {
+        User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+        log.info("Deleting session: {}", sessionId);
+
+        ChatSession session = chatSessionRepository.findBySessionIdAndUser_UserId(sessionId, currentUser.getUserId())
+                .orElseThrow(() -> new GlobalException(404, "Chat session not found or you don't have access"));
+
+        chatSessionRepository.delete(session);
+    }
+
+    @Override
+    @Transactional
+    public ChatResponse askQuestionInSession(Long sessionId, ChatRequest request) {
+        User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+        ChatSession session = chatSessionRepository.findBySessionIdAndUser_UserId(sessionId, currentUser.getUserId())
+                .orElseThrow(() -> new GlobalException(404, "Chat session not found or you don't have access"));
+
+        String question = request.getQuestion();
+        log.info("Processing question in session {}: {}", sessionId, question);
+
+        // 1. Get history (top 10 messages) before saving current message
+        List<ChatMessage> historyMessages = new ArrayList<>(chatMessageRepository.findTop10BySession_SessionIdOrderByCreatedAtDesc(sessionId));
+        Collections.reverse(historyMessages);
+
+        String history = historyMessages.stream()
+                .map(msg -> (msg.getSenderType() == SenderType.USER ? "User: " : "AI: ") + msg.getContent())
+                .collect(Collectors.joining("\n"));
+
+        // 2. Auto rename if this is the first message
+        long messageCount = chatMessageRepository.countBySession_SessionId(sessionId);
+        if (messageCount == 0) {
+            String title = question.length() > 80 ? question.substring(0, 77) + "..." : question;
+            session.setSessionTitle(title);
+            chatSessionRepository.save(session);
+        }
+
+        // 3. Save user message
+        ChatMessage userMsg = ChatMessage.builder()
+                .session(session)
+                .senderType(SenderType.USER)
+                .content(question)
+                .build();
+        chatMessageRepository.save(userMsg);
+
+        // 4. Retrieve session document ids
+        List<Long> sessionDocIds = chatSessionDocumentRepository.findBySession_SessionId(sessionId)
+                .stream()
+                .map(sd -> sd.getDocument().getDocumentId())
+                .collect(Collectors.toList());
+
+        // 5. Similarity search filtering by session documents
+        List<Document> relevantChunks = retrieveRelevantChunksWithFilters(question, sessionDocIds);
+        log.info("Retrieved {} relevant chunks for session {}", relevantChunks.size(), sessionId);
+
+        if (relevantChunks.isEmpty()) {
+            String aiAnswer = "No relevant information found in the documents to answer this question.";
+            ChatMessage aiMsg = ChatMessage.builder()
+                    .session(session)
+                    .senderType(SenderType.AI)
+                    .content(aiAnswer)
+                    .build();
+            chatMessageRepository.save(aiMsg);
+
+            return ChatResponse.builder()
+                    .answer(aiAnswer)
+                    .sources(List.of())
+                    .build();
+        }
+
+        String context = buildContext(relevantChunks);
+
+        List<String> sources = relevantChunks.stream()
+                .map(doc -> {
+                    Map<String, Object> metadata = doc.getMetadata();
+                    if (metadata != null && metadata.containsKey("originalFileName")) {
+                        return (String) metadata.get("originalFileName");
+                    }
+                    return "Unknown Source";
+                })
+                .distinct()
+                .collect(Collectors.toList());
+
+        try {
+            PromptTemplate promptTemplate = new PromptTemplate(RAG_WITH_HISTORY_PROMPT_TEMPLATE);
+            Map<String, Object> promptParameters = new HashMap<>();
+            promptParameters.put("history", history);
+            promptParameters.put("context", context);
+            promptParameters.put("question", question);
+            org.springframework.ai.chat.prompt.Prompt prompt = promptTemplate.create(promptParameters);
+
+            log.info("Calling OpenAI model with history and context...");
+            String answer = chatClient.prompt(prompt).call().content();
+
+            // 6. Save AI answer to DB
+            ChatMessage aiMsg = ChatMessage.builder()
+                    .session(session)
+                    .senderType(SenderType.AI)
+                    .content(answer)
+                    .build();
+            chatMessageRepository.save(aiMsg);
+
+            return ChatResponse.builder()
+                    .answer(answer)
+                    .sources(sources)
+                    .build();
+        } catch (Exception e) {
+            log.error("Error generating answer from LLM in session", e);
+            throw new GlobalException(500, "Failed to generate answer from chat model", e);
+        }
+    }
+
 
     // ==========================================
     //                 DOCUMENT

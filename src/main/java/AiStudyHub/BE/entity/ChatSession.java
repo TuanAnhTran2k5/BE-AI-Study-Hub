@@ -5,6 +5,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "chat_session")
@@ -28,6 +29,12 @@ public class ChatSession {
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 
+    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
+    List<ChatMessage> messages;
+
+    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
+    List<ChatSessionDocument> sessionDocuments;
+
     @PrePersist
     public void prePersist() {
         createdAt = LocalDateTime.now();
@@ -38,3 +45,4 @@ public class ChatSession {
         updatedAt = LocalDateTime.now();
     }
 }
+
