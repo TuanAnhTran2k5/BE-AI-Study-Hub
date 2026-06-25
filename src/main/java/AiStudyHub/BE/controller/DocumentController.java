@@ -22,12 +22,14 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/user/document")
-@SecurityRequirement(name = "api")
 @CrossOrigin("*")
+@SecurityRequirement(name = "api")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Tag(name = "document-controller")
@@ -65,9 +67,7 @@ public class DocumentController {
     }
 
     @PostMapping("/{documentId}/download/public")
-    public ResponseEntity<APIResponse<DocumentDownloadResponse>> downloadPublicDocument(
-            @PathVariable Long documentId
-    ) throws Exception {
+    public ResponseEntity<APIResponse<DocumentDownloadResponse>> downloadPublicDocument(@PathVariable Long documentId) throws Exception {
 
         DocumentDownloadResponse response = documentService.downloadPublicDocument(documentId);
 
@@ -84,7 +84,7 @@ public class DocumentController {
     @PatchMapping(value = "/{documentId}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<APIResponse<DocumentUpdateResponse>> updateDocument(
             @PathVariable Long documentId,
-            @org.springframework.web.bind.annotation.RequestBody DocumentUpdateRequest request
+            @RequestBody DocumentUpdateRequest request
     ) {
         DocumentUpdateResponse response = documentService.updateDocument(documentId, request);
         return ResponseEntity.ok(
@@ -103,7 +103,7 @@ public class DocumentController {
     @PostMapping(value = "/{documentId}/rating", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<APIResponse<RatingResponse>> submitRating(
             @PathVariable Long documentId,
-            @org.springframework.web.bind.annotation.RequestBody RatingRequest request
+            @RequestBody RatingRequest request
     ) {
         RatingResponse response = gamificationService.submitRating(documentId, request);
         return ResponseEntity.ok(
@@ -113,12 +113,41 @@ public class DocumentController {
 
     @Operation(summary = "Search public documents by title")
     @GetMapping("/search")
-    public ResponseEntity<APIResponse<java.util.List<DocumentUploadResponse>>> searchDocuments(
-            @RequestParam String keyword
+    public ResponseEntity<APIResponse<List<DocumentResponse>>> searchDocuments(
+            @RequestParam(required = false, defaultValue = "") String keyword
     ) {
-        java.util.List<DocumentUploadResponse> response = documentService.searchDocumentsByTitle(keyword);
+        List<DocumentResponse> response = documentService.searchDocumentsByTitle(keyword);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Search documents successfully", response)
         );
     }
+
+    @Operation(summary = "Get my documents")
+    @GetMapping("/my-documents")
+    public ResponseEntity<APIResponse<List<DocumentResponse>>> getMyDocuments(
+            @AuthenticationPrincipal User currentUser) {
+        
+        List<DocumentResponse> response = documentService.getMyDocuments(currentUser.getUserId());
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Get my documents successfully", response)
+        );
+    }
+
+    @Operation(summary = "Get document detail")
+    @GetMapping("/{documentId}")
+    public ResponseEntity<APIResponse<DocumentResponse>> getDocumentDetail(
+            @PathVariable Long documentId) {
+        
+        DocumentResponse response = documentService.getDocumentDetail(documentId);
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Get document detail successfully", response)
+        );
+    }
+
+    @Operation(summary = "View document content directly (for PDF viewers, etc.)")
+    @GetMapping("/{documentId}/view-content")
+    public ResponseEntity<Resource> viewDocumentContent(@PathVariable Long documentId) {
+        return documentService.viewDocumentContent(documentId);
+    }
 }
+

@@ -17,6 +17,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/curriculum")
+@CrossOrigin("*")
 @RequiredArgsConstructor
 @lombok.experimental.FieldDefaults(level = lombok.AccessLevel.PRIVATE, makeFinal = true)
 public class AdminCurriculumController {

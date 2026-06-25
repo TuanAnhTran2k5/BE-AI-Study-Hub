@@ -11,8 +11,8 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/reputation")
-@SecurityRequirement(name = "api")
 @CrossOrigin("*")
+@SecurityRequirement(name = "api")
 @Tag(name = "reputation-controller")
 public class ReputationController {
 

@@ -3,13 +3,10 @@ package AiStudyHub.BE.service.impl;
 import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.constraint.ModerationStatus;
 import AiStudyHub.BE.constraint.VisibilityStatus;
+import AiStudyHub.BE.constraint.UploadStatus;
 import AiStudyHub.BE.dto.Request.DocumentUpdateRequest;
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
-import AiStudyHub.BE.dto.Response.DeleteResponse;
-import AiStudyHub.BE.dto.Response.DocumentDownloadResponse;
-import AiStudyHub.BE.dto.Response.DocumentUpdateResponse;
-import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
-import AiStudyHub.BE.dto.Response.FileUploadResponse;
+import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.Download;
 import AiStudyHub.BE.entity.RagDocument;
@@ -32,6 +29,7 @@ import AiStudyHub.BE.service.IDuplicateCheck;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -40,6 +38,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -64,6 +65,11 @@ public class DocumentService implements IDocument {
     RagDocumentRepository ragDocumentRepository;
     IRagSystem ragSystemService;
 
+    @Autowired
+    @Lazy
+    @NonFinal
+    IDocument self;
+
     // --- UPLOAD & UPDATE & DELETE ---
 
     @Override
@@ -82,58 +88,109 @@ public class DocumentService implements IDocument {
 
         byte[] fileBytes = request.getFile().getBytes();
 
-        FileUploadResponse fileMetadata = supabaseStorageService.uploadFile(request.getFile(), null);
+        VisibilityStatus visibilityStatus =
+                request.getVisibilityStatus() == null
+                        ? VisibilityStatus.PRIVATE
+                        : request.getVisibilityStatus();
 
-        // File is already on Supabase. If any later DB step fails, the file would
-        // become an orphan, so clean it up before propagating the error.
+        Document document = documentMapper.toDocument(request);
+        document.setOwner(owner);
+        document.setSubject(subject);
+        document.setFileName(request.getFile().getOriginalFilename());
+        document.setFileType(request.getFile().getContentType());
+        document.setFileSize(fileSize);
+        document.setVisibilityStatus(visibilityStatus);
+        document.setModerationStatus(ModerationStatus.NORMAL);
+        document.setUploadStatus(UploadStatus.UPLOADING);
+        document.setAverageRating(0.0);
+        document.setRatingCount(0);
+        document.setDownloadCount(0);
+        document.setBookmarkCount(0);
+        document.setReportCount(0);
+
+        document = documentRepo.save(document);
+
+        // Trigger Async Upload Process
+        self.uploadDocumentAsync(
+                document.getDocumentId(),
+                fileBytes,
+                request.getFile().getOriginalFilename(),
+                request.getFile().getContentType(),
+                fileSize,
+                owner.getUserId()
+        );
+
+        DocumentUploadResponse response = documentMapper.toDocumentUploadResponse(document);
+        response.setMessage("Your file is uploading. The process will complete in the background.");
+        return response;
+    }
+
+    @Override
+    @Async
+    public void uploadDocumentAsync(Long documentId, byte[] fileBytes, String originalFileName, String contentType, Long fileSize, Long ownerId) {
+        log.info("Starting async upload process for documentId: {}", documentId);
+        
+        FileUploadResponse fileMetadata = null;
         try {
-            VisibilityStatus visibilityStatus =
-                    request.getVisibilityStatus() == null
-                            ? VisibilityStatus.PRIVATE
-                            : request.getVisibilityStatus();
+            // 1. Upload to Supabase
+            fileMetadata = supabaseStorageService.uploadBytes(fileBytes, originalFileName, null, contentType);
+            log.info("Async uploaded file to Supabase successfully: {}", fileMetadata.getPublicUrl());
 
-            Document document = documentMapper.toDocument(request);
-            document.setOwner(owner);
-            document.setSubject(subject);
+            // 2. Fetch document and owner
+            Document document = documentRepo.findById(documentId).orElse(null);
+            if (document == null) {
+                log.error("Document not found for ID: {}. Deleting uploaded file.", documentId);
+                safeDeleteFile(fileMetadata.getPublicUrl());
+                return;
+            }
+
+            User owner = userRepo.findById(ownerId).orElse(null);
+            if (owner == null) {
+                log.error("Owner not found for ID: {}. Deleting uploaded file.", ownerId);
+                safeDeleteFile(fileMetadata.getPublicUrl());
+                return;
+            }
+
+            // 3. Update document metadata
             document.setFileName(fileMetadata.getOriginalFileName());
             document.setFileUrl(fileMetadata.getPublicUrl());
             document.setFileType(fileMetadata.getContentType());
             document.setFileSize(fileMetadata.getFileSize());
-            document.setVisibilityStatus(visibilityStatus);
-            document.setModerationStatus(ModerationStatus.NORMAL);
-            document.setAverageRating(0.0);
-            document.setRatingCount(0);
-            document.setDownloadCount(0);
-            document.setBookmarkCount(0);
-            document.setReportCount(0);
 
-            document = documentRepo.save(document);
-
-            // Trigger Synchronous Duplicate Check
+            // 4. Duplicate Check
             Document duplicatedDoc = duplicateCheckService.performDuplicateCheck(document.getDocumentId(), fileBytes);
+            if (duplicatedDoc != null) {
+                document.setVisibilityStatus(VisibilityStatus.PRIVATE);
+                log.info("Duplication detected! Document set to PRIVATE. Duplicated with doc ID: {}", duplicatedDoc.getDocumentId());
+            }
 
-            // After uploading + saving the document, add the capacity
+            // 5. Update user storage usage
             storageService.increaseStorage(owner, fileSize);
             userRepo.save(owner);
 
+            // 6. Award badges / check achievements
             gamificationService.checkAndAwardBadges(owner.getUserId());
 
-            // Auto-index in RAG system if it's a supported format (best-effort)
+            // 7. Auto index RAG
             documentRagIndexer.autoIndexIfSupported(document, fileBytes);
 
-            DocumentUploadResponse response = documentMapper.toDocumentUploadResponse(document);
-            if (duplicatedDoc != null) {
-                response.setVisibilityStatus(VisibilityStatus.PRIVATE);
-                response.setMessage(String.format(
-                        "Your file is uploaded successfully, but it is set to private mode due to duplication with document '%s' (File: %s).",
-                        duplicatedDoc.getTitle(), duplicatedDoc.getFileName()));
-            }
-            return response;
+            // 8. Update status to COMPLETED
+            document.setUploadStatus(UploadStatus.COMPLETED);
+            documentRepo.save(document);
 
-        } catch (Exception ex) {
-            // Compensating action: remove the orphaned file from storage.
-            safeDeleteFile(fileMetadata.getPublicUrl());
-            throw ex;
+            log.info("Async upload process finished successfully for documentId: {}", documentId);
+
+        } catch (Exception e) {
+            log.error("Async upload process failed for documentId: {}", documentId, e);
+            if (fileMetadata != null) {
+                safeDeleteFile(fileMetadata.getPublicUrl());
+            }
+            
+            Document document = documentRepo.findById(documentId).orElse(null);
+            if (document != null) {
+                document.setUploadStatus(UploadStatus.FAILED);
+                documentRepo.save(document);
+            }
         }
     }
 
@@ -204,11 +261,38 @@ public class DocumentService implements IDocument {
     }
 
     @Override
-    public List<DocumentUploadResponse> searchDocumentsByTitle(String keyword) {
+    public List<DocumentResponse> searchDocumentsByTitle(String keyword) {
         return documentRepo.findByTitleContainingIgnoreCase(keyword).stream()
-                .filter(doc -> doc.getVisibilityStatus() == VisibilityStatus.PUBLIC)
-                .map(documentMapper::toDocumentUploadResponse)
+                .filter(doc -> doc.getVisibilityStatus() == VisibilityStatus.PUBLIC && doc.getUploadStatus() == UploadStatus.COMPLETED)
+                .map(documentMapper::toDocumentResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DocumentResponse> getMyDocuments(Long userId) {
+        return documentRepo.findByOwnerUserId(userId).stream()
+                .map(documentMapper::toDocumentResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public DocumentResponse getDocumentDetail(Long documentId) {
+        Document document = documentRepo.findById(documentId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (document.getVisibilityStatus() == VisibilityStatus.PRIVATE) {
+            User currentUser = SecurityUtils.getCurrentUser();
+            if (!document.getOwner().getUserId().equals(currentUser.getUserId())) {
+                throw new GlobalException(403, "You do not have permission to view this document");
+            }
+        } else {
+            // For public documents, make sure it is COMPLETED
+            if (document.getUploadStatus() != UploadStatus.COMPLETED) {
+                throw new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND);
+            }
+        }
+
+        return documentMapper.toDocumentResponse(document);
     }
 
     // --- DOWNLOAD ---
@@ -221,6 +305,10 @@ public class DocumentService implements IDocument {
 
         if (publicDocument.getVisibilityStatus() != VisibilityStatus.PUBLIC) {
             throw new GlobalException(ErrorCode.DOCUMENT_NOT_PUBLIC);
+        }
+
+        if (publicDocument.getUploadStatus() != UploadStatus.COMPLETED) {
+            throw new GlobalException(400, "This document is not fully uploaded yet.");
         }
 
         User authUser = SecurityUtils.getCurrentUser();
@@ -353,6 +441,36 @@ public class DocumentService implements IDocument {
                 .contentType(mediaType)
                 .contentLength(fileBytes.length)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .body(resource);
+    }
+
+    @Override
+    public ResponseEntity<Resource> viewDocumentContent(Long documentId) {
+        User currentUser = SecurityUtils.getCurrentUser();
+
+        Document document = documentRepo.findById(documentId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (document.getVisibilityStatus() == VisibilityStatus.PRIVATE) {
+            if (!document.getOwner().getUserId().equals(currentUser.getUserId())) {
+                throw new GlobalException(403, "You do not have permission to view the content of this document");
+            }
+        }
+
+        byte[] fileBytes = supabaseStorageService.downloadFile(document.getFileUrl());
+        Resource resource = new ByteArrayResource(fileBytes);
+
+        String fileName = document.getFileName();
+        if (fileName == null || fileName.isBlank()) {
+            fileName = "document";
+        }
+
+        MediaType mediaType = getMediaType(document.getFileType());
+
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .contentLength(fileBytes.length)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
                 .body(resource);
     }
 

@@ -139,7 +139,7 @@ class ReportServiceTest {
         });
 
         assertEquals(403, exception.getCode());
-        assertTrue(exception.getMessage().contains("khóa tính năng gửi báo cáo"));
+        assertTrue(exception.getMessage().contains("restricted from submitting reports"));
     }
 
     @Test
@@ -152,7 +152,7 @@ class ReportServiceTest {
         });
 
         assertEquals(429, exception.getCode());
-        assertTrue(exception.getMessage().contains("vượt quá giới hạn"));
+        assertTrue(exception.getMessage().contains("exceeded the limit"));
     }
 
     @Test
@@ -164,7 +164,7 @@ class ReportServiceTest {
         });
 
         assertEquals(400, exception.getCode());
-        assertTrue(exception.getMessage().contains("đã gửi báo cáo"));
+        assertTrue(exception.getMessage().contains("already submitted a report"));
     }
 
     @Test
@@ -285,7 +285,7 @@ class ReportServiceTest {
         });
 
         assertEquals(400, exception.getCode());
-        assertTrue(exception.getMessage().contains("chế độ riêng tư"));
+        assertTrue(exception.getMessage().contains("is private and cannot be reported"));
     }
 
     @Test
@@ -297,6 +297,6 @@ class ReportServiceTest {
         });
 
         assertEquals(400, exception.getCode());
-        assertTrue(exception.getMessage().contains("báo cáo tài liệu của chính mình"));
+        assertTrue(exception.getMessage().contains("You cannot report your own document"));
     }
 }

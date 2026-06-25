@@ -1,19 +1,18 @@
 package AiStudyHub.BE.dto.Response;
 
+import AiStudyHub.BE.constraint.SenderType;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
 import java.time.LocalDateTime;
 
 @Data
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class BookmarkResponse {
-
-    Long bookmarkId;
-    Long userId;
-    DocumentResponse document;
-    LocalDateTime bookmarkedAt;
+public class ChatMessageResponse {
+    Long messageId;
+    SenderType senderType;
+    String content;
+    LocalDateTime createdAt;
 }

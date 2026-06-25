@@ -21,8 +21,8 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/user/reports")
-@SecurityRequirement(name = "api")
 @CrossOrigin("*")
+@SecurityRequirement(name = "api")
 @Tag(name = "report-controller")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)

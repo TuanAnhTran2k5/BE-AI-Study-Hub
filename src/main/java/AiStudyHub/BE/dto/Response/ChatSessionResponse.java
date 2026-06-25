@@ -2,18 +2,18 @@ package AiStudyHub.BE.dto.Response;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class BookmarkResponse {
-
-    Long bookmarkId;
-    Long userId;
-    DocumentResponse document;
-    LocalDateTime bookmarkedAt;
+public class ChatSessionResponse {
+    Long sessionId;
+    String sessionTitle;
+    LocalDateTime createdAt;
+    LocalDateTime updatedAt;
+    List<Long> documentIds;
 }
