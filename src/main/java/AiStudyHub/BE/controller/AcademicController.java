@@ -2,40 +2,37 @@ package AiStudyHub.BE.controller;
 
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.SubjectResponse;
-import AiStudyHub.BE.entity.Subject;
-import AiStudyHub.BE.repository.ComboSubjectRepo;
-import AiStudyHub.BE.repository.SemesterRepo;
-import AiStudyHub.BE.repository.SubjectRepo;
-import org.springframework.beans.factory.annotation.Autowired;
+import AiStudyHub.BE.service.ICurriculum;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/academic")
+@RequestMapping("/api/user/academic")
 @CrossOrigin("*")
+@SecurityRequirement(name = "api")
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AcademicController {
 
-    @Autowired
-    private SemesterRepo semesterRepo;
-
-    @Autowired
-    private SubjectRepo subjectRepo;
-
-    @Autowired
-    private ComboSubjectRepo comboSubjectRepo;
+    ICurriculum curriculumService;
 
     @GetMapping("/semesters")
     public ResponseEntity<APIResponse<?>> getAllSemesters() {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get semesters successfully", semesterRepo.findAll())
+                APIResponse.response(200, "Get semesters successfully", curriculumService.getAllSemesters())
         );
     }
 
     @GetMapping("/combos")
     public ResponseEntity<APIResponse<?>> getAllCombos() {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get combos successfully", comboSubjectRepo.findAll())
+                APIResponse.response(200, "Get combos successfully", curriculumService.getAllComboSubjects())
         );
     }
 
@@ -43,17 +40,8 @@ public class AcademicController {
     public ResponseEntity<APIResponse<List<SubjectResponse>>> getSubjectsBySemester(
             @PathVariable Long semesterId
     ) {
-
-        List<SubjectResponse> result = subjectRepo.findBySemester_SemesterId(semesterId)
-
-       
-
-                                                  .stream()
-                                                  .map(this::toSubjectResponse)
-                                                  .toList();
-
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get subjects by semester successfully", result)
+                APIResponse.response(200, "Get subjects by semester successfully", curriculumService.getSubjectsBySemester(semesterId))
         );
     }
 
@@ -62,36 +50,8 @@ public class AcademicController {
             @PathVariable Long semesterId,
             @PathVariable Long comboId
     ) {
-
-
-
-        List<Subject> baseSubjects = subjectRepo.findBySemesterSemesterIdAndComboSubjectIsNull(semesterId);
-        List<Subject> comboSubjects = subjectRepo.findBySemesterSemesterIdAndComboSubjectComboId(semesterId, comboId);
-        
-        List<SubjectResponse> result = java.util.stream.Stream.concat(baseSubjects.stream(), comboSubjects.stream())
-
-                                                  .map(this::toSubjectResponse)
-                                                  .toList();
-
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get subjects by semester and combo successfully", result)
+                APIResponse.response(200, "Get subjects by semester and combo successfully", curriculumService.getSubjectsBySemesterAndCombo(semesterId, comboId))
         );
-    }
-
-    private SubjectResponse toSubjectResponse(Subject subject) {
-        return SubjectResponse.builder()
-                              .subjectId(subject.getSubjectId())
-                              .subjectCode(subject.getSubjectCode())
-                              .subjectName(subject.getSubjectName())
-                              .description(subject.getDescription())
-                              .subjectType(subject.getSubjectType())
-
-                              .semesterId(subject.getSemester().getSemesterId())
-                              .semesterNo(subject.getSemester().getSemesterNo())
-
-                              .comboId(subject.getComboSubject() == null ? null : subject.getComboSubject().getComboId())
-                              .comboCode(subject.getComboSubject() == null ? null : subject.getComboSubject().getComboCode())
-                              .comboName(subject.getComboSubject() == null ? null : subject.getComboSubject().getComboName())
-                              .build();
     }
 }

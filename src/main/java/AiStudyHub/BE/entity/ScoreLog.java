@@ -36,6 +36,10 @@ public class ScoreLog {
     @JoinColumn(name = "reportId")
     Report report;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reportCaseId")
+    ReportCase reportCase;
+
     Integer scoreChange;
 
     @Column(columnDefinition = "TEXT")

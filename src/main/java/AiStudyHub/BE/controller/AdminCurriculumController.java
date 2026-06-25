@@ -8,7 +8,7 @@ import AiStudyHub.BE.dto.Response.ComboSubjectResponse;
 import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.SemesterResponse;
 import AiStudyHub.BE.dto.Response.SubjectResponse;
-import AiStudyHub.BE.service.impl.ICurriculum;
+import AiStudyHub.BE.service.ICurriculum;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,10 +17,12 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/curriculum")
+@CrossOrigin("*")
 @RequiredArgsConstructor
+@lombok.experimental.FieldDefaults(level = lombok.AccessLevel.PRIVATE, makeFinal = true)
 public class AdminCurriculumController {
 
-    private final ICurriculum curriculumService;
+    ICurriculum curriculumService;
 
     // --- Semesters ---
     @GetMapping("/semesters")
@@ -50,7 +52,10 @@ public class AdminCurriculumController {
 
     // --- Subjects ---
     @GetMapping("/subjects")
-    public ResponseEntity<APIResponse<List<SubjectResponse>>> getAllSubjects() {
+    public ResponseEntity<APIResponse<List<SubjectResponse>>> getAllSubjects(@RequestParam(required = false) String keyword) {
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            return ResponseEntity.ok(APIResponse.response(200, "Search subjects successfully", curriculumService.searchSubjects(keyword.trim())));
+        }
         return ResponseEntity.ok(APIResponse.response(200, "Get all subjects successfully", curriculumService.getAllSubjects()));
     }
 
@@ -76,7 +81,10 @@ public class AdminCurriculumController {
 
     // --- ComboSubjects ---
     @GetMapping("/combos")
-    public ResponseEntity<APIResponse<List<ComboSubjectResponse>>> getAllComboSubjects() {
+    public ResponseEntity<APIResponse<List<ComboSubjectResponse>>> getAllComboSubjects(@RequestParam(required = false) String keyword) {
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            return ResponseEntity.ok(APIResponse.response(200, "Search combo subjects successfully", curriculumService.searchComboSubjects(keyword.trim())));
+        }
         return ResponseEntity.ok(APIResponse.response(200, "Get all combo subjects successfully", curriculumService.getAllComboSubjects()));
     }
 
@@ -92,7 +100,7 @@ public class AdminCurriculumController {
 
     @PutMapping("/combos/{id}")
     public ResponseEntity<APIResponse<ComboSubjectResponse>> updateComboSubject(@PathVariable Long id, @RequestBody ComboSubjectRequest request) {
-        return ResponseEntity.ok(APIResponse.response(200, "Update combo subject successfully. Lời khuyên: Vui lòng kiểm tra và cập nhật các môn học thuộc combo này nếu cần thiết.", curriculumService.updateComboSubject(id, request)));
+        return ResponseEntity.ok(APIResponse.response(200, "Update combo subject successfully. Advice: Please check and update the subjects belonging to this combo if necessary.", curriculumService.updateComboSubject(id, request)));
     }
 
     @DeleteMapping("/combos/{id}")

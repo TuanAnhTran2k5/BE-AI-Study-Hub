@@ -18,7 +18,7 @@ public interface RagDocumentMapper {
 
     @Mapping(target = "success", constant = "true")
     @Mapping(target = "message", constant = "RagDocument deleted successfully")
-    @Mapping(source = "document.documentId", target = "deletedId")
+    @Mapping(source = "document.document.documentId", target = "deletedId")
     @Mapping(target = "entityName", constant = "RagDocument")
     @Mapping(source = "document.originalFileName", target = "entityIdentifier")
     @Mapping(source = "deletedAt", target = "deletedAt")

@@ -6,12 +6,9 @@ import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
 
-/**
- * JPA entity representing a single text chunk of an uploaded RAG document.
- */
 @Entity
 @Table(name = "rag_chunk")
-@Getter
+@Getter 
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor

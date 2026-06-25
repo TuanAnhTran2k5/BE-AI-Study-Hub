@@ -59,10 +59,9 @@ public class User implements UserDetails {
     @Column(nullable = false)
     Long storageLimit = 2L * 1024 * 1024 * 1024; //2GB
 
-    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    UserStatus status = UserStatus.ACTIVE;
+    UserStatus status;
 
     String banReason;
     LocalDateTime bannedAt;

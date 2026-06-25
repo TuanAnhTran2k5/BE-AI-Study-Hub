@@ -27,4 +27,7 @@ public class ReportReason {
 
     @Column(columnDefinition = "TEXT")
     String description;
+
+    Integer reportThreshold;
+    Integer penaltyScore;
 }
