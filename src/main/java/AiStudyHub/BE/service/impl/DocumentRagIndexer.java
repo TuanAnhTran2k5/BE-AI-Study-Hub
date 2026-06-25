@@ -20,33 +20,38 @@ public class DocumentRagIndexer {
     IRagSystem ragDocumentService;
 
     private boolean isSupported(String contentType, String fileName) {
-        String lower = fileName != null ? fileName.toLowerCase() : "";
-        boolean byContentType = contentType != null && (
-                contentType.equalsIgnoreCase("application/pdf") ||
-                contentType.equalsIgnoreCase("application/vnd.openxmlformats-officedocument.wordprocessingml.document") ||
-                contentType.equalsIgnoreCase("text/plain"));
-        return byContentType
-                || lower.endsWith(".pdf")
-                || lower.endsWith(".docx")
-                || lower.endsWith(".txt");
+        if (contentType != null && (contentType.startsWith("image/") || contentType.startsWith("video/") || contentType.startsWith("audio/"))) {
+            return false;
+        }
+        return true;
     }
 
     public void autoIndexIfSupported(Document document, byte[] fileBytes) {
         if (!isSupported(document.getFileType(), document.getFileName())) {
+            log.info("Document '{}' type not supported for RAG indexing, skipping.", document.getFileName());
             return;
         }
         try {
-            log.info("Auto-indexing document '{}' in RAG system...", document.getFileName());
+            log.info("Auto-indexing document '{}' (ID: {}) in RAG system...",
+                    document.getFileName(), document.getDocumentId());
+
             RagDocument ragDoc = RagDocument.builder()
-                    .document(document)
+                    .document(document)          // set the full entity so getDocumentId() works
                     .originalFileName(document.getFileName())
                     .contentType(document.getFileType())
                     .fileSize(document.getFileSize())
                     .uploadedBy(document.getOwner().getEmail())
                     .status("PENDING")
                     .build();
+
             ragDoc = ragDocumentRepository.save(ragDoc);
+
+            // Explicitly re-attach the document reference after save,
+            // because JPA may have detached or not eagerly loaded it.
+            ragDoc.setDocument(document);
+
             ragDocumentService.indexDocumentContent(ragDoc, fileBytes);
+
             ragDoc.setStatus("INDEXED");
             ragDocumentRepository.save(ragDoc);
             log.info("Successfully auto-indexed document ID: {}", document.getDocumentId());

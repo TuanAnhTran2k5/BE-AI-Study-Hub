@@ -10,12 +10,12 @@ import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.service.IGamification;
 import AiStudyHub.BE.service.IDocument;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import org.springframework.web.bind.annotation.RequestBody;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -39,7 +39,9 @@ public class DocumentController {
     IGamification gamificationService;
 
     @Operation(summary = "Upload Document")
-    @RequestBody(content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE, schema = @Schema(implementation = DocumentUploadRequest.class)))
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+                    schema = @Schema(implementation = DocumentUploadRequest.class)))
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<APIResponse<DocumentUploadResponse>> uploadFile(
             @Valid @ModelAttribute DocumentUploadRequest request) throws Exception {
@@ -126,7 +128,7 @@ public class DocumentController {
     @GetMapping("/my-documents")
     public ResponseEntity<APIResponse<List<DocumentResponse>>> getMyDocuments(
             @AuthenticationPrincipal User currentUser) {
-        
+
         List<DocumentResponse> response = documentService.getMyDocuments(currentUser.getUserId());
         return ResponseEntity.ok(
                 APIResponse.response(200, "Get my documents successfully", response)
@@ -137,7 +139,7 @@ public class DocumentController {
     @GetMapping("/{documentId}")
     public ResponseEntity<APIResponse<DocumentResponse>> getDocumentDetail(
             @PathVariable Long documentId) {
-        
+
         DocumentResponse response = documentService.getDocumentDetail(documentId);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Get document detail successfully", response)
@@ -150,4 +152,3 @@ public class DocumentController {
         return documentService.viewDocumentContent(documentId);
     }
 }
-

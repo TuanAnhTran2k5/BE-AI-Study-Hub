@@ -23,4 +23,6 @@ public interface ReportRepo extends JpaRepository<Report, Long> {
     );
 
     List<Report> findAllByReportCase(ReportCase reportCase);
+
+    long deleteByDocumentDocumentId(Long documentId);
 }

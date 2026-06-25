@@ -13,11 +13,7 @@ import AiStudyHub.BE.entity.Subject;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.mapper.DocumentMapper;
-import AiStudyHub.BE.repository.DocumentRepo;
-import AiStudyHub.BE.repository.DownloadRepo;
-import AiStudyHub.BE.repository.RagDocumentRepository;
-import AiStudyHub.BE.repository.SubjectRepo;
-import AiStudyHub.BE.repository.UserRepo;
+import AiStudyHub.BE.repository.*;
 import AiStudyHub.BE.security.SecurityUtils;
 import AiStudyHub.BE.service.IDocument;
 import AiStudyHub.BE.service.IGamification;
@@ -59,6 +55,13 @@ public class DocumentService implements IDocument {
     DocumentRagIndexer documentRagIndexer;
     RagDocumentRepository ragDocumentRepository;
     IRagSystem ragSystemService;
+    RatingRepo ratingRepo;
+    BookmarkRepo bookmarkRepo;
+    ReportRepo reportRepo;
+    ReportCaseRepo reportCaseRepo;
+    ScoreLogRepo scoreLogRepo;
+    NotificationRepo notificationRepo;
+    ChatSessionDocumentRepo chatSessionDocumentRepo;
 
     // --- UPLOAD & UPDATE & DELETE ---
 
@@ -157,11 +160,21 @@ public class DocumentService implements IDocument {
         // 1. Delete associated RAG resources (Qdrant vectors, chunks, rag_document metadata)
         //    in the SAME transaction. If RAG cleanup fails, the whole delete rolls back, so we
         //    never leave document/RAG data inconsistent (and never hit a FK violation).
-        RagDocument ragDoc = ragDocumentRepository.findByDocument_DocumentId(documentId).orElse(null);
+        RagDocument ragDoc = ragDocumentRepository.findByDocumentDocumentId(documentId).orElse(null);
         if (ragDoc != null) {
             log.info("Deleting RAG resources for document ID: {}", documentId);
             ragSystemService.deleteDocument(documentId);
         }
+
+        // Delete child records to avoid FK constraint violations (pure camelCase methods)
+        scoreLogRepo.deleteByDocumentDocumentId(documentId);
+        notificationRepo.deleteByDocumentDocumentId(documentId);
+        downloadRepo.deleteByDocumentDocumentId(documentId);
+        ratingRepo.deleteByDocumentDocumentId(documentId);
+        bookmarkRepo.deleteByDocumentDocumentId(documentId);
+        chatSessionDocumentRepo.deleteByDocumentDocumentId(documentId);
+        reportRepo.deleteByDocumentDocumentId(documentId);
+        reportCaseRepo.deleteByDocumentDocumentId(documentId);
 
         // Do all DB work first so the transaction can roll back cleanly if anything fails.
         long deletedRows = documentRepo.deleteByDocumentId(documentId);
@@ -407,25 +420,22 @@ public class DocumentService implements IDocument {
     // --- UTILS ---
 
     private void applyPartialUpdate(Document document, DocumentUpdateRequest request) {
-        // title
-        if (request.getTitle() != null) {
-            if (request.getTitle().trim().isEmpty()) {
-                throw new GlobalException(ErrorCode.FIELD_REQUIRED);
-            }
+        // title: null, blank, or Swagger default placeholder "string" → skip
+        if (request.getTitle() != null && !request.getTitle().trim().isEmpty() && !request.getTitle().equals("string")) {
             document.setTitle(request.getTitle().trim());
-        } // else: keep current
+        }
 
-        // subjectId
-        if (request.getSubjectId() != null) {
+        // subjectId: null or <= 0 → skip (FE sometimes sends 0 as "no change")
+        if (request.getSubjectId() != null && request.getSubjectId() > 0) {
             Subject subject = subjectRepo.findById(request.getSubjectId())
                     .orElseThrow(() -> new GlobalException(ErrorCode.SUBJECT_NOT_FOUND));
             document.setSubject(subject);
-        } // else: keep current
+        }
 
-        // visibilityStatus
+        // visibilityStatus: null → skip
         if (request.getVisibilityStatus() != null) {
             document.setVisibilityStatus(request.getVisibilityStatus());
-        } // else: keep current
+        }
     }
 
     private void safeDeleteFile(String fileUrl) {

@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface DownloadRepo extends JpaRepository<Download, Long> {
 
     boolean existsByUserAndDocument(User user, Document document);
+
+    long deleteByDocumentDocumentId(Long documentId);
 }

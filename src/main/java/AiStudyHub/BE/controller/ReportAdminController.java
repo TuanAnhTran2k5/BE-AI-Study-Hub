@@ -3,8 +3,8 @@ package AiStudyHub.BE.controller;
 import AiStudyHub.BE.constraint.AdminDecision;
 import AiStudyHub.BE.constraint.CaseStatus;
 import AiStudyHub.BE.dto.Response.APIResponse;
-import AiStudyHub.BE.dto.Response.ReportCaseAdminView;
-import AiStudyHub.BE.dto.Response.ReportDetailView;
+import AiStudyHub.BE.dto.Response.ReportCaseAdminResponse;
+import AiStudyHub.BE.dto.Response.ReportDetailResponse;
 import AiStudyHub.BE.entity.Report;
 import AiStudyHub.BE.entity.ReportCase;
 import AiStudyHub.BE.exception.GlobalException;
@@ -33,8 +33,8 @@ public class ReportAdminController {
     private final IReport reportService;
 
     @GetMapping("/pending")
-    public ResponseEntity<APIResponse<List<ReportCaseAdminView>>> getPendingCases() {
-        List<ReportCaseAdminView> pendingCases = reportCaseRepo.findAllByCaseStatus(CaseStatus.PENDING_REVIEW)
+    public ResponseEntity<APIResponse<List<ReportCaseAdminResponse>>> getPendingCases() {
+        List<ReportCaseAdminResponse> pendingCases = reportCaseRepo.findAllByCaseStatus(CaseStatus.PENDING_REVIEW)
                 .stream()
                 .map(this::toCaseAdminView)
                 .toList();
@@ -42,9 +42,9 @@ public class ReportAdminController {
     }
 
     @GetMapping("/history")
-    public ResponseEntity<APIResponse<List<ReportCaseAdminView>>> getHistoryCases() {
+    public ResponseEntity<APIResponse<List<ReportCaseAdminResponse>>> getHistoryCases() {
         List<CaseStatus> statuses = List.of(CaseStatus.WARNING_1, CaseStatus.WARNING_2, CaseStatus.RESOLVED, CaseStatus.REJECTED);
-        List<ReportCaseAdminView> historyCases = reportCaseRepo.findAllByCaseStatusInOrderByResolvedAtDesc(statuses)
+        List<ReportCaseAdminResponse> historyCases = reportCaseRepo.findAllByCaseStatusInOrderByResolvedAtDesc(statuses)
                 .stream()
                 .map(this::toCaseAdminView)
                 .toList();
@@ -52,11 +52,11 @@ public class ReportAdminController {
     }
 
     @GetMapping("/{caseId}/reports")
-    public ResponseEntity<APIResponse<List<ReportDetailView>>> getReportsByCase(@PathVariable Long caseId) {
+    public ResponseEntity<APIResponse<List<ReportDetailResponse>>> getReportsByCase(@PathVariable Long caseId) {
         ReportCase reportCase = reportCaseRepo.findById(caseId)
                 .orElseThrow(() -> new GlobalException(404, "ReportCase not found"));
 
-        List<ReportDetailView> reports = reportRepo.findAllByReportCase(reportCase)
+        List<ReportDetailResponse> reports = reportRepo.findAllByReportCase(reportCase)
                 .stream()
                 .map(this::toReportDetailView)
                 .toList();
@@ -64,7 +64,7 @@ public class ReportAdminController {
     }
 
     @PostMapping("/{caseId}/claim")
-    public ResponseEntity<APIResponse<ReportCaseAdminView>> claimCase(
+    public ResponseEntity<APIResponse<ReportCaseAdminResponse>> claimCase(
             @PathVariable Long caseId,
             @RequestParam Long adminId
     ) {
@@ -73,7 +73,7 @@ public class ReportAdminController {
     }
 
     @PostMapping("/{caseId}/unclaim")
-    public ResponseEntity<APIResponse<ReportCaseAdminView>> unclaimCase(
+    public ResponseEntity<APIResponse<ReportCaseAdminResponse>> unclaimCase(
             @PathVariable Long caseId,
             @RequestParam Long adminId
     ) {
@@ -82,7 +82,7 @@ public class ReportAdminController {
     }
 
     @PostMapping("/{caseId}/resolve")
-    public ResponseEntity<APIResponse<ReportCaseAdminView>> resolveCase(
+    public ResponseEntity<APIResponse<ReportCaseAdminResponse>> resolveCase(
             @PathVariable Long caseId,
             @RequestBody ResolveRequest request
     ) {
@@ -90,8 +90,8 @@ public class ReportAdminController {
         return ResponseEntity.ok(APIResponse.response(200, "Resolve report case successfully", toCaseAdminView(rc)));
     }
 
-    private ReportCaseAdminView toCaseAdminView(ReportCase rc) {
-        return ReportCaseAdminView.builder()
+    private ReportCaseAdminResponse toCaseAdminView(ReportCase rc) {
+        return ReportCaseAdminResponse.builder()
                 .caseId(rc.getCaseId())
                 .documentId(rc.getDocument().getDocumentId())
                 .documentTitle(rc.getDocument().getTitle())
@@ -107,8 +107,8 @@ public class ReportAdminController {
                 .build();
     }
 
-    private ReportDetailView toReportDetailView(Report r) {
-        return ReportDetailView.builder()
+    private ReportDetailResponse toReportDetailView(Report r) {
+        return ReportDetailResponse.builder()
                 .reportId(r.getReportId())
                 .reporterName(r.getReporter().getFullName())
                 .description(r.getDescription())

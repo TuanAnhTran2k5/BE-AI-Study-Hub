@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class ReportCaseAdminView {
+public class ReportCaseAdminResponse {
     Long caseId;
     Long documentId;
     String documentTitle;
