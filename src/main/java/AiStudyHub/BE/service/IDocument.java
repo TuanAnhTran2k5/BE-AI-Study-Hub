@@ -14,6 +14,7 @@ import java.util.List;
 
 public interface IDocument {
     DocumentUploadResponse uploadDocument(DocumentUploadRequest request) throws Exception;
+    void uploadDocumentAsync(Long documentId, byte[] fileBytes, String originalFileName, String contentType, Long fileSize, Long ownerId);
     DocumentUpdateResponse updateDocument(Long documentId, DocumentUpdateRequest request);
     DeleteResponse deleteDocument(Long documentId) throws Exception;
     List<DocumentResponse> searchDocumentsByTitle(String keyword);

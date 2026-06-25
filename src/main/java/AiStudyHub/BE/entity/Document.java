@@ -2,6 +2,7 @@ package AiStudyHub.BE.entity;
 
 import AiStudyHub.BE.constraint.ModerationStatus;
 import AiStudyHub.BE.constraint.VisibilityStatus;
+import AiStudyHub.BE.constraint.UploadStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -40,6 +41,11 @@ public class Document {
     @Column(nullable = false, length = 30)
     ModerationStatus moderationStatus;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "upload_status", nullable = false, length = 30)
+    @Builder.Default
+    UploadStatus uploadStatus = UploadStatus.PENDING;
+
     @Builder.Default
     Double averageRating = 0.0;
     String fileName;
@@ -71,6 +77,7 @@ public class Document {
         createdAt = LocalDateTime.now();
         if (visibilityStatus == null) visibilityStatus = VisibilityStatus.PRIVATE;
         if (moderationStatus == null) moderationStatus = ModerationStatus.NORMAL;
+        if (uploadStatus == null) uploadStatus = UploadStatus.PENDING;
     }
 
     @PreUpdate

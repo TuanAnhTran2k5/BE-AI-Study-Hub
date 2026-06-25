@@ -35,6 +35,7 @@ public class DocumentResponse {
 
     VisibilityStatus visibilityStatus;
     ModerationStatus moderationStatus;
+    AiStudyHub.BE.constraint.UploadStatus uploadStatus;
 
     Double averageRating;
     Integer ratingCount;

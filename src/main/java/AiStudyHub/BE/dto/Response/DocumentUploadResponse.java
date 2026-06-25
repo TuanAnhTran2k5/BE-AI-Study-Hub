@@ -33,6 +33,8 @@ public class DocumentUploadResponse {
 
     VisibilityStatus visibilityStatus;
 
+    AiStudyHub.BE.constraint.UploadStatus uploadStatus;
+
     LocalDateTime createdAt;
 
     String message;

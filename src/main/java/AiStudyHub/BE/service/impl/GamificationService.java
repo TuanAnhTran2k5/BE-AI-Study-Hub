@@ -2,6 +2,7 @@ package AiStudyHub.BE.service.impl;
 
 import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.constraint.VisibilityStatus;
+import AiStudyHub.BE.constraint.UploadStatus;
 import AiStudyHub.BE.dto.Request.RatingRequest;
 import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.*;
@@ -340,7 +341,10 @@ public class GamificationService implements IGamification {
     public int runDailyReputation() {
         self.recomputeAllAggregates();
 
-        List<Document> docs = documentRepo.findByVisibilityStatusAndRatingCountGreaterThanEqual(VisibilityStatus.PUBLIC, 10);
+        List<Document> docs = documentRepo.findByVisibilityStatusAndRatingCountGreaterThanEqual(VisibilityStatus.PUBLIC, 10)
+                .stream()
+                .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
+                .toList();
         log.info("Reputation job started: {} eligible document(s)", docs.size());
 
         int processed = 0;
@@ -386,7 +390,10 @@ public class GamificationService implements IGamification {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean recomputeAllAggregates() {
-        List<Document> docsWithRatings = documentRepo.findByVisibilityStatus(VisibilityStatus.PUBLIC);
+        List<Document> docsWithRatings = documentRepo.findByVisibilityStatus(VisibilityStatus.PUBLIC)
+                .stream()
+                .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
+                .toList();
         for (Document doc : docsWithRatings) {
             List<Rating> ratings = ratingRepo.findByDocument(doc);
             int count = ratings.size();

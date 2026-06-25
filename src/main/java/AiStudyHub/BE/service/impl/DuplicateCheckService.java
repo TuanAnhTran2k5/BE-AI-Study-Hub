@@ -1,6 +1,7 @@
 package AiStudyHub.BE.service.impl;
 
 import AiStudyHub.BE.constraint.VisibilityStatus;
+import AiStudyHub.BE.constraint.UploadStatus;
 import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.Notification;
 import AiStudyHub.BE.repository.DocumentRepo;
@@ -66,7 +67,10 @@ public class DuplicateCheckService implements AiStudyHub.BE.service.IDuplicateCh
             }
 
             // 4. Compare with existing PUBLIC documents
-            List<Document> publicDocuments = documentRepo.findByVisibilityStatusAndSimHashContentIsNotNull(VisibilityStatus.PUBLIC);
+            List<Document> publicDocuments = documentRepo.findByVisibilityStatusAndSimHashContentIsNotNull(VisibilityStatus.PUBLIC)
+                    .stream()
+                    .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
+                    .toList();
             
             Document duplicatedDoc = null;
             for (Document pubDoc : publicDocuments) {
