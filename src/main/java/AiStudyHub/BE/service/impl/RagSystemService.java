@@ -10,9 +10,6 @@ import AiStudyHub.BE.entity.RagDocument;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
 
-
-
-
 import AiStudyHub.BE.mapper.RagDocumentMapper;
 import AiStudyHub.BE.repository.DocumentRepo;
 import AiStudyHub.BE.repository.RagChunkRepository;
@@ -211,7 +208,7 @@ public class RagSystemService implements IRagSystem {
 
         checkAuthorization(mainDoc, "index");
 
-        RagDocument ragDoc = ragDocumentRepository.findByDocument_DocumentId(documentId)
+        RagDocument ragDoc = ragDocumentRepository.findByDocumentDocumentId(documentId)
                 .orElse(null);
 
         if (ragDoc == null) {
@@ -258,7 +255,7 @@ public class RagSystemService implements IRagSystem {
 
         checkAuthorization(mainDoc, "delete RAG index for");
 
-        RagDocument document = ragDocumentRepository.findByDocument_DocumentId(documentId)
+        RagDocument document = ragDocumentRepository.findByDocumentDocumentId(documentId)
                 .orElseThrow(() -> new GlobalException(404, "RagDocument not found with document ID: " + documentId));
 
         cleanExistingRagResources(document);
@@ -279,7 +276,7 @@ public class RagSystemService implements IRagSystem {
             checkAuthorization(mainDoc, "view");
         }
 
-        RagDocument document = ragDocumentRepository.findByDocument_DocumentId(documentId)
+        RagDocument document = ragDocumentRepository.findByDocumentDocumentId(documentId)
                 .orElseThrow(() -> new GlobalException(404, "RagDocument not found with document ID: " + documentId));
         return ragDocumentMapper.toRagDocumentResponse(document);
     }

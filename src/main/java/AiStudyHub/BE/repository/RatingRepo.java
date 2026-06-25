@@ -4,7 +4,6 @@ import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.Rating;
 import AiStudyHub.BE.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
-
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -17,5 +16,5 @@ public interface RatingRepo extends JpaRepository<Rating, Long> {
 
     List<Rating> findByDocument(Document document);
 
-
+    long deleteByDocumentDocumentId(Long documentId);
 }

@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class ReportDetailView {
+public class ReportDetailResponse {
     Long reportId;
     String reporterName;
     String description;

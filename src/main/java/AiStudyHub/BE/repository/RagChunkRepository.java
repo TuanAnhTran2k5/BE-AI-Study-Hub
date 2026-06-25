@@ -14,5 +14,5 @@ public interface RagChunkRepository extends JpaRepository<RagChunk, Long> {
     List<RagChunk> findByDocumentId(Long documentId);
 
     @Transactional
-    void deleteByDocumentId(Long documentId);
+    long deleteByDocumentId(Long documentId);
 }
