@@ -90,110 +90,72 @@ public class DocumentService implements IDocument {
         storageService.validateStorage(owner, fileSize);
 
         byte[] fileBytes = request.getFile().getBytes();
+        String originalFileName = request.getFile().getOriginalFilename();
+        String contentType = request.getFile().getContentType();
 
         VisibilityStatus visibilityStatus =
                 request.getVisibilityStatus() == null
                         ? VisibilityStatus.PRIVATE
                         : request.getVisibilityStatus();
 
-        Document document = documentMapper.toDocument(request);
-        document.setOwner(owner);
-        document.setSubject(subject);
-        document.setFileName(request.getFile().getOriginalFilename());
-        document.setFileType(request.getFile().getContentType());
-        document.setFileSize(fileSize);
-        document.setVisibilityStatus(visibilityStatus);
-        document.setModerationStatus(ModerationStatus.NORMAL);
-        document.setUploadStatus(UploadStatus.UPLOADING);
-        document.setAverageRating(0.0);
-        document.setRatingCount(0);
-        document.setDownloadCount(0);
-        document.setBookmarkCount(0);
-        document.setReportCount(0);
-
-        document = documentRepo.save(document);
-
-        // Trigger Async Upload Process
-        self.uploadDocumentAsync(
-                document.getDocumentId(),
-                fileBytes,
-                request.getFile().getOriginalFilename(),
-                request.getFile().getContentType(),
-                fileSize,
-                owner.getUserId()
-        );
-
-        DocumentUploadResponse response = documentMapper.toDocumentUploadResponse(document);
-        response.setMessage("Your file is uploading. The process will complete in the background.");
-        return response;
-    }
-
-    @Override
-    @Async
-    public void uploadDocumentAsync(Long documentId, byte[] fileBytes, String originalFileName, String contentType, Long fileSize, Long ownerId) {
-        log.info("Starting async upload process for documentId: {}", documentId);
-        
         FileUploadResponse fileMetadata = null;
         try {
             // 1. Upload to Supabase
             fileMetadata = supabaseStorageService.uploadBytes(fileBytes, originalFileName, null, contentType);
-            log.info("Async uploaded file to Supabase successfully: {}", fileMetadata.getPublicUrl());
+            log.info("Uploaded file to Supabase successfully: {}", fileMetadata.getPublicUrl());
 
-            // 2. Fetch document and owner
-            Document document = documentRepo.findById(documentId).orElse(null);
-            if (document == null) {
-                log.error("Document not found for ID: {}. Deleting uploaded file.", documentId);
-                safeDeleteFile(fileMetadata.getPublicUrl());
-                return;
-            }
-
-            User owner = userRepo.findById(ownerId).orElse(null);
-            if (owner == null) {
-                log.error("Owner not found for ID: {}. Deleting uploaded file.", ownerId);
-                safeDeleteFile(fileMetadata.getPublicUrl());
-                return;
-            }
-
-            // 3. Update document metadata
+            // 2. Save document entity
+            Document document = documentMapper.toDocument(request);
+            document.setOwner(owner);
+            document.setSubject(subject);
             document.setFileName(fileMetadata.getOriginalFileName());
             document.setFileUrl(fileMetadata.getPublicUrl());
             document.setFileType(fileMetadata.getContentType());
             document.setFileSize(fileMetadata.getFileSize());
+            document.setVisibilityStatus(visibilityStatus);
+            document.setModerationStatus(ModerationStatus.NORMAL);
+            document.setUploadStatus(UploadStatus.UPLOADING);
+            document.setAverageRating(0.0);
+            document.setRatingCount(0);
+            document.setDownloadCount(0);
+            document.setBookmarkCount(0);
+            document.setReportCount(0);
 
-            // 4. Duplicate Check
+            document = documentRepo.save(document);
+
+            // 3. Duplicate Check
             Document duplicatedDoc = duplicateCheckService.performDuplicateCheck(document.getDocumentId(), fileBytes);
             if (duplicatedDoc != null) {
                 document.setVisibilityStatus(VisibilityStatus.PRIVATE);
                 log.info("Duplication detected! Document set to PRIVATE. Duplicated with doc ID: {}", duplicatedDoc.getDocumentId());
             }
 
-            // 5. Update user storage usage
+            // 4. Update user storage usage
             storageService.increaseStorage(owner, fileSize);
             userRepo.save(owner);
 
-            // 6. Award badges / check achievements
+            // 5. Award badges / check achievements
             gamificationService.checkAndAwardBadges(owner.getUserId());
 
-            // 7. Auto index RAG
+            // 6. Auto index RAG
             documentRagIndexer.autoIndexIfSupported(document, fileBytes);
 
-            // 8. Update status to COMPLETED
+            // 7. Update status to COMPLETED
             document.setUploadStatus(UploadStatus.COMPLETED);
-            documentRepo.save(document);
+            document = documentRepo.save(document);
 
-            log.info("Async upload process finished successfully for documentId: {}", documentId);
+            log.info("Upload process finished successfully for documentId: {}", document.getDocumentId());
+
+            DocumentUploadResponse response = documentMapper.toDocumentUploadResponse(document);
+            response.setMessage("Upload và xử lý tài liệu thành công");
+            return response;
 
         } catch (Exception e) {
-            log.error("Async upload process failed for documentId: {}", documentId, e);
+            log.error("Upload process failed", e);
             if (fileMetadata != null) {
                 safeDeleteFile(fileMetadata.getPublicUrl());
             }
-            
-            Document document = documentRepo.findById(documentId).orElse(null);
-            if (document != null) {
-                document.setUploadStatus(UploadStatus.FAILED);
-                documentRepo.save(document);
-            }
+            throw e;
         }
     }
 

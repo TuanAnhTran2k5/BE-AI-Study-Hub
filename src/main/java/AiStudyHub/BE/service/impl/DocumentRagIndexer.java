@@ -4,6 +4,7 @@ import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.RagDocument;
 import AiStudyHub.BE.repository.RagDocumentRepository;
 import AiStudyHub.BE.service.IRagSystem;
+import AiStudyHub.BE.exception.GlobalException;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -56,8 +57,14 @@ public class DocumentRagIndexer {
             ragDocumentRepository.save(ragDoc);
             log.info("Successfully auto-indexed document ID: {}", document.getDocumentId());
         } catch (Exception e) {
-            log.error("Auto-indexing failed for document ID: {}. Document upload remains valid.",
+            log.error("Auto-indexing failed for document ID: {}. Rolling back upload.",
                     document.getDocumentId(), e);
+            ragDocumentRepository.findByDocumentDocumentId(document.getDocumentId())
+                    .ifPresent(ragDoc -> {
+                        ragDoc.setStatus("FAILED");
+                        ragDocumentRepository.save(ragDoc);
+                    });
+            throw new GlobalException(500, "Failed to index document");
         }
     }
 }
