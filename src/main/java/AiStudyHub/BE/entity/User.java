@@ -77,6 +77,66 @@ public class User implements UserDetails {
 
     LocalDateTime createdAt;
 
+    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Document> documents;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Bookmark> bookmarks;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Rating> ratings;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Download> downloads;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<ChatSession> chatSessions;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<OtpVerification> otpVerifications;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Notification> notifications;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<UserBadge> userBadges;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<UserRank> userRanks;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<WeeklyScore> weeklyScores;
+
+    @OneToMany(mappedBy = "reporter", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Report> reports;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<ScoreLog> scoreLogs;
+
     @PrePersist
     public void prePersist() {
         if (this.createdAt == null) this.createdAt = LocalDateTime.now();

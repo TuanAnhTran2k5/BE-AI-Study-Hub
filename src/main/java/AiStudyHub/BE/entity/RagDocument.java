@@ -5,10 +5,8 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
-/**
- * JPA entity representing metadata for an uploaded RAG document.
- */
 @Entity
 @Table(name = "rag_document")
 @Getter
@@ -44,6 +42,11 @@ public class RagDocument {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "document_id")
     Document document;
+
+    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<RagChunk> chunks;
 
 
     @PrePersist

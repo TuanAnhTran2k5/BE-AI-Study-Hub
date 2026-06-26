@@ -7,6 +7,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "report_cases")
@@ -64,6 +65,11 @@ public class ReportCase {
 
     @Column(columnDefinition = "TEXT")
     String adminNote;
+
+    @OneToMany(mappedBy = "reportCase", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Report> reports;
 
     @PrePersist
     public void prePersist() {
