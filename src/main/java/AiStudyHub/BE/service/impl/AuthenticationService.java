@@ -337,7 +337,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     }
 
     @Override
-    public boolean resetPassword(ResetPasswordRequest request) {
+    public boolean verifyForgotPasswordOtp(VerifyOtpRequest request) {
         String email = request.getEmail();
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
@@ -358,13 +358,39 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             throw new GlobalException(ErrorCode.OTP_EXPIRED);
         }
 
+        otp.setVerifiedAt(LocalDateTime.now());
+        otpVerificationRepo.save(otp);
+
+        return true;
+    }
+
+    @Override
+    public boolean resetPassword(ResetPasswordRequest request) {
+        String email = request.getEmail();
+        User user = userRepo.findByEmail(email)
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
+        if (user.getStatus() == UserStatus.BANNED) {
+            throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+        }
+
+        OtpVerification otp = otpVerificationRepo
+                .findFirstByUserAndPurposeAndIsUseFalseAndVerifiedAtIsNotNullOrderByCreatedAtDesc(
+                        user,
+                        OtpPurpose.FORGOT_PASSWORD
+                )
+                .orElseThrow(() -> new GlobalException(ErrorCode.INVALID_OTP));
+
+        if (otp.getVerifiedAt().plusMinutes(15).isBefore(LocalDateTime.now())) {
+            throw new GlobalException(ErrorCode.OTP_EXPIRED);
+        }
+
         // Update password
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         userRepo.save(user);
 
         // Mark OTP as used
         otp.setIsUse(true);
-        otp.setVerifiedAt(LocalDateTime.now());
         otpVerificationRepo.save(otp);
         
         return true;

@@ -26,6 +26,8 @@ public interface IAuthentication {
 
     ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request);
 
+    boolean verifyForgotPasswordOtp(VerifyOtpRequest request);
+
     boolean resetPassword(ResetPasswordRequest request);
 
     ResendOtpResponse resendOtp(ResendOtpRequest request);
