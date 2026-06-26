@@ -83,22 +83,24 @@ public class RagSystemService implements IRagSystem {
             4. Do NOT use external knowledge, assumptions, or personal opinions.
             5. Never invent or infer facts that are not present in the Context.
 
-            Language Rules:
-            1. Always respond in the same language used by the user (INCLUDE Summary Rules, Document Rules).
-            2. If the user writes in Vietnamese, respond in Vietnamese.
-            3. If the user writes in English, respond in English.
-            4. Apply this rule to all supported languages.
+            Language Rules (CRITICAL & HIGHEST PRIORITY):
+            1. Analyze the User Question to determine its dominant language (the language whose words appear most frequently). If the user mixes multiple languages (code-switching), identify the language with the highest word count in the question.
+            2. You MUST write your ENTIRE response (including all greetings, explanations, warnings, headings, list labels, and content) strictly in that DOMINANT LANGUAGE.
+            3. Apply this rule universally to ANY language worldwide (e.g., English, Vietnamese, Japanese, Spanish, French, Korean, Chinese, etc.).
+            4. Never mix languages in your answer unless explicitly requested by the user.
 
             Document Rules:
-            1. If no document or Context is provided, inform the user that no document is available for analysis.
-            2. If the Context does not contain enough information to answer the question, clearly state that the requested information is not available in the provided documents.
+            1. If Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED":
+                1.1 If the User Question is a general greeting, introduction, or casual small talk unrelated to documents, answer naturally and politely in the dominant language of the User Question without mentioning missing documents.
+                1.2 If the User Question is asking about document content or requesting factual information from documents, respond in the dominant language of the User Question stating that no relevant document data is available and asking the user to provide documents. (Translate this exact meaning into the dominant language: "I do not have data related to what you asked, please provide the document.").
+            2. If Context contains retrieved documents (not empty) and does not contain enough information to answer the question, clearly state in the dominant language that the requested information is not available in the provided documents.
 
             Summary Rules:
-            - When the user requests a summary, structure the response as:
-                1. Main Topic
-                2. Purpose
-                3. Key Points
-                4. Conclusion
+            - When the user requests a summary, structure the response into 4 numbered parts. You MUST dynamically translate these 4 headings into the dominant language of the User Question:
+                1. [Translate heading meaning: Main Topic]
+                2. [Translate heading meaning: Purpose]
+                3. [Translate heading meaning: Key Points]
+                4. [Translate heading meaning: Conclusion]
 
             Conversation Rules:
             1. If the user's message is a general conversation (e.g., greetings, introductions, small talk) and does not require document information, answer naturally without mentioning the Context.
@@ -110,15 +112,19 @@ public class RagSystemService implements IRagSystem {
             User Question:
             {question}
             
-            Please answer according to the system instructions above.
+            IMPORTANT FINAL LANGUAGE OVERRIDE:
+            Look strictly at the "User Question" above ("{question}"). Determine its dominant language (the language appearing most frequently in the question).
+            You MUST write your ENTIRE response (including headings 1, 2, 3, 4 and content) in that exact dominant language of "{question}". Even if the Context is in Vietnamese or another language, DO NOT respond in the Context's language.
             """;
 
     private static final String RAG_WITH_HISTORY_PROMPT_TEMPLATE = """
             You are an AI Study Assistant.
             
-            Language Rules:          
-            1. ALWAYS respond in the EXACT SAME LANGUAGE as the user's current question (INCLUDE Knowledge Rules, Document Rules, Conversation Rules).
-            2. Never switch languages unless the user does.
+            Language Rules (CRITICAL & HIGHEST PRIORITY):          
+            1. Analyze the Current User Question to determine its dominant language (the language whose words appear most frequently). If the user mixes multiple languages (code-switching), identify the language with the highest word count in the question.
+            2. You MUST write your ENTIRE response (including all greetings, explanations, warnings, headings, list labels, and content) strictly in that DOMINANT LANGUAGE.
+            3. Apply this rule universally to ANY language worldwide (e.g., English, Vietnamese, Japanese, Spanish, French, Korean, Chinese, etc.).
+            4. Never mix languages in your answer unless explicitly requested by the user.
             
             Knowledge Rules:            
             1. The provided Context contains information retrieved from one or more user documents.
@@ -128,18 +134,20 @@ public class RagSystemService implements IRagSystem {
             5. Never invent, assume, or infer information that is not explicitly present in the Context.
             
             Document Rules:            
-            1. Answer using only information available in the Context.
-            2. If the Context does not contain enough information to answer the question, clearly state that the requested information is not available in the provided documents.
+            1. If Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED":
+                1.1 If the Current User Question is a general greeting, introduction, or casual small talk unrelated to documents, answer naturally and politely in the dominant language of the Current User Question without mentioning missing documents.
+                1.2 If the Current User Question is asking about document content or requesting factual information from documents, respond in the dominant language of the Current User Question stating that no relevant document data is available and asking the user to provide documents. (Translate this exact meaning into the dominant language: "I do not have data related to what you asked, please provide the document.").
+            2. If Context contains retrieved documents (not empty) and does not contain enough information to answer the question, clearly state in the dominant language that the requested information is not available in the provided documents.
             3. If multiple topics appear in the Context, focus only on the information relevant to the current question.
             4. Do not summarize or discuss unrelated document content.
             
             Conversation Rules:            
             1. If the user's message is a general greeting or casual conversation (e.g., "Hello", "How are you?", "What is your name?"), respond naturally and do not force document information into the answer.
-            2. If the user asks to summarize a document, provide:
-                2.1 Main Topic
-                2.2 Purpose
-                2.3 Key Points
-                2.4 Conclusion
+            2. If the user asks to summarize a document, provide 4 sections dynamically translated into the dominant language of the Current User Question:
+                2.1 [Translate heading meaning: Main Topic]
+                2.2 [Translate heading meaning: Purpose]
+                2.3 [Translate heading meaning: Key Points]
+                2.4 [Translate heading meaning: Conclusion]
             
             Previous Conversation History:
             {history}
@@ -149,6 +157,10 @@ public class RagSystemService implements IRagSystem {
             
             Current User Question:
             {question}
+            
+            IMPORTANT FINAL LANGUAGE OVERRIDE:
+            Look strictly at the "Current User Question" above ("{question}"). Determine its dominant language (the language appearing most frequently in the question).
+            You MUST write your ENTIRE response (including headings 2.1, 2.2, 2.3, 2.4 and content) in that exact dominant language of "{question}". Ignore the language of the Context and History.
             
             Answer:
             """;
@@ -166,25 +178,24 @@ public class RagSystemService implements IRagSystem {
         List<Document> relevantChunks = retrieveRelevantChunks(question);
         log.info("Retrieved {} relevant chunks from vector store", relevantChunks.size());
 
+        String context;
+        List<String> sources;
         if (relevantChunks.isEmpty()) {
-            return ChatResponse.builder()
-                    .answer("No relevant information found in the documents to answer this question.")
-                    .sources(List.of())
-                    .build();
+            context = "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED";
+            sources = List.of();
+        } else {
+            context = buildContext(relevantChunks);
+            sources = relevantChunks.stream()
+                    .map(doc -> {
+                        Map<String, Object> metadata = doc.getMetadata();
+                        if (metadata != null && metadata.containsKey("originalFileName")) {
+                            return (String) metadata.get("originalFileName");
+                        }
+                        return "Unknown Source";
+                    })
+                    .distinct()
+                    .collect(Collectors.toList());
         }
-
-        String context = buildContext(relevantChunks);
-
-        List<String> sources = relevantChunks.stream()
-                .map(doc -> {
-                    Map<String, Object> metadata = doc.getMetadata();
-                    if (metadata != null && metadata.containsKey("originalFileName")) {
-                        return (String) metadata.get("originalFileName");
-                    }
-                    return "Unknown Source";
-                })
-                .distinct()
-                .collect(Collectors.toList());
 
         try {
             PromptTemplate promptTemplate = new PromptTemplate(RAG_PROMPT_TEMPLATE);
@@ -435,33 +446,24 @@ public class RagSystemService implements IRagSystem {
         List<Document> relevantChunks = retrieveRelevantChunksWithFilters(question, sessionDocIds);
         log.info("Retrieved {} relevant chunks for session {}", relevantChunks.size(), sessionId);
 
+        String context;
+        List<String> sources;
         if (relevantChunks.isEmpty()) {
-            String aiAnswer = "No relevant information found in the documents to answer this question.";
-            ChatMessage aiMsg = ChatMessage.builder()
-                    .session(session)
-                    .senderType(SenderType.AI)
-                    .content(aiAnswer)
-                    .build();
-            chatMessageRepository.save(aiMsg);
-
-            return ChatResponse.builder()
-                    .answer(aiAnswer)
-                    .sources(List.of())
-                    .build();
+            context = "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED";
+            sources = List.of();
+        } else {
+            context = buildContext(relevantChunks);
+            sources = relevantChunks.stream()
+                    .map(doc -> {
+                        Map<String, Object> metadata = doc.getMetadata();
+                        if (metadata != null && metadata.containsKey("originalFileName")) {
+                            return (String) metadata.get("originalFileName");
+                        }
+                        return "Unknown Source";
+                    })
+                    .distinct()
+                    .collect(Collectors.toList());
         }
-
-        String context = buildContext(relevantChunks);
-
-        List<String> sources = relevantChunks.stream()
-                .map(doc -> {
-                    Map<String, Object> metadata = doc.getMetadata();
-                    if (metadata != null && metadata.containsKey("originalFileName")) {
-                        return (String) metadata.get("originalFileName");
-                    }
-                    return "Unknown Source";
-                })
-                .distinct()
-                .collect(Collectors.toList());
 
         try {
             PromptTemplate promptTemplate = new PromptTemplate(RAG_WITH_HISTORY_PROMPT_TEMPLATE);
