@@ -22,4 +22,9 @@ public interface OtpVerificationRepo extends JpaRepository<OtpVerification, Long
             User user,
             OtpPurpose purpose
     );
+
+    Optional<OtpVerification> findFirstByUserAndPurposeAndIsUseFalseAndVerifiedAtIsNotNullOrderByCreatedAtDesc(
+            User user,
+            OtpPurpose purpose
+    );
 }

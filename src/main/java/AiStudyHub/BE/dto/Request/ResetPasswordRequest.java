@@ -19,7 +19,6 @@ public class ResetPasswordRequest {
     @Email(message = "INVALID_FORMAT")
     String email;
 
-    @NotBlank(message = "FIELD_REQUIRED")
     String otpCode;
 
     @NotBlank(message = "FIELD_REQUIRED")

@@ -98,6 +98,16 @@ public class AuthController {
                         ));
     }
 
+    @PostMapping("forgot-password/verify-otp")
+    public ResponseEntity<APIResponse<Boolean>> verifyForgotPasswordOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        boolean result = authenticationService.verifyForgotPasswordOtp(request);
+        return ResponseEntity.status(200)
+                .body(
+                        APIResponse.response(
+                                200, "Verify OTP successfully", result
+                        ));
+    }
+
     @PostMapping("forgot-password/reset")
     public ResponseEntity<APIResponse<Boolean>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         boolean result = authenticationService.resetPassword(request);
