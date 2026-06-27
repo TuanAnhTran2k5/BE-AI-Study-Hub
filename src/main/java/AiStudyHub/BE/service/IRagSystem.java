@@ -2,6 +2,7 @@ package AiStudyHub.BE.service;
 
 import AiStudyHub.BE.dto.Request.ChatRequest;
 import AiStudyHub.BE.dto.Request.CreateSessionRequest;
+import AiStudyHub.BE.dto.Request.SuggestPromptsRequest;
 import AiStudyHub.BE.dto.Response.ChatResponse;
 import AiStudyHub.BE.dto.Response.ChatSessionResponse;
 import AiStudyHub.BE.dto.Response.ChatMessageResponse;
@@ -17,6 +18,7 @@ public interface IRagSystem {
     ChatResponse askQuestion(ChatRequest request);
     String buildContext(List<Document> documents);
     List<Document> retrieveRelevantChunks(String question);
+    List<String> suggestPrompts(SuggestPromptsRequest request);
 
     // --- SESSION CHAT ---
     ChatSessionResponse createSession(CreateSessionRequest request);

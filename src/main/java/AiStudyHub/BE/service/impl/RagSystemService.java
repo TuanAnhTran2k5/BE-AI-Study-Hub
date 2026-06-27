@@ -5,6 +5,7 @@ import AiStudyHub.BE.constraint.UploadStatus;
 import AiStudyHub.BE.constraint.SenderType;
 import AiStudyHub.BE.dto.Request.ChatRequest;
 import AiStudyHub.BE.dto.Request.CreateSessionRequest;
+import AiStudyHub.BE.dto.Request.SuggestPromptsRequest;
 import AiStudyHub.BE.dto.Response.ChatResponse;
 import AiStudyHub.BE.dto.Response.ChatSessionResponse;
 import AiStudyHub.BE.dto.Response.ChatMessageResponse;
@@ -679,6 +680,103 @@ public class RagSystemService implements IRagSystem {
 
             ragChunkRepository.deleteByDocumentId(document.getId());
             log.info("Deleted existing chunks from database");
+        }
+    }
+
+    @Override
+    public List<String> suggestPrompts(SuggestPromptsRequest request) {
+        User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+        List<Long> docIds = request.getDocumentIds();
+        log.info("Generating prompt suggestions for user {} on documents {}", currentUser.getUserId(), docIds);
+
+        StringBuilder contextBuilder = new StringBuilder();
+        for (Long docId : docIds) {
+            AiStudyHub.BE.entity.Document document = documentRepo.findById(docId)
+                    .orElseThrow(() -> new GlobalException(404, "Document not found with ID: " + docId));
+
+            // Check document access permissions
+            boolean isPublic = document.getVisibilityStatus() == VisibilityStatus.PUBLIC;
+            boolean isOwner = document.getOwner().getUserId().equals(currentUser.getUserId());
+            if (!isPublic && !isOwner) {
+                throw new GlobalException(403, "You do not have permission to access document with ID: " + docId);
+            }
+
+            // Retrieve RagDocument and chunks
+            RagDocument ragDoc = ragDocumentRepository.findByDocumentDocumentId(docId)
+                    .orElseThrow(() -> new GlobalException(404, "RagDocument not found for document ID: " + docId));
+            
+            // Get up to 5 chunks from each document to form the context
+            List<RagChunk> chunks = ragDoc.getChunks();
+            if (chunks != null) {
+                chunks.stream()
+                      .sorted(Comparator.comparing(RagChunk::getChunkIndex))
+                      .limit(5)
+                      .forEach(chunk -> {
+                          if (contextBuilder.length() < 12000) { // Limit total context size
+                              contextBuilder.append(chunk.getContent()).append("\n");
+                          }
+                      });
+            }
+        }
+
+        String context = contextBuilder.toString().trim();
+        if (context.isEmpty()) {
+            throw new GlobalException(400, "Documents do not have indexed content for suggestion.");
+        }
+
+        String promptText = """
+                You are an AI Study Assistant.
+                Based on the provided document context below, generate exactly 5 relevant, diverse, and specific suggested prompts (questions or requests) that a student might want to ask to study or test themselves on this material.
+                
+                Rules:
+                1. The suggestions must be directly relevant to the document content.
+                2. The output MUST be a JSON array of strings, containing exactly 5 prompts. Do not include any markdown formatting (like ```json), explanations, or additional text.
+                3. The prompts must be in the dominant language of the document context (e.g. Vietnamese if the text is in Vietnamese, English if the text is in English).
+                
+                Example Output:
+                ["Giải thích khái niệm tính kế thừa kèm ví dụ", "Tính đa hình trong Java là gì?", "Sự khác biệt giữa abstract class và interface", "Tạo một sơ đồ lớp UML cho hệ thống thư viện", "Tạo câu hỏi trắc nghiệm về OOP trong Java"]
+                
+                Document Context:
+                {context}
+                """;
+
+        try {
+            PromptTemplate promptTemplate = new PromptTemplate(promptText);
+            Map<String, Object> params = Map.of("context", context);
+            org.springframework.ai.chat.prompt.Prompt prompt = promptTemplate.create(params);
+
+            log.info("Calling LLM to generate suggested prompts...");
+            String responseContent = chatClient.prompt(prompt).call().content();
+            
+            // Clean up and parse JSON response
+            if (responseContent != null) {
+                responseContent = responseContent.trim();
+                if (responseContent.startsWith("```json")) {
+                    responseContent = responseContent.substring(7);
+                }
+                if (responseContent.startsWith("```")) {
+                    responseContent = responseContent.substring(3);
+                }
+                if (responseContent.endsWith("```")) {
+                    responseContent = responseContent.substring(0, responseContent.length() - 3);
+                }
+                responseContent = responseContent.trim();
+
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                return mapper.readValue(responseContent, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+            }
+            
+            throw new GlobalException(500, "AI returned empty response");
+        } catch (Exception e) {
+            log.error("Error generating suggested prompts from LLM", e);
+            // Return default prompts if parsing fails to avoid breaking user experience
+            return List.of(
+                "Summarize the main content of this document",
+                "Explain the key concepts in the document",
+                "Create study quiz questions from the material",
+                "List key terms and definitions",
+                "Create a mind map or section summary"
+            );
         }
     }
 }
