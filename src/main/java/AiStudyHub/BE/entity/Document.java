@@ -8,6 +8,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "document")
@@ -71,6 +72,41 @@ public class Document {
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
     LocalDateTime deletedAt;
+
+    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<RagDocument> ragDocuments;
+
+    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Bookmark> bookmarks;
+
+    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Rating> ratings;
+
+    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Download> downloads;
+
+    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<ChatSessionDocument> chatSessionDocuments;
+
+    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<Report> reports;
+
+    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    List<ReportCase> reportCases;
 
     @PrePersist
     public void prePersist() {
