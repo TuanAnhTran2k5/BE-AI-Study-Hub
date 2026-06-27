@@ -607,11 +607,22 @@ public class RagSystemService implements IRagSystem {
 
             String fullText = documents.stream()
                     .map(Document::getText)
+                    .filter(text -> text != null && !text.trim().isEmpty())
                     .collect(Collectors.joining("\n"));
+
+            if (fullText.trim().isEmpty()) {
+                log.warn("Extracted text is empty for document ID: {}, skipping vector store indexing.", document.getId());
+                return false;
+            }
 
             Document parentDoc = new Document(fullText);
             List<Document> chunks = textSplitter.apply(List.of(parentDoc));
             log.info("Split document ID: {} into {} chunks", document.getId(), chunks.size());
+
+            if (chunks.isEmpty()) {
+                log.warn("No text chunks generated for document ID: {}, skipping vector store indexing.", document.getId());
+                return false;
+            }
 
             List<RagChunk> ragChunks = new ArrayList<>();
             List<Document> docsToVectorStore = new ArrayList<>();
