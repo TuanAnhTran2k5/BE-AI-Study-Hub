@@ -2,6 +2,7 @@ package AiStudyHub.BE.controller;
 
 import AiStudyHub.BE.dto.Request.ChatRequest;
 import AiStudyHub.BE.dto.Request.CreateSessionRequest;
+import AiStudyHub.BE.dto.Request.SuggestPromptsRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.ChatResponse;
 import AiStudyHub.BE.dto.Response.ChatSessionResponse;
@@ -83,6 +84,15 @@ public class RagChatController {
         ragChatService.deleteSession(sessionId);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Session deleted successfully", null)
+        );
+    }
+
+    @PostMapping("/suggest-prompts")
+    public ResponseEntity<APIResponse<List<String>>> suggestPrompts(@RequestBody @Valid SuggestPromptsRequest request) {
+        log.info("API Request: Suggest prompts for document IDs: {}", request.getDocumentIds());
+        List<String> response = ragChatService.suggestPrompts(request);
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Suggested prompts generated successfully", response)
         );
     }
 }
