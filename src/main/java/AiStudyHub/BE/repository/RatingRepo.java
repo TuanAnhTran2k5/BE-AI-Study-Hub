@@ -14,6 +14,8 @@ public interface RatingRepo extends JpaRepository<Rating, Long> {
 
     Optional<Rating> findByUserAndDocument(User user, Document document);
 
+    Optional<Rating> findByUserUserIdAndDocumentDocumentId(Long userId, Long documentId);
+
     List<Rating> findByDocument(Document document);
 
     long deleteByDocumentDocumentId(Long documentId);
