@@ -267,7 +267,23 @@ public class DocumentService implements IDocument {
             }
         }
 
-        return documentMapper.toDocumentResponse(document);
+        DocumentResponse response = documentMapper.toDocumentResponse(document);
+
+        // Populate isBookmarked and myRating if the user is authenticated
+        try {
+            User currentUser = SecurityUtils.getCurrentUser();
+            if (currentUser != null && currentUser.getUserId() != null) {
+                boolean isBookmarked = bookmarkRepo.existsByUserUserIdAndDocumentDocumentId(currentUser.getUserId(), documentId);
+                response.setIsBookmarked(isBookmarked);
+
+                ratingRepo.findByUserUserIdAndDocumentDocumentId(currentUser.getUserId(), documentId)
+                        .ifPresent(rating -> response.setMyRating(rating.getRatingValue()));
+            }
+        } catch (Exception e) {
+            log.debug("Unauthenticated user accessing document detail: {}", e.getMessage());
+        }
+
+        return response;
     }
 
     // --- DOWNLOAD ---

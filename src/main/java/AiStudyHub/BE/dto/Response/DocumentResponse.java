@@ -44,6 +44,9 @@ public class DocumentResponse {
     Integer bookmarkCount;
     Integer reportCount;
 
+    Boolean isBookmarked;
+    Integer myRating;
+
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 }

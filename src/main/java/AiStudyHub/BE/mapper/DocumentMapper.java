@@ -65,5 +65,7 @@ public interface DocumentMapper {
     @Mapping(source = "subject.subjectId", target = "subjectId")
     @Mapping(source = "subject.subjectCode", target = "subjectCode")
     @Mapping(source = "subject.subjectName", target = "subjectName")
+    @Mapping(target = "isBookmarked", ignore = true)
+    @Mapping(target = "myRating", ignore = true)
     DocumentResponse toDocumentResponse(Document document);
 }
