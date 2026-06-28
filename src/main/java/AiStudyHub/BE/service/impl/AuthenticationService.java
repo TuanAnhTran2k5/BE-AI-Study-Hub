@@ -211,25 +211,46 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     @Override
     public UserResponse googleLogin(GoogleLoginRequest request) {
         WebClient webClient = WebClient.create();
-        GoogleUserInfo googleUserInfo;
-        try {
-            googleUserInfo = webClient.get()
-                    .uri("https://oauth2.googleapis.com/tokeninfo?id_token=" + request.getToken())
-                    .retrieve()
-                    .bodyToMono(GoogleUserInfo.class)
-                    .block();
-        } catch (Exception e) {
-            log.error("Error verifying Google ID token, trying as access token: {}", e.getMessage());
+        GoogleUserInfo googleUserInfo = null;
+        String token = request.getToken();
+
+        boolean isJwtIdToken = token != null && token.startsWith("ey") && token.split("\\.").length == 3;
+
+        if (isJwtIdToken) {
+            try {
+                googleUserInfo = webClient.get()
+                        .uri("https://oauth2.googleapis.com/tokeninfo?id_token=" + token)
+                        .retrieve()
+                        .bodyToMono(GoogleUserInfo.class)
+                        .block();
+            } catch (Exception e) {
+                log.debug("ID token verification failed, attempting userinfo endpoint with bearer token: {}", e.getMessage());
+            }
+        }
+
+        if (googleUserInfo == null) {
             try {
                 googleUserInfo = webClient.get()
                         .uri("https://www.googleapis.com/oauth2/v3/userinfo")
-                        .headers(h -> h.setBearerAuth(request.getToken()))
+                        .headers(h -> h.setBearerAuth(token))
                         .retrieve()
                         .bodyToMono(GoogleUserInfo.class)
                         .block();
             } catch (Exception ex) {
-                log.error("Error verifying Google access token: {}", ex.getMessage());
-                throw new GlobalException(ErrorCode.UNAUTHENTICATED);
+                if (!isJwtIdToken) {
+                    try {
+                        googleUserInfo = webClient.get()
+                                .uri("https://oauth2.googleapis.com/tokeninfo?id_token=" + token)
+                        .retrieve()
+                        .bodyToMono(GoogleUserInfo.class)
+                        .block();
+                    } catch (Exception ignored) {
+                    }
+                }
+                if (googleUserInfo == null) {
+                    log.error("Error verifying Google token (both ID token and Access token endpoints failed): {}", ex.getMessage());
+                    throw new GlobalException(ErrorCode.UNAUTHENTICATED);
+                }
             }
         }
 
@@ -247,14 +268,19 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                         existingUser.setStatus(UserStatus.ACTIVE);
                     }
                     
-                    if (existingUser.getAvatarUrl() == null || existingUser.getAvatarUrl().isBlank()) {
-                        existingUser.setAvatarUrl(finalUserInfo.getPicture());
+                    if (existingUser.getAvatarUrl() == null || existingUser.getAvatarUrl().isBlank() || existingUser.getAvatarUrl().contains("googleusercontent.com")) {
+                        if (finalUserInfo.getPicture() != null && !finalUserInfo.getPicture().isBlank()) {
+                            existingUser.setAvatarUrl(finalUserInfo.getPicture());
+                        }
                     }
                     
                     return userRepo.save(existingUser);
                 })
                 .orElseGet(() -> {
                     User newUser = userMapper.toUser(finalUserInfo);
+                    if (newUser.getAvatarUrl() == null || newUser.getAvatarUrl().isBlank()) {
+                        newUser.setAvatarUrl(finalUserInfo.getPicture());
+                    }
                     newUser.setAuthProvider(AuthProvider.GOOGLE);
                     newUser.setRole(UserRole.US);
                     newUser.setStatus(UserStatus.ACTIVE);
