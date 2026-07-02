@@ -2,7 +2,9 @@ package AiStudyHub.BE.controller;
 
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.SubjectResponse;
-import AiStudyHub.BE.service.ICurriculum;
+import AiStudyHub.BE.service.IComboSubjectService;
+import AiStudyHub.BE.service.ISemesterService;
+import AiStudyHub.BE.service.ISubjectService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -20,19 +22,21 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AcademicController {
 
-    ICurriculum curriculumService;
+    ISemesterService semesterService;
+    IComboSubjectService comboSubjectService;
+    ISubjectService subjectService;
 
     @GetMapping("/semesters")
     public ResponseEntity<APIResponse<?>> getAllSemesters() {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get semesters successfully", curriculumService.getAllSemesters())
+                APIResponse.response(200, "Get semesters successfully", semesterService.getAllSemesters())
         );
     }
 
     @GetMapping("/combos")
     public ResponseEntity<APIResponse<?>> getAllCombos() {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get combos successfully", curriculumService.getAllComboSubjects())
+                APIResponse.response(200, "Get combos successfully", comboSubjectService.getAllComboSubjects())
         );
     }
 
@@ -41,7 +45,7 @@ public class AcademicController {
             @PathVariable Long semesterId
     ) {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get subjects by semester successfully", curriculumService.getSubjectsBySemester(semesterId))
+                APIResponse.response(200, "Get subjects by semester successfully", subjectService.getSubjectsBySemester(semesterId))
         );
     }
 
@@ -51,7 +55,7 @@ public class AcademicController {
             @PathVariable Long comboId
     ) {
         return ResponseEntity.ok(
-                APIResponse.response(200, "Get subjects by semester and combo successfully", curriculumService.getSubjectsBySemesterAndCombo(semesterId, comboId))
+                APIResponse.response(200, "Get subjects by semester and combo successfully", subjectService.getSubjectsBySemesterAndCombo(semesterId, comboId))
         );
     }
 }
