@@ -79,11 +79,22 @@ public class RagChatController {
     }
 
     @DeleteMapping("/sessions/{sessionId}")
-    public ResponseEntity<APIResponse<Void>> deleteSession(@PathVariable Long sessionId) {
+    public ResponseEntity<APIResponse<ChatResponse>> deleteSession(@PathVariable Long sessionId) {
         log.info("API Request: Delete session {}", sessionId);
-        ragChatService.deleteSession(sessionId);
+        ChatResponse response = ragChatService.deleteSession(sessionId);
         return ResponseEntity.ok(
-                APIResponse.response(200, "Session deleted successfully", null)
+                APIResponse.response(200, "Session deleted successfully", response)
+        );
+    }
+
+    @PutMapping("/sessions/{sessionId}/documents")
+    public ResponseEntity<APIResponse<ChatSessionResponse>> updateSessionDocuments(
+            @PathVariable Long sessionId,
+            @RequestBody @Valid CreateSessionRequest request) {
+        log.info("API Request: Update documents for session {}", sessionId);
+        ChatSessionResponse response = ragChatService.updateSessionDocuments(sessionId, request);
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Session documents updated successfully", response)
         );
     }
 

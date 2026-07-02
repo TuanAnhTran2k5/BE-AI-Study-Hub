@@ -18,7 +18,7 @@ import AiStudyHub.BE.entity.ChatSession;
 import AiStudyHub.BE.entity.ChatMessage;
 import AiStudyHub.BE.entity.ChatSessionDocument;
 import AiStudyHub.BE.exception.GlobalException;
-
+import AiStudyHub.BE.security.SecurityUtils;
 import AiStudyHub.BE.mapper.RagDocumentMapper;
 import AiStudyHub.BE.repository.DocumentRepo;
 import AiStudyHub.BE.repository.RagChunkRepository;
@@ -176,27 +176,21 @@ public class RagSystemService implements IRagSystem {
 
         User currentUser = null;
         try {
-            currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+            currentUser = SecurityUtils.getCurrentUser();
         } catch (Exception ignored) {
         }
 
         if (currentUser != null) {
-            ChatSession session;
-            List<ChatSession> userSessions = chatSessionRepository.findByUser_UserIdOrderByCreatedAtDesc(currentUser.getUserId());
-            if (!userSessions.isEmpty()) {
-                session = userSessions.get(0);
-            } else {
-                String title = question.length() > 80 ? question.substring(0, 77) + "..." : question;
-                LocalDateTime now = LocalDateTime.now();
-                
-                session = ChatSession.builder()
-                        .user(currentUser)
-                        .sessionTitle(title)
-                        .createdAt(now)
-                        .updatedAt(now)
-                        .build();
-                session = chatSessionRepository.save(session);
-            }
+            String title = question.length() > 80 ? question.substring(0, 77) + "..." : question;
+            LocalDateTime now = LocalDateTime.now();
+
+            ChatSession session = ChatSession.builder()
+                    .user(currentUser)
+                    .sessionTitle(title)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build();
+            session = chatSessionRepository.save(session);
             return askQuestionInSession(session.getSessionId(), request);
         }
 
@@ -225,11 +219,11 @@ public class RagSystemService implements IRagSystem {
         try {
             PromptTemplate promptTemplate = new PromptTemplate(RAG_PROMPT_TEMPLATE);
             Map<String, Object> promptParameters = new HashMap<>();
-            String currentDate = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE, yyyy-MM-dd HH:mm:ss"));
+            String currentDate = LocalDateTime.now().format(DateTimeFormatter.ofPattern("EEEE, yyyy-MM-dd HH:mm:ss"));
             promptParameters.put("currentDate", currentDate);
             promptParameters.put("context", context);
             promptParameters.put("question", question);
-            org.springframework.ai.chat.prompt.Prompt prompt = promptTemplate.create(promptParameters);
+            Prompt prompt = promptTemplate.create(promptParameters);
 
             log.info("Compiled RAG Context length: {} characters", context.length());
             log.info("Calling OpenAI chat model...");
@@ -336,47 +330,6 @@ public class RagSystemService implements IRagSystem {
         User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
         log.info("Creating chat session for user: {}", currentUser.getUserId());
 
-        List<Long> reqDocIds = request.getDocumentIds() != null ? request.getDocumentIds() : List.of();
-        java.util.Set<Long> reqSet = new java.util.HashSet<>(reqDocIds);
-
-        List<ChatSession> userSessions = chatSessionRepository.findByUser_UserIdOrderByCreatedAtDesc(currentUser.getUserId());
-        if (!userSessions.isEmpty()) {
-            ChatSession latest = userSessions.get(0);
-            List<Long> existingDocIds = chatSessionDocumentRepository.findBySession_SessionId(latest.getSessionId())
-                    .stream()
-                    .map(sd -> sd.getDocument().getDocumentId())
-                    .collect(Collectors.toList());
-
-            for (Long docId : reqDocIds) {
-                if (!existingDocIds.contains(docId)) {
-                    AiStudyHub.BE.entity.Document document = documentRepo.findById(docId)
-                            .orElseThrow(() -> new GlobalException(404, "Document not found with ID: " + docId));
-
-                    boolean isPublic = document.getVisibilityStatus() == VisibilityStatus.PUBLIC;
-                    boolean isOwner = document.getOwner().getUserId().equals(currentUser.getUserId());
-                    if (!isPublic && !isOwner) {
-                        throw new GlobalException(403, "You do not have permission to access document with ID: " + docId);
-                    }
-
-                    ChatSessionDocument sessionDoc = ChatSessionDocument.builder()
-                            .session(latest)
-                            .document(document)
-                            .build();
-                    chatSessionDocumentRepository.save(sessionDoc);
-                    existingDocIds.add(docId);
-                }
-            }
-
-            log.info("Reusing latest session {} and updating attached documents", latest.getSessionId());
-            return ChatSessionResponse.builder()
-                    .sessionId(latest.getSessionId())
-                    .sessionTitle(latest.getSessionTitle())
-                    .createdAt(latest.getCreatedAt())
-                    .updatedAt(latest.getUpdatedAt())
-                    .documentIds(existingDocIds)
-                    .build();
-        }
-
         LocalDateTime now = LocalDateTime.now();
         ChatSession session = ChatSession.builder()
                 .user(currentUser)
@@ -403,7 +356,7 @@ public class RagSystemService implements IRagSystem {
                         .session(session)
                         .document(document)
                         .build();
-                chatSessionDocumentRepository.save(sessionDoc);
+                chatSessionDocumentRepository.saveAndFlush(sessionDoc);
                 documentIds.add(docId);
             }
         }
@@ -422,10 +375,10 @@ public class RagSystemService implements IRagSystem {
         User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
         log.info("Retrieving chat sessions for user: {}", currentUser.getUserId());
 
-        List<ChatSession> sessions = chatSessionRepository.findByUser_UserIdOrderByCreatedAtDesc(currentUser.getUserId());
+        List<ChatSession> sessions = chatSessionRepository.findByUserUserIdOrderByCreatedAtDesc(currentUser.getUserId());
 
         return sessions.stream().map(session -> {
-            List<Long> documentIds = chatSessionDocumentRepository.findBySession_SessionId(session.getSessionId())
+            List<Long> documentIds = chatSessionDocumentRepository.findBySessionSessionId(session.getSessionId())
                     .stream()
                     .map(sd -> sd.getDocument().getDocumentId())
                     .collect(Collectors.toList());
@@ -444,16 +397,16 @@ public class RagSystemService implements IRagSystem {
                     .documentIds(documentIds)
                     .build();
         })
-        .sorted(java.util.Comparator.comparing(ChatSessionResponse::getUpdatedAt, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+        .sorted(Comparator.comparing(ChatSessionResponse::getUpdatedAt, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
         .collect(Collectors.toList());
     }
 
     @Override
     public Page<ChatMessageResponse> getSessionMessages(Long sessionId, int page, int size) {
-        User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+        User currentUser = SecurityUtils.getCurrentUser();
         log.info("Retrieving messages for session: {}", sessionId);
 
-        ChatSession session = chatSessionRepository.findBySessionIdAndUser_UserId(sessionId, currentUser.getUserId())
+        ChatSession session = chatSessionRepository.findBySessionIdAndUserUserId(sessionId, currentUser.getUserId())
                 .orElseThrow(() -> new GlobalException(404, "Chat session not found or you don't have access"));
 
         Pageable pageable = PageRequest.of(page, size);
@@ -475,21 +428,70 @@ public class RagSystemService implements IRagSystem {
 
     @Override
     @Transactional
-    public void deleteSession(Long sessionId) {
-        User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+    public ChatResponse deleteSession(Long sessionId) {
+        User currentUser = SecurityUtils.getCurrentUser();
         log.info("Deleting session: {}", sessionId);
 
-        ChatSession session = chatSessionRepository.findBySessionIdAndUser_UserId(sessionId, currentUser.getUserId())
+        ChatSession session = chatSessionRepository.findBySessionIdAndUserUserId(sessionId, currentUser.getUserId())
                 .orElseThrow(() -> new GlobalException(404, "Chat session not found or you don't have access"));
 
         chatSessionRepository.delete(session);
+
+        return ChatResponse.builder()
+                .answer("Chat session deleted successfully")
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public ChatSessionResponse updateSessionDocuments(Long sessionId, CreateSessionRequest request) {
+        User currentUser = SecurityUtils.getCurrentUser();
+        log.info("Updating documents for session {}: {}", sessionId, request.getDocumentIds());
+
+        ChatSession session = chatSessionRepository.findBySessionIdAndUserUserId(sessionId, currentUser.getUserId())
+                .orElseThrow(() -> new GlobalException(404, "Chat session not found or you don't have access"));
+
+        chatSessionDocumentRepository.deleteBySessionSessionId(sessionId);
+        chatSessionDocumentRepository.flush();
+
+        List<Long> documentIds = new ArrayList<>();
+        if (request.getDocumentIds() != null && !request.getDocumentIds().isEmpty()) {
+            for (Long docId : request.getDocumentIds()) {
+                AiStudyHub.BE.entity.Document document = documentRepo.findById(docId)
+                        .orElseThrow(() -> new GlobalException(404, "Document not found with ID: " + docId));
+
+                boolean isPublic = document.getVisibilityStatus() == VisibilityStatus.PUBLIC;
+                boolean isOwner = document.getOwner().getUserId().equals(currentUser.getUserId());
+                if (!isPublic && !isOwner) {
+                    throw new GlobalException(403, "You do not have permission to access document with ID: " + docId);
+                }
+
+                ChatSessionDocument sessionDoc = ChatSessionDocument.builder()
+                        .session(session)
+                        .document(document)
+                        .build();
+                chatSessionDocumentRepository.saveAndFlush(sessionDoc);
+                documentIds.add(docId);
+            }
+        }
+
+        session.setUpdatedAt(LocalDateTime.now());
+        chatSessionRepository.save(session);
+
+        return ChatSessionResponse.builder()
+                .sessionId(session.getSessionId())
+                .sessionTitle(session.getSessionTitle())
+                .createdAt(session.getCreatedAt())
+                .updatedAt(session.getUpdatedAt())
+                .documentIds(documentIds)
+                .build();
     }
 
     @Override
     @Transactional
     public ChatResponse askQuestionInSession(Long sessionId, ChatRequest request) {
         User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
-        ChatSession session = chatSessionRepository.findBySessionIdAndUser_UserId(sessionId, currentUser.getUserId())
+        ChatSession session = chatSessionRepository.findBySessionIdAndUserUserId(sessionId, currentUser.getUserId())
                 .orElseThrow(() -> new GlobalException(404, "Chat session not found or you don't have access"));
 
         String question = request.getQuestion();
@@ -507,8 +509,9 @@ public class RagSystemService implements IRagSystem {
         long messageCount = chatMessageRepository.countBySession_SessionId(sessionId);
         if (messageCount == 0) {
             String title = question.length() > 80 ? question.substring(0, 77) + "..." : question;
+            // session is a managed entity — Hibernate will flush this setter
+            // at end of @Transactional without touching lazy sessionDocuments collection
             session.setSessionTitle(title);
-            chatSessionRepository.save(session);
         }
 
         // 3. Save user message
@@ -520,7 +523,7 @@ public class RagSystemService implements IRagSystem {
         chatMessageRepository.save(userMsg);
 
         // 4. Retrieve session document ids
-        List<Long> sessionDocIds = chatSessionDocumentRepository.findBySession_SessionId(sessionId)
+        List<Long> sessionDocIds = chatSessionDocumentRepository.findBySessionSessionId(sessionId)
                 .stream()
                 .map(sd -> sd.getDocument().getDocumentId())
                 .collect(Collectors.toList());
@@ -551,7 +554,7 @@ public class RagSystemService implements IRagSystem {
         try {
             PromptTemplate promptTemplate = new PromptTemplate(RAG_WITH_HISTORY_PROMPT_TEMPLATE);
             Map<String, Object> promptParameters = new HashMap<>();
-            String currentDate = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("EEEE, yyyy-MM-dd HH:mm:ss"));
+            String currentDate = LocalDateTime.now().format(DateTimeFormatter.ofPattern("EEEE, yyyy-MM-dd HH:mm:ss"));
             promptParameters.put("currentDate", currentDate);
             promptParameters.put("history", history);
             promptParameters.put("context", context);

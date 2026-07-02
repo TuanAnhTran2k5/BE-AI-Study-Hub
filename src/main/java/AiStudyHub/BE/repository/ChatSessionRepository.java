@@ -9,6 +9,6 @@ import java.util.Optional;
 
 @Repository
 public interface ChatSessionRepository extends JpaRepository<ChatSession, Long> {
-    List<ChatSession> findByUser_UserIdOrderByCreatedAtDesc(Long userId);
-    Optional<ChatSession> findBySessionIdAndUser_UserId(Long sessionId, Long userId);
+    List<ChatSession> findByUserUserIdOrderByCreatedAtDesc(Long userId);
+    Optional<ChatSession> findBySessionIdAndUserUserId(Long sessionId, Long userId);
 }

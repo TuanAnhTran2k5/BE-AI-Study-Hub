@@ -93,7 +93,7 @@ public class Document {
     @EqualsAndHashCode.Exclude
     List<Download> downloads;
 
-    @OneToMany(mappedBy = "document", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "document", cascade = CascadeType.REMOVE)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     List<ChatSessionDocument> chatSessionDocuments;

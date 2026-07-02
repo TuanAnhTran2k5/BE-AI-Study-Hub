@@ -17,5 +17,5 @@ public interface BookmarkRepo extends JpaRepository<Bookmark, Long> {
 
     long deleteByDocumentDocumentId(Long documentId);
 
-    void deleteByUserUserIdAndDocumentDocumentId(Long userId, Long documentId);
+    long deleteByUserUserIdAndDocumentDocumentId(Long userId, Long documentId);
 }
