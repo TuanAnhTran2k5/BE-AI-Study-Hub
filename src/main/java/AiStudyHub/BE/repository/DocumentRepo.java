@@ -28,4 +28,9 @@ public interface DocumentRepo extends JpaRepository<Document, Long> {
     List<Document> findByOwnerUserId(Long userId);
 
     List<Document> findByTitleContainingIgnoreCase(String keyword);
+
+    long countByOwnerUserId(Long userId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(d.downloadCount), 0) FROM Document d WHERE d.owner.userId = :userId")
+    long sumDownloadCountByOwnerUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 }

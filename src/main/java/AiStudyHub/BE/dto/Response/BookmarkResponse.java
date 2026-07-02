@@ -16,4 +16,6 @@ public class BookmarkResponse {
     Long userId;
     DocumentResponse document;
     LocalDateTime bookmarkedAt;
+    Long bookmarkCount;
+    Boolean isBookmarked;
 }

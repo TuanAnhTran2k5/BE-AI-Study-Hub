@@ -59,12 +59,15 @@ public class BookmarkService implements IBookmark {
         document.setBookmarkCount(currentCount + 1);
         documentRepo.save(document);
 
-        return bookmarkMapper.toResponse(bookmark);
+        BookmarkResponse response = bookmarkMapper.toResponse(bookmark);
+        response.setBookmarkCount((long) document.getBookmarkCount());
+        response.setIsBookmarked(true);
+        return response;
     }
 
     @Override
     @Transactional
-    public DeleteResponse removeBookmark(Long userId, Long documentId) {
+    public BookmarkResponse removeBookmark(Long userId, Long documentId) {
         Bookmark bookmark = bookmarkRepo.findByUserUserIdAndDocumentDocumentId(userId, documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.NOT_FOUND));
 
@@ -77,7 +80,13 @@ public class BookmarkService implements IBookmark {
             document.setBookmarkCount(currentCount - 1);
             documentRepo.save(document);
         }
-        return bookmarkMapper.toDeleteResponse(bookmark, java.time.LocalDateTime.now());
+        
+        BookmarkResponse response = BookmarkResponse.builder()
+                .userId(userId)
+                .bookmarkCount((long) document.getBookmarkCount())
+                .isBookmarked(false)
+                .build();
+        return response;
     }
 
     @Override

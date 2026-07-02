@@ -17,6 +17,7 @@ import AiStudyHub.BE.mapper.DocumentMapper;
 import AiStudyHub.BE.repository.*;
 import AiStudyHub.BE.security.SecurityUtils;
 import AiStudyHub.BE.service.IDocument;
+import AiStudyHub.BE.service.IUser;
 import AiStudyHub.BE.service.IGamification;
 import AiStudyHub.BE.service.IRagSystem;
 import AiStudyHub.BE.service.IStorageService;
@@ -67,6 +68,7 @@ public class DocumentService implements IDocument {
     ScoreLogRepo scoreLogRepo;
     NotificationRepo notificationRepo;
     ChatSessionDocumentRepo chatSessionDocumentRepo;
+    IUser userService;
 
     @Autowired
     @Lazy
@@ -148,6 +150,14 @@ public class DocumentService implements IDocument {
 
             DocumentUploadResponse response = documentMapper.toDocumentUploadResponse(document);
             response.setMessage("Upload và xử lý tài liệu thành công");
+            try {
+                UserResponse profile = userService.getProfile(owner.getUserId());
+                response.setStorageUsed(profile.getStorageUsed());
+                response.setStorageRemaining(profile.getStorageRemaining());
+                response.setStorageUsagePercent(profile.getStorageUsagePercent());
+            } catch (Exception ex) {
+                log.warn("Failed to populate updated storage info in upload response: {}", ex.getMessage());
+            }
             return response;
 
         } catch (Exception e) {
@@ -212,6 +222,15 @@ public class DocumentService implements IDocument {
         // External storage deletion happens LAST: if it throws, the DB transaction
         // rolls back and the document row + file both remain (consistent state).
         supabaseStorageService.deleteFile(fileUrl);
+
+        try {
+            UserResponse profile = userService.getProfile(owner.getUserId());
+            response.setStorageUsed(profile.getStorageUsed());
+            response.setStorageRemaining(profile.getStorageRemaining());
+            response.setStorageUsagePercent(profile.getStorageUsagePercent());
+        } catch (Exception ex) {
+            log.warn("Failed to populate updated storage info in delete response: {}", ex.getMessage());
+        }
 
         return response;
     }
@@ -392,6 +411,17 @@ public class DocumentService implements IDocument {
             );
 
             response.setPublicOwnerName(publicOwnerName);
+
+            try {
+                UserResponse ownerProfile = userService.getProfile(publicOwner.getUserId());
+                response.setOwnerCurrentRank(ownerProfile.getCurrentRank());
+                if (ownerProfile.getRankProgress() != null) {
+                    response.setOwnerNextRank(ownerProfile.getRankProgress().getNextRank());
+                    response.setOwnerProgressPercent(ownerProfile.getRankProgress().getProgressPercent());
+                }
+            } catch (Exception ex) {
+                log.warn("Failed to populate owner rank progress in download response: {}", ex.getMessage());
+            }
 
             return response;
 

@@ -21,4 +21,5 @@ public class RatingResponse {
     Double averageRating;
 
     Integer ratingCount;
+    Integer myRating;
 }
