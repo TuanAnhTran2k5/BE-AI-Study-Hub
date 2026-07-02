@@ -28,11 +28,13 @@ import AiStudyHub.BE.repository.ChatMessageRepository;
 import AiStudyHub.BE.repository.ChatSessionDocumentRepository;
 import AiStudyHub.BE.service.IRagSystem;
 import AiStudyHub.BE.service.ISupabaseStorage;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.tika.TikaDocumentReader;
@@ -52,6 +54,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -76,36 +80,33 @@ public class RagSystemService implements IRagSystem {
 
     private static final String RAG_PROMPT_TEMPLATE = """
             You are an AI Study Assistant.
+            Current System Date & Time: {currentDate}
 
-            Your responsibilities:
-            1. Help users understand, summarize, explain, and analyze information contained in uploaded documents.
-            2. Treat the provided Context as the only source of truth.
-            3. Answer ONLY using information explicitly found in the Context.
-            4. Do NOT use external knowledge, assumptions, or personal opinions.
-            5. Never invent or infer facts that are not present in the Context.
+            Your responsibilities & Knowledge Rules:
+            1. Help users understand, summarize, explain, and analyze information from uploaded documents as well as general academic and study topics.
+            2. Prioritize Provided Context: Treat the provided Context as the primary and authoritative reference when answering questions related to the user's documents.
+            3. Combine & Expand: You are strongly encouraged to combine the provided Context with your pre-trained general knowledge (knowledge trained by your developers) to explain concepts more clearly, provide relevant examples, draw connections, and answer related or extended questions.
+            4. Flexible Answering: If the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED" or does not contain enough information to answer a general, academic, conceptual, or practical question, answer fully and accurately using your pre-trained general knowledge. Do NOT refuse to answer or state that information is missing just because it is not in the Context.
+            5. Document-Specific Queries: Only if the user specifically asks about private or unique details of an un-retrieved document (e.g., "What does my uploaded report say in section 2?"), state clearly what is in the Context or politely inform them if that specific document content is missing while offering relevant general knowledge.
+            6. Temporal Accuracy: The current system date and time is {currentDate}. Always use this exact current date when answering any time-related questions (such as "today", "current year", "now", or comparing dates). Never claim your knowledge or date is restricted to an old pre-training cutoff date.
 
             Language Rules (CRITICAL & HIGHEST PRIORITY):
-            1. Analyze the User Question to determine its dominant language (the language whose words appear most frequently). If the user mixes multiple languages (code-switching), identify the language with the highest word count in the question.
-            2. You MUST write your ENTIRE response (including all greetings, explanations, warnings, headings, list labels, and content) strictly in that DOMINANT LANGUAGE.
-            3. Apply this rule universally to ANY language worldwide (e.g., English, Vietnamese, Japanese, Spanish, French, Korean, Chinese, etc.).
-            4. Never mix languages in your answer unless explicitly requested by the user.
+            1. Conversational Language: Analyze the User Question to determine its dominant language (e.g., Vietnamese, English, Japanese, Korean, Spanish, etc.). You MUST write all explanations, analysis, commentary, and conversational phrases strictly in that DOMINANT LANGUAGE.
+            2. Target Language Exception (Multilingual Study & Examples): When the user uploads or discusses a document written in or containing foreign language vocabulary, grammar, texts, or code (such as Japanese vocabulary, English grammar, Chinese idioms, programming code, etc.) and asks to create example sentences, explain usage, quote text, or generate exercises:
+               - You MUST generate or preserve those vocabulary terms, example sentences, quotes, or technical snippets directly in their ORIGINAL / TARGET LANGUAGE (e.g., Japanese sentences in Japanese with Kanji/Hiragana, English quotes in English).
+               - Accompany the target language examples with clear translations and detailed explanations in the dominant conversational language of the User Question.
+               - Never force-translate the foreign language example sentences solely into the conversational language!
 
-            Document Rules:
-            1. If Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED":
-                1.1 If the User Question is a general greeting, introduction, or casual small talk unrelated to documents, answer naturally and politely in the dominant language of the User Question without mentioning missing documents.
-                1.2 If the User Question is asking about document content or requesting factual information from documents, respond in the dominant language of the User Question stating that no relevant document data is available and asking the user to provide documents. (Translate this exact meaning into the dominant language: "I do not have data related to what you asked, please provide the document.").
-            2. If Context contains retrieved documents (not empty) and does not contain enough information to answer the question, clearly state in the dominant language that the requested information is not available in the provided documents.
-
-            Summary Rules:
-            - When the user requests a summary, structure the response into 4 numbered parts. You MUST dynamically translate these 4 headings into the dominant language of the User Question:
+            Formatting & Summary Rules:
+            1. ONLY when the user explicitly requests to summarize a document or topic (using words like "summarize", "tóm tắt", "tóm lược"), structure your response into 4 numbered parts dynamically translated into the dominant language of the User Question:
                 1. [Translate heading meaning: Main Topic]
                 2. [Translate heading meaning: Purpose]
                 3. [Translate heading meaning: Key Points]
                 4. [Translate heading meaning: Conclusion]
+            2. For all regular questions, conversational messages, explanations, or Q&A that are NOT explicit summary requests, DO NOT structure your answer with those 4 headings. Respond naturally using paragraphs, clear bullet points, or conversational style suitable for the prompt.
 
             Conversation Rules:
-            1. If the user's message is a general conversation (e.g., greetings, introductions, small talk) and does not require document information, answer naturally without mentioning the Context.
-            2. Do not include information from the Context unless it is relevant to the user's request. 
+            1. If the user's message is a general conversation (e.g., greetings, introductions, small talk) or general inquiry, answer naturally and helpfully without mentioning the Context.
             
             Context:
             {context}
@@ -114,41 +115,37 @@ public class RagSystemService implements IRagSystem {
             {question}
             
             IMPORTANT FINAL LANGUAGE OVERRIDE:
-            Look strictly at the "User Question" above ("{question}"). Determine its dominant language (the language appearing most frequently in the question).
-            You MUST write your ENTIRE response (including headings 1, 2, 3, 4 and content) in that exact dominant language of "{question}". Even if the Context is in Vietnamese or another language, DO NOT respond in the Context's language.
+            Look strictly at the "User Question" above ("{question}"). Determine its dominant language.
+            Write your conversational explanations and commentary strictly in that exact dominant language of "{question}". However, whenever the question asks for example sentences, vocabulary usage, quotes, or exercises related to a foreign language document (e.g. Japanese, English, Chinese, etc.), ALWAYS output the example sentences/quotes in that target foreign language accompanied by explanations/translations in the dominant language of "{question}".
             """;
 
     private static final String RAG_WITH_HISTORY_PROMPT_TEMPLATE = """
             You are an AI Study Assistant.
+            Current System Date & Time: {currentDate}
             
             Language Rules (CRITICAL & HIGHEST PRIORITY):          
-            1. Analyze the Current User Question to determine its dominant language (the language whose words appear most frequently). If the user mixes multiple languages (code-switching), identify the language with the highest word count in the question.
-            2. You MUST write your ENTIRE response (including all greetings, explanations, warnings, headings, list labels, and content) strictly in that DOMINANT LANGUAGE.
-            3. Apply this rule universally to ANY language worldwide (e.g., English, Vietnamese, Japanese, Spanish, French, Korean, Chinese, etc.).
-            4. Never mix languages in your answer unless explicitly requested by the user.
+            1. Conversational Language: Analyze the Current User Question to determine its dominant language (e.g., Vietnamese, English, Japanese, Korean, Spanish, etc.). You MUST write all explanations, analysis, commentary, and conversational phrases strictly in that DOMINANT LANGUAGE.
+            2. Target Language Exception (Multilingual Study & Examples): When the user uploads or discusses a document written in or containing foreign language vocabulary, grammar, texts, or code (such as Japanese vocabulary, English grammar, Chinese idioms, programming code, etc.) and asks to create example sentences, explain usage, quote text, or generate exercises:
+               - You MUST generate or preserve those vocabulary terms, example sentences, quotes, or technical snippets directly in their ORIGINAL / TARGET LANGUAGE (e.g., Japanese sentences in Japanese with Kanji/Hiragana, English quotes in English).
+               - Accompany the target language examples with clear translations and detailed explanations in the dominant conversational language of the Current User Question.
+               - Never force-translate the foreign language example sentences solely into the conversational language!
             
-            Knowledge Rules:            
-            1. The provided Context contains information retrieved from one or more user documents.
-            2. Treat the Context as the primary source of truth.
-            3. Use Previous Conversation History only to understand the conversation flow and references such as "this", "that", "the previous topic", etc.
-            4. Do NOT rely on Previous Conversation History as a source of factual information unless it is also supported by the Context.
-            5. Never invent, assume, or infer information that is not explicitly present in the Context.
+            Knowledge & Flexibility Rules:            
+            1. Prioritize Provided Context: Treat the provided Context as the primary reference when answering questions related to user documents.
+            2. Combine with General Training Knowledge: You are strongly encouraged to combine the Context with your pre-trained general AI knowledge (knowledge trained by your developers) to provide deeper explanations, analogies, practical examples, or answer related questions that extend beyond the exact wording of the documents.
+            3. Flexible Answering: If the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED" or does not contain enough information for a general or academic study question, answer fully and accurately using your general training knowledge. Do NOT refuse or say "I do not have data" for general study/knowledge questions.
+            4. Document-Specific Queries: Only if the user specifically inquires about private/specific content from a document not present in Context, politely inform them that the specific document section is unavailable while offering any relevant general knowledge.
+            5. Conversation History: Use Previous Conversation History to maintain conversation flow, understand references ("this", "that", "the previous topic"), and support a natural multi-turn chat experience.
+            6. Temporal Accuracy: The current system date and time is {currentDate}. Always use this exact current date when answering any time-related questions (such as "today", "current year", "now"). Never claim your knowledge or date is restricted to an old pre-training cutoff date when discussing dates.
             
-            Document Rules:            
-            1. If Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED":
-                1.1 If the Current User Question is a general greeting, introduction, or casual small talk unrelated to documents, answer naturally and politely in the dominant language of the Current User Question without mentioning missing documents.
-                1.2 If the Current User Question is asking about document content or requesting factual information from documents, respond in the dominant language of the Current User Question stating that no relevant document data is available and asking the user to provide documents. (Translate this exact meaning into the dominant language: "I do not have data related to what you asked, please provide the document.").
-            2. If Context contains retrieved documents (not empty) and does not contain enough information to answer the question, clearly state in the dominant language that the requested information is not available in the provided documents.
-            3. If multiple topics appear in the Context, focus only on the information relevant to the current question.
-            4. Do not summarize or discuss unrelated document content.
-            
-            Conversation Rules:            
-            1. If the user's message is a general greeting or casual conversation (e.g., "Hello", "How are you?", "What is your name?"), respond naturally and do not force document information into the answer.
-            2. If the user asks to summarize a document, provide 4 sections dynamically translated into the dominant language of the Current User Question:
+            Formatting & Conversation Rules:            
+            1. If the user's message is a general greeting or casual conversation (e.g., "Hello", "How are you?", "What is your name?"), respond naturally and warmly without forcing document structure.
+            2. ONLY when the user explicitly asks to summarize a document or topic (using words like "summarize", "tóm tắt"), provide 4 sections dynamically translated into the dominant language of the Current User Question:
                 2.1 [Translate heading meaning: Main Topic]
                 2.2 [Translate heading meaning: Purpose]
                 2.3 [Translate heading meaning: Key Points]
                 2.4 [Translate heading meaning: Conclusion]
+            3. For all other questions or conversational turns, DO NOT structure your answer with those 4 headings. Answer naturally in paragraphs or bullet points appropriate for the question.
             
             Previous Conversation History:
             {history}
@@ -160,8 +157,8 @@ public class RagSystemService implements IRagSystem {
             {question}
             
             IMPORTANT FINAL LANGUAGE OVERRIDE:
-            Look strictly at the "Current User Question" above ("{question}"). Determine its dominant language (the language appearing most frequently in the question).
-            You MUST write your ENTIRE response (including headings 2.1, 2.2, 2.3, 2.4 and content) in that exact dominant language of "{question}". Ignore the language of the Context and History.
+            Look strictly at the "Current User Question" above ("{question}"). Determine its dominant language.
+            Write your conversational explanations and commentary strictly in that exact dominant language of "{question}". However, whenever the question asks for example sentences, vocabulary usage, quotes, or exercises related to a foreign language document (e.g. Japanese, English, Chinese, etc.), ALWAYS output the example sentences/quotes in that target foreign language accompanied by explanations/translations in the dominant language of "{question}".
             
             Answer:
             """;
@@ -172,9 +169,36 @@ public class RagSystemService implements IRagSystem {
     // ==========================================
 
     @Override
+    @Transactional
     public ChatResponse askQuestion(ChatRequest request) {
         String question = request.getQuestion();
         log.info("Processing user question: {}", question);
+
+        User currentUser = null;
+        try {
+            currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+        } catch (Exception ignored) {
+        }
+
+        if (currentUser != null) {
+            ChatSession session;
+            List<ChatSession> userSessions = chatSessionRepository.findByUser_UserIdOrderByCreatedAtDesc(currentUser.getUserId());
+            if (!userSessions.isEmpty()) {
+                session = userSessions.get(0);
+            } else {
+                String title = question.length() > 80 ? question.substring(0, 77) + "..." : question;
+                LocalDateTime now = LocalDateTime.now();
+                
+                session = ChatSession.builder()
+                        .user(currentUser)
+                        .sessionTitle(title)
+                        .createdAt(now)
+                        .updatedAt(now)
+                        .build();
+                session = chatSessionRepository.save(session);
+            }
+            return askQuestionInSession(session.getSessionId(), request);
+        }
 
         List<Document> relevantChunks = retrieveRelevantChunks(question);
         log.info("Retrieved {} relevant chunks from vector store", relevantChunks.size());
@@ -201,6 +225,8 @@ public class RagSystemService implements IRagSystem {
         try {
             PromptTemplate promptTemplate = new PromptTemplate(RAG_PROMPT_TEMPLATE);
             Map<String, Object> promptParameters = new HashMap<>();
+            String currentDate = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE, yyyy-MM-dd HH:mm:ss"));
+            promptParameters.put("currentDate", currentDate);
             promptParameters.put("context", context);
             promptParameters.put("question", question);
             org.springframework.ai.chat.prompt.Prompt prompt = promptTemplate.create(promptParameters);
@@ -264,7 +290,11 @@ public class RagSystemService implements IRagSystem {
             }
 
             List<Long> targetIds;
-            if (sessionDocIds != null && !sessionDocIds.isEmpty()) {
+            if (sessionDocIds != null) {
+                if (sessionDocIds.isEmpty()) {
+                    log.info("Session has no attached documents. Returning empty chunks for general AI mode.");
+                    return List.of();
+                }
                 targetIds = sessionDocIds.stream()
                         .filter(accessibleIds::contains)
                         .toList();
@@ -306,9 +336,53 @@ public class RagSystemService implements IRagSystem {
         User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
         log.info("Creating chat session for user: {}", currentUser.getUserId());
 
+        List<Long> reqDocIds = request.getDocumentIds() != null ? request.getDocumentIds() : List.of();
+        java.util.Set<Long> reqSet = new java.util.HashSet<>(reqDocIds);
+
+        List<ChatSession> userSessions = chatSessionRepository.findByUser_UserIdOrderByCreatedAtDesc(currentUser.getUserId());
+        if (!userSessions.isEmpty()) {
+            ChatSession latest = userSessions.get(0);
+            List<Long> existingDocIds = chatSessionDocumentRepository.findBySession_SessionId(latest.getSessionId())
+                    .stream()
+                    .map(sd -> sd.getDocument().getDocumentId())
+                    .collect(Collectors.toList());
+
+            for (Long docId : reqDocIds) {
+                if (!existingDocIds.contains(docId)) {
+                    AiStudyHub.BE.entity.Document document = documentRepo.findById(docId)
+                            .orElseThrow(() -> new GlobalException(404, "Document not found with ID: " + docId));
+
+                    boolean isPublic = document.getVisibilityStatus() == VisibilityStatus.PUBLIC;
+                    boolean isOwner = document.getOwner().getUserId().equals(currentUser.getUserId());
+                    if (!isPublic && !isOwner) {
+                        throw new GlobalException(403, "You do not have permission to access document with ID: " + docId);
+                    }
+
+                    ChatSessionDocument sessionDoc = ChatSessionDocument.builder()
+                            .session(latest)
+                            .document(document)
+                            .build();
+                    chatSessionDocumentRepository.save(sessionDoc);
+                    existingDocIds.add(docId);
+                }
+            }
+
+            log.info("Reusing latest session {} and updating attached documents", latest.getSessionId());
+            return ChatSessionResponse.builder()
+                    .sessionId(latest.getSessionId())
+                    .sessionTitle(latest.getSessionTitle())
+                    .createdAt(latest.getCreatedAt())
+                    .updatedAt(latest.getUpdatedAt())
+                    .documentIds(existingDocIds)
+                    .build();
+        }
+
+        LocalDateTime now = LocalDateTime.now();
         ChatSession session = ChatSession.builder()
                 .user(currentUser)
                 .sessionTitle("Cuộc trò chuyện mới")
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
         session = chatSessionRepository.save(session);
 
@@ -356,14 +430,22 @@ public class RagSystemService implements IRagSystem {
                     .map(sd -> sd.getDocument().getDocumentId())
                     .collect(Collectors.toList());
 
+            Page<ChatMessage> latestMsgPage = chatMessageRepository.findBySession_SessionIdOrderByCreatedAtDesc(
+                    session.getSessionId(), PageRequest.of(0, 1));
+            LocalDateTime updatedTime = !latestMsgPage.isEmpty() && latestMsgPage.getContent().get(0).getCreatedAt() != null
+                    ? latestMsgPage.getContent().get(0).getCreatedAt()
+                    : (session.getUpdatedAt() != null ? session.getUpdatedAt() : session.getCreatedAt());
+
             return ChatSessionResponse.builder()
                     .sessionId(session.getSessionId())
                     .sessionTitle(session.getSessionTitle())
                     .createdAt(session.getCreatedAt())
-                    .updatedAt(session.getUpdatedAt())
+                    .updatedAt(updatedTime)
                     .documentIds(documentIds)
                     .build();
-        }).collect(Collectors.toList());
+        })
+        .sorted(java.util.Comparator.comparing(ChatSessionResponse::getUpdatedAt, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+        .collect(Collectors.toList());
     }
 
     @Override
@@ -469,10 +551,12 @@ public class RagSystemService implements IRagSystem {
         try {
             PromptTemplate promptTemplate = new PromptTemplate(RAG_WITH_HISTORY_PROMPT_TEMPLATE);
             Map<String, Object> promptParameters = new HashMap<>();
+            String currentDate = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("EEEE, yyyy-MM-dd HH:mm:ss"));
+            promptParameters.put("currentDate", currentDate);
             promptParameters.put("history", history);
             promptParameters.put("context", context);
             promptParameters.put("question", question);
-            org.springframework.ai.chat.prompt.Prompt prompt = promptTemplate.create(promptParameters);
+            Prompt prompt = promptTemplate.create(promptParameters);
 
             log.info("Calling OpenAI model with history and context...");
             String answer = chatClient.prompt(prompt).call().content();
@@ -483,9 +567,13 @@ public class RagSystemService implements IRagSystem {
                     .senderType(SenderType.AI)
                     .content(answer)
                     .build();
-            chatMessageRepository.save(aiMsg);
+            aiMsg = chatMessageRepository.save(aiMsg);
+
+            session.setUpdatedAt(aiMsg.getCreatedAt() != null ? aiMsg.getCreatedAt() : LocalDateTime.now());
+            chatSessionRepository.save(session);
 
             return ChatResponse.builder()
+                    .sessionId(sessionId)
                     .answer(answer)
                     .sources(sources)
                     .build();
@@ -572,7 +660,7 @@ public class RagSystemService implements IRagSystem {
         cleanExistingRagResources(document);
         ragDocumentRepository.delete(document);
         log.info("Deleted RagDocument metadata");
-        return ragDocumentMapper.toDeleteResponse(document, java.time.LocalDateTime.now());
+        return ragDocumentMapper.toDeleteResponse(document, LocalDateTime.now());
     }
 
     @Override
@@ -582,7 +670,7 @@ public class RagSystemService implements IRagSystem {
         AiStudyHub.BE.entity.Document mainDoc = documentRepo.findById(documentId)
                 .orElseThrow(() -> new GlobalException(404, "Document not found with ID: " + documentId));
 
-        boolean isPublic = mainDoc.getVisibilityStatus() == AiStudyHub.BE.constraint.VisibilityStatus.PUBLIC;
+        boolean isPublic = mainDoc.getVisibilityStatus() == VisibilityStatus.PUBLIC;
         if (!isPublic) {
             checkAuthorization(mainDoc, "view");
         }
@@ -743,7 +831,7 @@ public class RagSystemService implements IRagSystem {
         try {
             PromptTemplate promptTemplate = new PromptTemplate(promptText);
             Map<String, Object> params = Map.of("context", context);
-            org.springframework.ai.chat.prompt.Prompt prompt = promptTemplate.create(params);
+            Prompt prompt = promptTemplate.create(params);
 
             log.info("Calling LLM to generate suggested prompts...");
             String responseContent = chatClient.prompt(prompt).call().content();
@@ -762,7 +850,7 @@ public class RagSystemService implements IRagSystem {
                 }
                 responseContent = responseContent.trim();
 
-                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                ObjectMapper mapper = new ObjectMapper();
                 return mapper.readValue(responseContent, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
             }
             

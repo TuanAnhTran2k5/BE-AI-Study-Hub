@@ -17,6 +17,7 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ChatResponse {
 
+    Long sessionId;
     String answer;
     List<String> sources;
 }
