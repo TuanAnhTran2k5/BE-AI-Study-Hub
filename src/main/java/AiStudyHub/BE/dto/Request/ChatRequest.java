@@ -3,9 +3,7 @@ package AiStudyHub.BE.dto.Request;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
-/**
- * Request DTO representing a user's natural language question.
- */
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

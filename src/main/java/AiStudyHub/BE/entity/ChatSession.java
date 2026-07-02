@@ -32,7 +32,7 @@ public class ChatSession {
     @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
     List<ChatMessage> messages;
 
-    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "session", cascade = CascadeType.REMOVE)
     List<ChatSessionDocument> sessionDocuments;
 
     @PrePersist

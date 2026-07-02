@@ -8,6 +8,6 @@ import java.util.List;
 
 @Repository
 public interface ChatSessionDocumentRepository extends JpaRepository<ChatSessionDocument, Long> {
-    List<ChatSessionDocument> findBySession_SessionId(Long sessionId);
-    void deleteBySession_SessionId(Long sessionId);
+    List<ChatSessionDocument> findBySessionSessionId(Long sessionId);
+    long deleteBySessionSessionId(Long sessionId);
 }
