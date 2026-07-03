@@ -11,7 +11,7 @@ public interface IBookmark {
 
     BookmarkResponse addBookmark(Long userId, BookmarkRequest request);
 
-    BookmarkResponse removeBookmark(Long userId, Long documentId);
+    DeleteResponse removeBookmark(Long userId, Long documentId);
 
     List<BookmarkResponse> getBookmarksByUser(Long userId);
 

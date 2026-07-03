@@ -50,7 +50,7 @@ public class BookmarkController {
 
     @DeleteMapping("/{documentId}")
     @Operation(summary = "Remove a bookmark for a document")
-    public ResponseEntity<APIResponse<BookmarkResponse>> deleteBookmark(
+    public ResponseEntity<APIResponse<DeleteResponse>> deleteBookmark(
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long documentId) {
 
@@ -58,7 +58,7 @@ public class BookmarkController {
             throw new GlobalException(ErrorCode.INVALID_TOKEN);
         }
 
-        BookmarkResponse response = bookmarkService.removeBookmark(currentUser.getUserId(), documentId);
+        DeleteResponse response = bookmarkService.removeBookmark(currentUser.getUserId(), documentId);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Bookmark removed successfully", response)
         );

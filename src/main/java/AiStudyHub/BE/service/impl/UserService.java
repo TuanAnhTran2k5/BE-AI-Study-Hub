@@ -118,13 +118,13 @@ public class UserService implements IUser {
     }
 
     @Override
-    public Page<LeaderboardEntry> getGlobalLeaderboard(int page, int size) {
+    public Page<LeaderboardResponse> getGlobalLeaderboard(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         Page<User> userPage = userRepo.findAllByOrderByTotalScoreDescUserIdAsc(pageable);
         
         List<Ranking> allRankings = rankingRepo.findAll();
         
-        List<LeaderboardEntry> entries = new ArrayList<>();
+        List<LeaderboardResponse> entries = new ArrayList<>();
         for (int i = 0; i < userPage.getContent().size(); i++) {
             User u = userPage.getContent().get(i);
             
@@ -147,7 +147,7 @@ public class UserService implements IUser {
             
             RankingResponse mappedRank = mapToRankingResponse(rankObj);
             
-            entries.add(LeaderboardEntry.builder()
+            entries.add(LeaderboardResponse.builder()
                     .rank(rank)
                     .userId(u.getUserId())
                     .fullName(u.getFullName())

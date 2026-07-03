@@ -67,7 +67,7 @@ public class BookmarkService implements IBookmark {
 
     @Override
     @Transactional
-    public BookmarkResponse removeBookmark(Long userId, Long documentId) {
+    public DeleteResponse removeBookmark(Long userId, Long documentId) {
         Bookmark bookmark = bookmarkRepo.findByUserUserIdAndDocumentDocumentId(userId, documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.NOT_FOUND));
 
@@ -81,12 +81,14 @@ public class BookmarkService implements IBookmark {
             documentRepo.save(document);
         }
         
-        BookmarkResponse response = BookmarkResponse.builder()
-                .userId(userId)
-                .bookmarkCount((long) document.getBookmarkCount())
-                .isBookmarked(false)
+        return DeleteResponse.builder()
+                .success(true)
+                .message("Bookmark removed successfully")
+                .deletedId(bookmark.getBookmarkId())
+                .entityName("Bookmark")
+                .entityIdentifier(String.valueOf(bookmark.getBookmarkId()))
+                .deletedAt(java.time.LocalDateTime.now())
                 .build();
-        return response;
     }
 
     @Override

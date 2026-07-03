@@ -4,7 +4,7 @@ import AiStudyHub.BE.dto.Request.UpdateProfileRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.UserResponse;
 import AiStudyHub.BE.dto.Response.GlobalLeaderboardResponse;
-import AiStudyHub.BE.dto.Response.LeaderboardEntry;
+import AiStudyHub.BE.dto.Response.LeaderboardResponse;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.security.SecurityUtils;
 import AiStudyHub.BE.service.IUser;
@@ -56,11 +56,11 @@ public class UserController {
     }
 
     @GetMapping("leaderboard")
-    public ResponseEntity<APIResponse<org.springframework.data.domain.Page<LeaderboardEntry>>> getGlobalLeaderboard(
+    public ResponseEntity<APIResponse<org.springframework.data.domain.Page<LeaderboardResponse>>> getGlobalLeaderboard(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        org.springframework.data.domain.Page<LeaderboardEntry> response = userService.getGlobalLeaderboard(page, size);
+        org.springframework.data.domain.Page<LeaderboardResponse> response = userService.getGlobalLeaderboard(page, size);
         return ResponseEntity.status(200)
                 .body(APIResponse.response(200, "Get leaderboard successfully", response));
     }
