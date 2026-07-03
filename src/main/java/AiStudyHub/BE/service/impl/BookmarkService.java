@@ -9,10 +9,12 @@ import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.mapper.BookmarkMapper;
+import AiStudyHub.BE.constraint.VisibilityStatus;
 import AiStudyHub.BE.repository.BookmarkRepo;
 import AiStudyHub.BE.repository.DocumentRepo;
 import AiStudyHub.BE.repository.UserRepo;
 import AiStudyHub.BE.service.IBookmark;
+import AiStudyHub.BE.service.IGamification;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -32,6 +34,7 @@ public class BookmarkService implements IBookmark {
     UserRepo userRepo;
     DocumentRepo documentRepo;
     BookmarkMapper bookmarkMapper;
+    IGamification gamificationService;
 
     @Override
     @Transactional
@@ -52,12 +55,28 @@ public class BookmarkService implements IBookmark {
                 .document(document)
                 .build();
 
-        bookmark = bookmarkRepo.save(bookmark);
+        bookmark = bookmarkRepo.saveAndFlush(bookmark);
 
         // Update the document's bookmarkCount cache
         int currentCount = document.getBookmarkCount() != null ? document.getBookmarkCount() : 0;
         document.setBookmarkCount(currentCount + 1);
         documentRepo.save(document);
+
+        // Award points if the original document is PUBLIC and not owned by the bookmarking user
+        Document targetDoc = document.getSourceDocument() != null ? document.getSourceDocument() : document;
+        boolean isPublic = targetDoc.getVisibilityStatus() == VisibilityStatus.PUBLIC;
+        boolean isNotSelf = !targetDoc.getOwner().getUserId().equals(userId);
+
+        if (isPublic && isNotSelf) {
+            gamificationService.awardBookmarkScore(
+                    user.getUserId(),
+                    user.getFullName(),
+                    targetDoc.getOwner().getUserId(),
+                    targetDoc.getDocumentId(),
+                    targetDoc.getTitle(),
+                    targetDoc.getVisibilityStatus().name()
+            );
+        }
 
         BookmarkResponse response = bookmarkMapper.toResponse(bookmark);
         response.setBookmarkCount((long) document.getBookmarkCount());

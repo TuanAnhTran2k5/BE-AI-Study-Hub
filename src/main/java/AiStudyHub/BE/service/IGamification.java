@@ -7,8 +7,8 @@ import AiStudyHub.BE.dto.Response.RatingResponse;
 import AiStudyHub.BE.dto.Response.UserBadgeResponse;
 import AiStudyHub.BE.dto.Response.UserRankResponse;
 import AiStudyHub.BE.dto.Response.WeeklyScoreResponse;
-import AiStudyHub.BE.entity.Document;
-import AiStudyHub.BE.entity.User;
+import AiStudyHub.BE.constraint.ScoreTypeCode;
+import AiStudyHub.BE.dto.Response.ScoreContextResponse;
 
 import java.util.List;
 
@@ -16,7 +16,16 @@ public interface IGamification {
 
     // --- SCORE ---
     record ScoreTypeSpec(String code, String name, int defaultPoint, String description) {}
-    int awardScore(User user, Document document, ScoreTypeSpec spec, int scoreChange, String description);
+
+    int awardScore(ScoreContextResponse context);
+    int getPoints(String typeCode, int defaultFallback);
+
+    /**
+     * Precondition: Requires bookmark persistence completed.
+     * Ràng buộc UNIQUE(userId, documentId) trên bảng Bookmark và uniqueActionKey trên ScoreLog là chốt chặn chính.
+     * Vui lòng chỉ gọi sau khi thực thể Bookmark tương ứng đã được lưu và flush xuống DB thành công.
+     */
+    int awardBookmarkScore(Long actorUserId, String actorFullName, Long receiverUserId, Long documentId, String documentTitle, String visibilityStatus);
 
     // --- RANKING & BADGE ---
     boolean checkAndAwardBadges(Long userId);
@@ -36,4 +45,6 @@ public interface IGamification {
     int runDailyReputation();
     boolean applyReputation(Long documentId);
     boolean recomputeAllAggregates();
+
+    long getEventCount(ScoreTypeCode code);
 }
