@@ -415,10 +415,12 @@ public class DocumentService implements IDocument {
             boolean firstDownload = !downloadRepo.existsByUserAndDocument(currentUser, publicDocument);
             Integer addedPoint = 0;
 
-            publicDocument.setDownloadCount(
-                    publicDocument.getDownloadCount() == null ? 1 : publicDocument.getDownloadCount() + 1
-            );
-            documentRepo.save(publicDocument);
+            if (firstDownload) {
+                publicDocument.setDownloadCount(
+                        publicDocument.getDownloadCount() == null ? 1 : publicDocument.getDownloadCount() + 1
+                );
+                documentRepo.save(publicDocument);
+            }
 
             Download download = Download.builder()
                     .user(currentUser)
