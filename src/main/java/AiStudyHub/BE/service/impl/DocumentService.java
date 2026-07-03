@@ -4,6 +4,7 @@ import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.constraint.ModerationStatus;
 import AiStudyHub.BE.constraint.VisibilityStatus;
 import AiStudyHub.BE.constraint.UploadStatus;
+import AiStudyHub.BE.constraint.ScoreTypeCode;
 import AiStudyHub.BE.dto.Request.DocumentUpdateRequest;
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
 import AiStudyHub.BE.dto.Response.*;
@@ -12,6 +13,7 @@ import AiStudyHub.BE.entity.Download;
 import AiStudyHub.BE.entity.RagDocument;
 import AiStudyHub.BE.entity.Subject;
 import AiStudyHub.BE.entity.User;
+import AiStudyHub.BE.entity.ScoreLog;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.mapper.DocumentMapper;
 import AiStudyHub.BE.repository.*;
@@ -200,7 +202,6 @@ public class DocumentService implements IDocument {
             ragSystemService.deleteDocument(documentId);
         }
 
-        scoreLogRepo.deleteByDocumentDocumentId(documentId);
         notificationRepo.deleteByDocumentDocumentId(documentId);
         downloadRepo.deleteByDocumentDocumentId(documentId);
         ratingRepo.deleteByDocumentDocumentId(documentId);
@@ -208,6 +209,23 @@ public class DocumentService implements IDocument {
         chatSessionDocumentRepo.deleteByDocumentDocumentId(documentId);
         reportRepo.deleteByDocumentDocumentId(documentId);
         reportCaseRepo.deleteByDocumentDocumentId(documentId);
+
+        // Deduct points from owner if bookmarks were deleted (points sync on delete)
+        List<ScoreLog> bookmarkLogs = scoreLogRepo.findByDocumentIdAndScoreTypeTypeCode(documentId, ScoreTypeCode.BOOKMARK.name());
+        int totalDeduction = bookmarkLogs.stream()
+                .mapToInt(ScoreLog::getScoreChange)
+                .sum();
+
+        if (totalDeduction > 0) {
+            long currentScore = owner.getTotalScore() == null ? 0L : owner.getTotalScore();
+            owner.setTotalScore(currentScore - totalDeduction);
+            userRepo.save(owner);
+
+            gamificationService.addWeeklyScore(owner.getUserId(), -totalDeduction);
+            gamificationService.updateUserRank(owner.getUserId());
+
+            scoreLogRepo.deleteAll(bookmarkLogs);
+        }
 
         long deletedRows = documentRepo.deleteByDocumentId(documentId);
 
@@ -430,14 +448,19 @@ public class DocumentService implements IDocument {
 
             if (firstDownload) {
                 if (!publicOwner.getUserId().equals(currentUser.getUserId())) {
-                    addedPoint = gamificationService.awardScore(
-                            publicOwner,
-                            publicDocument,
-                            new IGamification.ScoreTypeSpec("DOC_DOWNLOAD", "Document Download", 5,
-                                    "Score awarded when another user downloads your document"),
-                            5,
-                            "Awarded 5 points because " + currentUser.getFullName()
-                                    + " downloaded your document: " + publicDocument.getTitle());
+                    int points = gamificationService.getPoints(ScoreTypeCode.DOC_DOWNLOAD.name(), 5);
+                    String desc = "Awarded " + points + " points because " + currentUser.getFullName()
+                                    + " downloaded your document: " + publicDocument.getTitle();
+                    addedPoint = gamificationService.awardScore(ScoreContextResponse.builder()
+                            .receiverUserId(publicOwner.getUserId())
+                            .documentId(publicDocument.getDocumentId())
+                            .documentTitle(publicDocument.getTitle())
+                            .spec(new IGamification.ScoreTypeSpec(ScoreTypeCode.DOC_DOWNLOAD.name(), "Document Download", points,
+                                    "Score awarded when another user downloads your document"))
+                            .scoreChange(points)
+                            .description(desc)
+                            .actorUserId(currentUser.getUserId())
+                            .build());
 
                     download.setScoreAwarded(true);
 

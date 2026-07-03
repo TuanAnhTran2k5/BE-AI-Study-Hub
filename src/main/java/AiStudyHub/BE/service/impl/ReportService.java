@@ -167,7 +167,8 @@ public class ReportService implements IReport {
 
         ScoreLog logEntry = ScoreLog.builder()
                 .user(user)
-                .document(reportCase.getDocument())
+                .documentId(reportCase.getDocument() != null ? reportCase.getDocument().getDocumentId() : null)
+                .documentTitle(reportCase.getDocument() != null ? reportCase.getDocument().getTitle() : null)
                 .scoreType(penaltyType)
                 .reportCase(reportCase)
                 .scoreChange(-points)
@@ -288,11 +289,12 @@ public class ReportService implements IReport {
 
                 ScoreLog logEntry = ScoreLog.builder()
                         .user(reporter)
-                        .document(document)
+                        .documentId(document != null ? document.getDocumentId() : null)
+                        .documentTitle(document != null ? document.getTitle() : null)
                         .scoreType(falseReportType)
                         .reportCase(rc)
                         .scoreChange(-10)
-                        .description("Penalty for false reporting of document: " + document.getTitle())
+                        .description("Penalty for false reporting of document: " + (document != null ? document.getTitle() : ""))
                         .build();
                 scoreLogRepo.save(logEntry);
 

@@ -6,6 +6,7 @@ import AiStudyHub.BE.constraint.UploadStatus;
 import AiStudyHub.BE.dto.Request.RatingRequest;
 import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.*;
+import AiStudyHub.BE.constraint.ScoreTypeCode;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.mapper.RatingMapper;
 import AiStudyHub.BE.repository.*;
@@ -66,29 +67,41 @@ public class GamificationService implements IGamification {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public int awardScore(User user, Document document, ScoreTypeSpec spec, int scoreChange, String description) {
-        ScoreType type = scoreTypeCache.computeIfAbsent(spec.code(), code ->
+    public int awardScore(ScoreContextResponse context) {
+        ScoreType type = scoreTypeCache.computeIfAbsent(context.getSpec().code(), code ->
                 scoreTypeRepo.findByTypeCode(code)
                         .orElseGet(() -> scoreTypeRepo.save(ScoreType.builder()
                                 .typeCode(code)
-                                .typeName(spec.name())
-                                .defaultPoint(spec.defaultPoint())
-                                .description(spec.description())
+                                .typeName(context.getSpec().name())
+                                .defaultPoint(context.getSpec().defaultPoint())
+                                .description(context.getSpec().description())
                                 .build())));
 
-        long current = user.getTotalScore() == null ? 0L : user.getTotalScore();
-        user.setTotalScore(current + scoreChange);
-        userRepo.save(user);
+        User receiver = userRepo.findById(context.getReceiverUserId())
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
+        long current = receiver.getTotalScore() == null ? 0L : receiver.getTotalScore();
+        receiver.setTotalScore(current + context.getScoreChange());
+        userRepo.save(receiver);
+
+        // Generate uniqueActionKey for non-repeatable score types
+        String uniqueKey = null;
+        if (ScoreTypeCode.BOOKMARK.name().equals(context.getSpec().code()) || ScoreTypeCode.DOC_DOWNLOAD.name().equals(context.getSpec().code())) {
+            uniqueKey = context.getSpec().code() + ":" + context.getActorUserId() + ":" + context.getDocumentId();
+        }
 
         scoreLogRepo.save(ScoreLog.builder()
-                .user(user)
-                .document(document)
+                .user(receiver)
+                .documentId(context.getDocumentId())
+                .documentTitle(context.getDocumentTitle())
                 .scoreType(type)
-                .scoreChange(scoreChange)
-                .description(description)
+                .scoreChange(context.getScoreChange())
+                .description(context.getDescription())
+                .actorUserId(context.getActorUserId())
+                .uniqueActionKey(uniqueKey)
                 .build());
 
-        return scoreChange;
+        return context.getScoreChange();
     }
 
     // ==========================================
@@ -334,6 +347,42 @@ public class GamificationService implements IGamification {
         return response;
     }
 
+    @Override
+    public int getPoints(String typeCode, int defaultFallback) {
+        return scoreTypeRepo.findByTypeCode(typeCode)
+                .map(ScoreType::getDefaultPoint)
+                .orElse(defaultFallback);
+    }
+
+    @Override
+    public int awardBookmarkScore(Long actorUserId, String actorFullName, Long receiverUserId, Long documentId, String documentTitle, String visibilityStatus) {
+        // 1. Kiểm tra lịch sử đã được cộng điểm cho tài liệu này chưa
+        if (scoreLogRepo.existsByActorUserIdAndDocumentIdAndScoreTypeTypeCode(
+                actorUserId, documentId, ScoreTypeCode.BOOKMARK.name())) {
+            return 0; 
+        }
+
+        // 2. Lấy cấu hình điểm động từ DB
+        int points = this.getPoints(ScoreTypeCode.BOOKMARK.name(), 3);
+        String desc = "Awarded " + points + " points because " + actorFullName + " bookmarked your document: " + documentTitle;
+
+        // 3. Thực hiện cộng điểm qua ScoreContext decoupled
+        this.awardScore(ScoreContextResponse.builder()
+                .receiverUserId(receiverUserId)
+                .documentId(documentId)
+                .documentTitle(documentTitle)
+                .spec(new IGamification.ScoreTypeSpec(ScoreTypeCode.BOOKMARK.name(), "Document bookmarked", points, "Score awarded when another user bookmarks your document"))
+                .scoreChange(points)
+                .description(desc)
+                .actorUserId(actorUserId)
+                .build()
+        );
+        this.updateUserRank(receiverUserId);
+        this.addWeeklyScore(receiverUserId, points);
+
+        return points;
+    }
+
     // ==========================================
     //               REPUTATION
     // ==========================================
@@ -376,12 +425,15 @@ public class GamificationService implements IGamification {
         int change = ReputationPolicy.tierScore(avg, count);
 
         User owner = doc.getOwner();
-        self.awardScore(
-                owner,
-                doc,
-                new IGamification.ScoreTypeSpec(RATING_REPUTATION, "Rating Reputation", 0, "Daily reputation score derived from document ratings"),
-                change,
-                "Reputation " + (change >= 0 ? "+" : "") + change + " for avg=" + avg + ", count=" + count);
+        self.awardScore(ScoreContextResponse.builder()
+                .receiverUserId(owner.getUserId())
+                .documentId(doc.getDocumentId())
+                .documentTitle(doc.getTitle())
+                .spec(new IGamification.ScoreTypeSpec(ScoreTypeCode.RATING_REPUTATION.name(), "Rating Reputation", 0, "Daily reputation score derived from document ratings"))
+                .scoreChange(change)
+                .description("Reputation " + (change >= 0 ? "+" : "") + change + " for avg=" + avg + ", count=" + count)
+                .build()
+        );
 
         self.updateUserRank(owner.getUserId());
         self.addWeeklyScore(owner.getUserId(), change);
@@ -465,5 +517,10 @@ public class GamificationService implements IGamification {
         return java.math.BigDecimal.valueOf(value)
                 .setScale(2, java.math.RoundingMode.HALF_UP)
                 .doubleValue();
+    }
+
+    @Override
+    public long getEventCount(ScoreTypeCode code) {
+        return scoreLogRepo.countByScoreTypeTypeCode(code.name());
     }
 }
