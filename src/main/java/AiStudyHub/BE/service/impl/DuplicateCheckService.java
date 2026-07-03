@@ -66,14 +66,17 @@ public class DuplicateCheckService implements AiStudyHub.BE.service.IDuplicateCh
                 return null;
             }
 
-            // 4. Compare with existing PUBLIC documents
-            List<Document> publicDocuments = documentRepo.findByVisibilityStatusAndSimHashContentIsNotNull(VisibilityStatus.PUBLIC)
+            // 4. Compare with existing documents owned by the CURRENT USER only (in My documents)
+            // Do not check against community documents so different users can upload the same material.
+            Long ownerId = document.getOwner().getUserId();
+            List<Document> myDocuments = documentRepo.findByOwnerUserId(ownerId)
                     .stream()
+                    .filter(d -> d.getSimHashContent() != null)
                     .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
                     .toList();
             
             Document duplicatedDoc = null;
-            for (Document pubDoc : publicDocuments) {
+            for (Document pubDoc : myDocuments) {
                 // Skip self
                 if (pubDoc.getDocumentId().equals(document.getDocumentId())) {
                     continue;

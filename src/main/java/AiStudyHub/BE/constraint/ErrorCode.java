@@ -44,6 +44,7 @@ public enum ErrorCode {
     DOCUMENT_NOT_PUBLIC("Document is not public", HttpStatus.FORBIDDEN),
     FORBIDDEN_DOWNLOAD_CLOUD_DOCUMENT( "You can only download documents from your own cloud storage", HttpStatus.FORBIDDEN),
     FORBIDDEN_UPDATE_DOCUMENT("You can only update your own documents", HttpStatus.FORBIDDEN),
+    CANNOT_EDIT_DOWNLOADED_DOCUMENT("Downloaded documents cannot be edited", HttpStatus.FORBIDDEN),
 
     // Authentication
     EMAIL_ALREADY_EXISTS("Email already exists", HttpStatus.BAD_REQUEST),
