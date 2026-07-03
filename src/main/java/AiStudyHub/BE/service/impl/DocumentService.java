@@ -153,7 +153,7 @@ public class DocumentService implements IDocument {
             log.info("Upload process finished successfully for documentId: {}", document.getDocumentId());
 
             DocumentUploadResponse response = documentMapper.toDocumentUploadResponse(document);
-            response.setMessage("Upload và xử lý tài liệu thành công");
+            response.setMessage("Upload and process document successfully");
             try {
                 UserResponse profile = userService.getProfile(owner.getUserId());
                 response.setStorageUsed(profile.getStorageUsed());
@@ -194,16 +194,12 @@ public class DocumentService implements IDocument {
         User owner = document.getOwner();
         String fileUrl = document.getFileUrl();
 
-        // 1. Delete associated RAG resources (Qdrant vectors, chunks, rag_document metadata)
-        //    in the SAME transaction. If RAG cleanup fails, the whole delete rolls back, so we
-        //    never leave document/RAG data inconsistent (and never hit a FK violation).
         RagDocument ragDoc = ragDocumentRepository.findByDocumentDocumentId(documentId).orElse(null);
         if (ragDoc != null) {
             log.info("Deleting RAG resources for document ID: {}", documentId);
             ragSystemService.deleteDocument(documentId);
         }
 
-        // Delete child records to avoid FK constraint violations (pure camelCase methods)
         scoreLogRepo.deleteByDocumentDocumentId(documentId);
         notificationRepo.deleteByDocumentDocumentId(documentId);
         downloadRepo.deleteByDocumentDocumentId(documentId);
@@ -213,7 +209,6 @@ public class DocumentService implements IDocument {
         reportRepo.deleteByDocumentDocumentId(documentId);
         reportCaseRepo.deleteByDocumentDocumentId(documentId);
 
-        // Do all DB work first so the transaction can roll back cleanly if anything fails.
         long deletedRows = documentRepo.deleteByDocumentId(documentId);
 
         if (deletedRows == 0) {
@@ -222,9 +217,6 @@ public class DocumentService implements IDocument {
 
         storageService.decreaseStorage(owner, fileSize);
         userRepo.save(owner);
-
-        // External storage deletion happens LAST: if it throws, the DB transaction
-        // rolls back and the document row + file both remain (consistent state).
         supabaseStorageService.deleteFile(fileUrl);
 
         try {
@@ -251,12 +243,6 @@ public class DocumentService implements IDocument {
             throw new GlobalException(ErrorCode.FORBIDDEN_UPDATE_DOCUMENT);
         }
 
-        // Req #3 / Bug #3 fix: block editing if this document is a downloaded copy (read-only).
-        // Uses the explicit sourceDocument link instead of matching simHashContent against the
-        // Download table. simHashContent is also populated on ordinary uploads for duplicate
-        // detection, so the old check could wrongly lock a user's own original upload as
-        // read-only whenever its content hash happened to match something that same user had
-        // separately downloaded (e.g. a widely-shared PDF uploaded by many people).
         if (document.getSourceDocument() != null) {
             throw new GlobalException(ErrorCode.CANNOT_EDIT_DOWNLOADED_DOCUMENT);
         }
@@ -277,18 +263,11 @@ public class DocumentService implements IDocument {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @Transactional(readOnly = true)
     public List<DocumentResponse> getMyDocuments(Long userId) {
         return documentRepo.findByOwnerUserId(userId).stream()
                 .map(doc -> {
                     DocumentResponse resp = documentMapper.toDocumentResponse(doc);
-                    // Bug #3 fix: use the explicit sourceDocument link instead of matching on
-                    // simHashContent. simHashContent is also populated on ordinary uploads
-                    // (duplicate-check in uploadDocument), so hash-matching could attribute a
-                    // user's own original upload to whoever else owns a document that happens
-                    // to hash the same (e.g. the same shared PDF uploaded independently).
-                    // sourceDocument is only ever set on true download copies, so it can't
-                    // misfire this way.
                     Document source = doc.getSourceDocument();
                     if (source != null) {
                         User originalOwner = source.getOwner();
@@ -302,7 +281,7 @@ public class DocumentService implements IDocument {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @Transactional(readOnly = true)
     public DocumentResponse getDocumentDetail(Long documentId) {
         Document document = documentRepo.findById(documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
@@ -335,20 +314,21 @@ public class DocumentService implements IDocument {
             log.debug("Unauthenticated user accessing document detail: {}", e.getMessage());
         }
 
-        // Detect download copy via the explicit sourceDocument link (set once, at download
-        // time, in downloadPublicDocument) — see Bug #3 fix notes in getMyDocuments above.
-        // Safe to lazy-load inside @Transactional(readOnly=true) session.
-        try {
-            Document source = document.getSourceDocument();
-            if (source != null) {
-                User originalOwner = source.getOwner();
-                response.setOwnerName(originalOwner.getFullName());
-                response.setOwnerAvatar(originalOwner.getAvatarUrl());
-                response.setOriginalUploaderName(originalOwner.getFullName());
-            }
-        } catch (Exception e) {
-            log.warn("Failed to resolve original owner info for documentId={}: {}", documentId, e.getMessage());
+        User uploader;
+
+        if (document.getSourceDocument() != null) {
+
+            uploader = document.getSourceDocument().getOwner();
+
+        } else {
+
+            uploader = document.getOwner();
+
         }
+
+        response.setOriginalUploaderId(uploader.getUserId());
+        response.setOriginalUploaderName(uploader.getFullName());
+        response.setOriginalUploaderAvatar(uploader.getAvatarUrl());
 
         return response;
     }
@@ -390,13 +370,7 @@ public class DocumentService implements IDocument {
                 publicDocument.getFileType()
         );
 
-        // The copy already exists in storage. If any DB step below fails, the
-        // transaction rolls back but the copied file would be orphaned, so we
-        // remove it in the compensating catch block.
         try {
-            // Ensure the private copy always has a simHashContent so it can be
-            // detected as a download-copy later (for originalUploaderName lookup).
-            // Use the public doc's hash if available; otherwise compute it now.
             String resolvedSimHash = publicDocument.getSimHashContent();
             if (resolvedSimHash == null) {
                 try {
@@ -423,9 +397,6 @@ public class DocumentService implements IDocument {
                     .fileType(uploadResponse.getContentType())
                     .fileSize(uploadResponse.getFileSize())
                     .simHashContent(resolvedSimHash)
-                    // Bug #3 fix: explicit, unambiguous link to the source public document.
-                    // This is now the single source of truth for "is this a download copy,
-                    // and of what" — see notes on the new Document.sourceDocument field.
                     .sourceDocument(publicDocument)
                     .build();
 
@@ -487,11 +458,11 @@ public class DocumentService implements IDocument {
                     LocalDateTime.now()
             );
 
-            // Bug #2 fix: mapper maps ownerName from privateDocument.owner (= downloader).
-            // Override fields to reflect the original public document's uploader.
-            response.setOwnerId(publicOwner.getUserId());
-            response.setOwnerName(publicOwnerName);
             response.setPublicOwnerName(publicOwnerName);
+
+            response.setOriginalUploaderId(publicOwner.getUserId());
+            response.setOriginalUploaderName(publicOwner.getFullName());
+            response.setOriginalUploaderAvatar(publicOwner.getAvatarUrl());
 
             try {
                 UserResponse ownerProfile = userService.getProfile(publicOwner.getUserId());

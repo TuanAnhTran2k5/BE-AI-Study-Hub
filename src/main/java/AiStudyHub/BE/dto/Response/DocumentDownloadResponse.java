@@ -29,6 +29,12 @@ public class DocumentDownloadResponse {
 
     String ownerName;
 
+    Long originalUploaderId;
+
+    String originalUploaderName;
+
+    String originalUploaderAvatar;
+
     Boolean firstDownload;
 
     Integer addedPoint;
