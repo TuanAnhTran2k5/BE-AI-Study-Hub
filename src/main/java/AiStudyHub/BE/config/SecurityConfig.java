@@ -76,7 +76,7 @@ public class SecurityConfig {
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                             response.getWriter().write(
                                     new ObjectMapper().writeValueAsString(
-                                            Map.of("code", 401, "message", "Unauthorized - Token is missing or invalid")
+                                            Map.of("code", 401, "message", "You need to login to continue the operation or view document details.", "loginUrl", "/login")
                                     )
                             );
                         })

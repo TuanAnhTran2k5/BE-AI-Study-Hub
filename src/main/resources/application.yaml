@@ -75,6 +75,8 @@ app:
       - "/api/auth/**"
       - "/api/storage/**"
       - "/api/files/**"
+      - "/api/user/document/search"
+      - "/api/user/academic/**"
 
 jwt:
   signerKey: ${JWT_SIGNER_KEY}
