@@ -4,11 +4,16 @@ import AiStudyHub.BE.constraint.VisibilityStatus;
 import AiStudyHub.BE.constraint.UploadStatus;
 import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.Notification;
+import AiStudyHub.BE.entity.User;
+import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.repository.DocumentRepo;
 import AiStudyHub.BE.repository.NotificationRepo;
+import AiStudyHub.BE.security.SecurityUtils;
+import AiStudyHub.BE.service.IDuplicateCheck;
 import AiStudyHub.BE.utils.SimHashUtil;
 import AiStudyHub.BE.utils.TextExtractionUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.security.SecurityUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -20,7 +25,7 @@ import java.util.List;
 
 @Service
 @Slf4j
-public class DuplicateCheckService implements AiStudyHub.BE.service.IDuplicateCheck {
+public class DuplicateCheckService implements IDuplicateCheck {
 
     @Autowired
     private TextExtractionUtil textExtractionUtil;
@@ -33,7 +38,6 @@ public class DuplicateCheckService implements AiStudyHub.BE.service.IDuplicateCh
 
     @Autowired
     private NotificationRepo notificationRepo;
-
     
     // Synchronously checks if the uploaded document is a duplicate of an existing public document.
     // Uses SimHash to determine >= 90% text similarity.
@@ -73,6 +77,7 @@ public class DuplicateCheckService implements AiStudyHub.BE.service.IDuplicateCh
                     .stream()
                     .filter(d -> d.getSimHashContent() != null)
                     .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
+                    .filter(d -> d.getOwner().getUserId().equals(SecurityUtils.getCurrentUser().getUserId()))
                     .toList();
             
             Document duplicatedDoc = null;
