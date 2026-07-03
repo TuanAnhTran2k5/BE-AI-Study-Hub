@@ -23,6 +23,8 @@ import AiStudyHub.BE.service.IRagSystem;
 import AiStudyHub.BE.service.IStorageService;
 import AiStudyHub.BE.service.ISupabaseStorage;
 import AiStudyHub.BE.service.IDuplicateCheck;
+import AiStudyHub.BE.utils.SimHashUtil;
+import AiStudyHub.BE.utils.TextExtractionUtil;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -69,6 +71,8 @@ public class DocumentService implements IDocument {
     NotificationRepo notificationRepo;
     ChatSessionDocumentRepo chatSessionDocumentRepo;
     IUser userService;
+    SimHashUtil simHashUtil;
+    TextExtractionUtil textExtractionUtil;
 
     @Autowired
     @Lazy
@@ -247,6 +251,16 @@ public class DocumentService implements IDocument {
             throw new GlobalException(ErrorCode.FORBIDDEN_UPDATE_DOCUMENT);
         }
 
+        // Req #3 / Bug #3 fix: block editing if this document is a downloaded copy (read-only).
+        // Uses the explicit sourceDocument link instead of matching simHashContent against the
+        // Download table. simHashContent is also populated on ordinary uploads for duplicate
+        // detection, so the old check could wrongly lock a user's own original upload as
+        // read-only whenever its content hash happened to match something that same user had
+        // separately downloaded (e.g. a widely-shared PDF uploaded by many people).
+        if (document.getSourceDocument() != null) {
+            throw new GlobalException(ErrorCode.CANNOT_EDIT_DOWNLOADED_DOCUMENT);
+        }
+
         applyPartialUpdate(document, request);
 
         Document saved = documentRepo.save(document); // @PreUpdate
@@ -263,13 +277,32 @@ public class DocumentService implements IDocument {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<DocumentResponse> getMyDocuments(Long userId) {
         return documentRepo.findByOwnerUserId(userId).stream()
-                .map(documentMapper::toDocumentResponse)
+                .map(doc -> {
+                    DocumentResponse resp = documentMapper.toDocumentResponse(doc);
+                    // Bug #3 fix: use the explicit sourceDocument link instead of matching on
+                    // simHashContent. simHashContent is also populated on ordinary uploads
+                    // (duplicate-check in uploadDocument), so hash-matching could attribute a
+                    // user's own original upload to whoever else owns a document that happens
+                    // to hash the same (e.g. the same shared PDF uploaded independently).
+                    // sourceDocument is only ever set on true download copies, so it can't
+                    // misfire this way.
+                    Document source = doc.getSourceDocument();
+                    if (source != null) {
+                        User originalOwner = source.getOwner();
+                        resp.setOwnerName(originalOwner.getFullName());
+                        resp.setOwnerAvatar(originalOwner.getAvatarUrl());
+                        resp.setOriginalUploaderName(originalOwner.getFullName());
+                    }
+                    return resp;
+                })
                 .collect(Collectors.toList());
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public DocumentResponse getDocumentDetail(Long documentId) {
         Document document = documentRepo.findById(documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
@@ -288,7 +321,7 @@ public class DocumentService implements IDocument {
 
         DocumentResponse response = documentMapper.toDocumentResponse(document);
 
-        // Populate isBookmarked and myRating if the user is authenticated
+        // Populate isBookmarked, myRating, and originalUploaderName if the user is authenticated
         try {
             User currentUser = SecurityUtils.getCurrentUser();
             if (currentUser != null && currentUser.getUserId() != null) {
@@ -300,6 +333,21 @@ public class DocumentService implements IDocument {
             }
         } catch (Exception e) {
             log.debug("Unauthenticated user accessing document detail: {}", e.getMessage());
+        }
+
+        // Detect download copy via the explicit sourceDocument link (set once, at download
+        // time, in downloadPublicDocument) — see Bug #3 fix notes in getMyDocuments above.
+        // Safe to lazy-load inside @Transactional(readOnly=true) session.
+        try {
+            Document source = document.getSourceDocument();
+            if (source != null) {
+                User originalOwner = source.getOwner();
+                response.setOwnerName(originalOwner.getFullName());
+                response.setOwnerAvatar(originalOwner.getAvatarUrl());
+                response.setOriginalUploaderName(originalOwner.getFullName());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to resolve original owner info for documentId={}: {}", documentId, e.getMessage());
         }
 
         return response;
@@ -346,6 +394,23 @@ public class DocumentService implements IDocument {
         // transaction rolls back but the copied file would be orphaned, so we
         // remove it in the compensating catch block.
         try {
+            // Ensure the private copy always has a simHashContent so it can be
+            // detected as a download-copy later (for originalUploaderName lookup).
+            // Use the public doc's hash if available; otherwise compute it now.
+            String resolvedSimHash = publicDocument.getSimHashContent();
+            if (resolvedSimHash == null) {
+                try {
+                    String text = textExtractionUtil.extractText(
+                            new java.io.ByteArrayInputStream(fileBytes));
+                    if (text != null && !text.trim().isEmpty()) {
+                        resolvedSimHash = simHashUtil.calculateSimHash(text);
+                    }
+                } catch (Exception hashEx) {
+                    log.warn("Could not compute simHash for download copy of documentId={}: {}",
+                            documentId, hashEx.getMessage());
+                }
+            }
+
             Document privateDocument = Document.builder()
                     .owner(currentUser)
                     .subject(publicDocument.getSubject())
@@ -357,12 +422,24 @@ public class DocumentService implements IDocument {
                     .fileUrl(uploadResponse.getPublicUrl())
                     .fileType(uploadResponse.getContentType())
                     .fileSize(uploadResponse.getFileSize())
-                    .simHashContent(publicDocument.getSimHashContent())
+                    .simHashContent(resolvedSimHash)
+                    // Bug #3 fix: explicit, unambiguous link to the source public document.
+                    // This is now the single source of truth for "is this a download copy,
+                    // and of what" — see notes on the new Document.sourceDocument field.
+                    .sourceDocument(publicDocument)
                     .build();
 
             privateDocument = documentRepo.save(privateDocument);
             storageService.increaseStorage(currentUser, uploadResponse.getFileSize());
             userRepo.save(currentUser);
+
+            // Index the downloaded copy into Qdrant so the owner can use AI chat on it.
+            // Re-use the already-downloaded fileBytes — no extra network call needed.
+            documentRagIndexer.autoIndexIfSupported(privateDocument, fileBytes);
+
+            // Mark as COMPLETED after RAG indexing (mirrors the uploadDocument flow).
+            privateDocument.setUploadStatus(UploadStatus.COMPLETED);
+            privateDocument = documentRepo.save(privateDocument);
 
             boolean firstDownload = !downloadRepo.existsByUserAndDocument(currentUser, publicDocument);
             Integer addedPoint = 0;
@@ -410,6 +487,10 @@ public class DocumentService implements IDocument {
                     LocalDateTime.now()
             );
 
+            // Bug #2 fix: mapper maps ownerName from privateDocument.owner (= downloader).
+            // Override fields to reflect the original public document's uploader.
+            response.setOwnerId(publicOwner.getUserId());
+            response.setOwnerName(publicOwnerName);
             response.setPublicOwnerName(publicOwnerName);
 
             try {
@@ -512,7 +593,28 @@ public class DocumentService implements IDocument {
 
         // visibilityStatus: null → skip
         if (request.getVisibilityStatus() != null) {
-            document.setVisibilityStatus(request.getVisibilityStatus());
+            VisibilityStatus newStatus = request.getVisibilityStatus();
+
+            if (newStatus == VisibilityStatus.PUBLIC
+                    && document.getVisibilityStatus() == VisibilityStatus.PRIVATE
+                    && document.getSimHashContent() != null) {
+
+                boolean stillDuplicate = documentRepo
+                        .findByOwnerUserId(document.getOwner().getUserId())
+                        .stream()
+                        .filter(d -> d.getSimHashContent() != null)
+                        .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
+                        .filter(d -> !d.getDocumentId().equals(document.getDocumentId()))
+                        .anyMatch(d -> simHashUtil.calculateHammingDistance(
+                                document.getSimHashContent(), d.getSimHashContent()) <= 3);
+
+                if (stillDuplicate) {
+                    throw new GlobalException(400,
+                            "Cannot make document public: it is a duplicate of an existing public document.");
+                }
+            }
+
+            document.setVisibilityStatus(newStatus);
         }
     }
 

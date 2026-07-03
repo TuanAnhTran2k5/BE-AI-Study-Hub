@@ -46,6 +46,7 @@ public class DocumentResponse {
 
     Boolean isBookmarked;
     Integer myRating;
+    String originalUploaderName;
 
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
