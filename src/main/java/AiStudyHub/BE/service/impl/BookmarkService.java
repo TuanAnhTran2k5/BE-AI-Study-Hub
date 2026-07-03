@@ -59,7 +59,10 @@ public class BookmarkService implements IBookmark {
         document.setBookmarkCount(currentCount + 1);
         documentRepo.save(document);
 
-        return bookmarkMapper.toResponse(bookmark);
+        BookmarkResponse response = bookmarkMapper.toResponse(bookmark);
+        response.setBookmarkCount((long) document.getBookmarkCount());
+        response.setIsBookmarked(true);
+        return response;
     }
 
     @Override
@@ -77,7 +80,15 @@ public class BookmarkService implements IBookmark {
             document.setBookmarkCount(currentCount - 1);
             documentRepo.save(document);
         }
-        return bookmarkMapper.toDeleteResponse(bookmark, java.time.LocalDateTime.now());
+        
+        return DeleteResponse.builder()
+                .success(true)
+                .message("Bookmark removed successfully")
+                .deletedId(bookmark.getBookmarkId())
+                .entityName("Bookmark")
+                .entityIdentifier(String.valueOf(bookmark.getBookmarkId()))
+                .deletedAt(java.time.LocalDateTime.now())
+                .build();
     }
 
     @Override

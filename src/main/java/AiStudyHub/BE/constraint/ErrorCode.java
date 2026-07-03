@@ -59,6 +59,9 @@ public enum ErrorCode {
     // File storage
     FILE_TOO_LARGE("File exceeds 20MB", HttpStatus.BAD_REQUEST),
     STORAGE_LIMIT_EXCEEDED("2GB storage capacity exceeded", HttpStatus.BAD_REQUEST),
+    INVALID_IMAGE_SIZE("Image exceeds 5MB", HttpStatus.BAD_REQUEST),
+    UNSUPPORTED_IMAGE_TYPE("Only JPG, PNG or WEBP are supported", HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+    INVALID_IMAGE_FILE("Corrupted or invalid image file", HttpStatus.BAD_REQUEST),
 
     // Rating
     INVALID_RATING_VALUE("Rating value must be an integer between 1 and 5", HttpStatus.BAD_REQUEST),

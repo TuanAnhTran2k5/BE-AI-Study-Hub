@@ -17,6 +17,5 @@ public class UpdateProfileRequest {
     @Size(min = 5,max = 50, message = "INVALID_SIZE")
     String fullName;
 
-    @Size(max = 2000, message = "AVATAR_URL_TOO_LONG")
-    String avatarUrl;
+    org.springframework.web.multipart.MultipartFile avatar;
 }

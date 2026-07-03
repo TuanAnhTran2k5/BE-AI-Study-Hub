@@ -38,4 +38,7 @@ public class DocumentDownloadResponse {
     String publicOwnerName;
 
     LocalDateTime downloadedAt;
+    UserRankResponse ownerCurrentRank;
+    String ownerNextRank;
+    Double ownerProgressPercent;
 }
