@@ -181,6 +181,10 @@ public class RagSystemService implements IRagSystem {
         }
 
         if (currentUser != null) {
+            if (request.getSessionId() != null) {
+                return askQuestionInSession(request.getSessionId(), request);
+            }
+
             String title = question.length() > 80 ? question.substring(0, 77) + "..." : question;
             LocalDateTime now = LocalDateTime.now();
 
@@ -191,6 +195,20 @@ public class RagSystemService implements IRagSystem {
                     .updatedAt(now)
                     .build();
             session = chatSessionRepository.save(session);
+
+            if (request.getDocumentIds() != null && !request.getDocumentIds().isEmpty()) {
+                for (Long docId : request.getDocumentIds()) {
+                    AiStudyHub.BE.entity.Document document = documentRepo.findById(docId).orElse(null);
+                    if (document != null) {
+                        ChatSessionDocument sessionDoc = ChatSessionDocument.builder()
+                                .session(session)
+                                .document(document)
+                                .build();
+                        chatSessionDocumentRepository.saveAndFlush(sessionDoc);
+                    }
+                }
+            }
+
             return askQuestionInSession(session.getSessionId(), request);
         }
 
@@ -311,7 +329,8 @@ public class RagSystemService implements IRagSystem {
             SearchRequest searchRequest = SearchRequest.builder()
                     .query(question)
                     .filterExpression(filterExpression)
-                    .topK(5)
+                    .similarityThreshold(0.0)
+                    .topK(10)
                     .build();
             return vectorStore.similaritySearch(searchRequest);
         } catch (Exception e) {
@@ -522,7 +541,28 @@ public class RagSystemService implements IRagSystem {
                 .build();
         chatMessageRepository.save(userMsg);
 
-        // 4. Retrieve session document ids
+        // 4. Sync session documents if documentIds is provided in the request
+        if (request.getDocumentIds() != null) {
+            chatSessionDocumentRepository.deleteBySessionSessionId(sessionId);
+            chatSessionDocumentRepository.flush();
+
+            for (Long docId : request.getDocumentIds()) {
+                AiStudyHub.BE.entity.Document document = documentRepo.findById(docId).orElse(null);
+                if (document != null) {
+                    boolean isPublic = document.getVisibilityStatus() == VisibilityStatus.PUBLIC;
+                    boolean isOwner = document.getOwner().getUserId().equals(currentUser.getUserId());
+                    if (isPublic || isOwner) {
+                        ChatSessionDocument sessionDoc = ChatSessionDocument.builder()
+                                .session(session)
+                                .document(document)
+                                .build();
+                        chatSessionDocumentRepository.saveAndFlush(sessionDoc);
+                    }
+                }
+            }
+        }
+
+        // 5. Retrieve session document ids
         List<Long> sessionDocIds = chatSessionDocumentRepository.findBySessionSessionId(sessionId)
                 .stream()
                 .map(sd -> sd.getDocument().getDocumentId())
@@ -577,6 +617,10 @@ public class RagSystemService implements IRagSystem {
 
             return ChatResponse.builder()
                     .sessionId(sessionId)
+                    .sessionTitle(session.getSessionTitle())
+                    .createdAt(session.getCreatedAt())
+                    .updatedAt(session.getUpdatedAt())
+                    .documentIds(sessionDocIds)
                     .answer(answer)
                     .sources(sources)
                     .build();

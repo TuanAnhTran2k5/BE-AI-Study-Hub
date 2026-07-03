@@ -51,11 +51,16 @@ public class DocumentRagIndexer {
             // because JPA may have detached or not eagerly loaded it.
             ragDoc.setDocument(document);
 
-            ragDocumentService.indexDocumentContent(ragDoc, fileBytes);
+            boolean indexed = ragDocumentService.indexDocumentContent(ragDoc, fileBytes);
 
-            ragDoc.setStatus("INDEXED");
+            if (indexed) {
+                ragDoc.setStatus("INDEXED");
+                log.info("Successfully auto-indexed document ID: {}", document.getDocumentId());
+            } else {
+                ragDoc.setStatus("FAILED");
+                log.warn("Failed to extract text or chunks for document ID: {}", document.getDocumentId());
+            }
             ragDocumentRepository.save(ragDoc);
-            log.info("Successfully auto-indexed document ID: {}", document.getDocumentId());
         } catch (Exception e) {
             log.error("Auto-indexing failed for document ID: {}. Rolling back upload.",
                     document.getDocumentId(), e);
