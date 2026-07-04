@@ -131,19 +131,20 @@ public class UserService implements IUser {
             // Calculate global rank for this user
             int rank = (int) (userRepo.countByTotalScoreGreaterThan(u.getTotalScore() == null ? 0L : u.getTotalScore()) + 1);
             
-            // Find current rank object for style
+            // Find current rank object dynamically by totalScore, fallback to history or Bronze
             UserRank currentRankEntity = userRankRepo.findByUser(u).stream()
                     .max(Comparator.comparing(UserRank::getAchievedAt))
                     .orElse(null);
-            Ranking rankObj = null;
-            if (currentRankEntity != null) {
-                rankObj = currentRankEntity.getRank();
-            } else {
-                rankObj = allRankings.stream()
-                        .filter(r -> r.getMinScore() == 0 || "Bronze".equalsIgnoreCase(r.getRankName()))
-                        .findFirst()
-                        .orElse(null);
-            }
+            long score = u.getTotalScore() == null ? 0L : u.getTotalScore();
+            Ranking rankObj = allRankings.stream()
+                    .filter(r -> r.getMinScore() != null && r.getMaxScore() != null
+                            && r.getMinScore() <= score && score <= r.getMaxScore())
+                    .findFirst()
+                    .orElseGet(() -> currentRankEntity != null ? currentRankEntity.getRank() :
+                            allRankings.stream()
+                                    .filter(r -> r.getMinScore() == 0 || "Bronze".equalsIgnoreCase(r.getRankName()))
+                                    .findFirst()
+                                    .orElse(null));
             
             RankingResponse mappedRank = mapToRankingResponse(rankObj);
             
@@ -196,21 +197,22 @@ public class UserService implements IUser {
             }
         }
 
-        // 4. Rank mapping with fallback to Bronze
+        // 4. Rank mapping dynamically by totalScore, fallback to history or Bronze
         UserRank currentRankEntity = userRankRepo.findByUser(user).stream()
                 .max(Comparator.comparing(UserRank::getAchievedAt))
                 .orElse(null);
                 
-        Ranking rankObj = null;
-        if (currentRankEntity != null) {
-            rankObj = currentRankEntity.getRank();
-        } else {
-            // Find default Bronze rank
-            rankObj = rankingRepo.findAll().stream()
-                    .filter(r -> r.getMinScore() == 0 || "Bronze".equalsIgnoreCase(r.getRankName()))
-                    .findFirst()
-                    .orElse(null);
-        }
+        long score = user.getTotalScore() == null ? 0L : user.getTotalScore();
+        List<Ranking> allRankings = rankingRepo.findAll();
+        Ranking rankObj = allRankings.stream()
+                .filter(r -> r.getMinScore() != null && r.getMaxScore() != null
+                        && r.getMinScore() <= score && score <= r.getMaxScore())
+                .findFirst()
+                .orElseGet(() -> currentRankEntity != null ? currentRankEntity.getRank() :
+                        allRankings.stream()
+                                .filter(r -> r.getMinScore() == 0 || "Bronze".equalsIgnoreCase(r.getRankName()))
+                                .findFirst()
+                                .orElse(null));
 
         UserRankResponse currentRankResponse = null;
         if (rankObj != null) {
