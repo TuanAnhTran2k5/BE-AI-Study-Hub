@@ -210,21 +210,22 @@ public class DocumentService implements IDocument {
         reportRepo.deleteByDocumentDocumentId(documentId);
         reportCaseRepo.deleteByDocumentDocumentId(documentId);
 
-        // Deduct points from owner if bookmarks were deleted (points sync on delete)
-        List<ScoreLog> bookmarkLogs = scoreLogRepo.findByDocumentIdAndScoreTypeTypeCode(documentId, ScoreTypeCode.BOOKMARK.name());
-        int totalDeduction = bookmarkLogs.stream()
+        // Deduct points from owner for all score logs associated with this document (bookmarks, downloads, ratings, upload, etc.)
+        List<ScoreLog> docScoreLogs = scoreLogRepo.findByDocumentId(documentId);
+        int totalDeduction = docScoreLogs.stream()
                 .mapToInt(ScoreLog::getScoreChange)
                 .sum();
 
-        if (totalDeduction > 0) {
+        if (totalDeduction != 0) {
             long currentScore = owner.getTotalScore() == null ? 0L : owner.getTotalScore();
             owner.setTotalScore(currentScore - totalDeduction);
             userRepo.save(owner);
 
             gamificationService.addWeeklyScore(owner.getUserId(), -totalDeduction);
             gamificationService.updateUserRank(owner.getUserId());
-
-            scoreLogRepo.deleteAll(bookmarkLogs);
+        }
+        if (!docScoreLogs.isEmpty()) {
+            scoreLogRepo.deleteAll(docScoreLogs);
         }
 
         long deletedRows = documentRepo.deleteByDocumentId(documentId);
