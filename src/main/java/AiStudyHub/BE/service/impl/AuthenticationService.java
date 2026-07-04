@@ -19,6 +19,7 @@ import AiStudyHub.BE.dto.Request.VerifyTokenRequest;
 import AiStudyHub.BE.dto.Response.GoogleUserInfo;
 import AiStudyHub.BE.dto.Response.RegisterResponse;
 import AiStudyHub.BE.dto.Response.UserResponse;
+import AiStudyHub.BE.service.IUser;
 import AiStudyHub.BE.entity.OtpVerification;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
@@ -66,6 +67,8 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     private OtpVerificationRepo otpVerificationRepo;
     @Autowired
     private IEmail emailService;
+    @Autowired
+    private IUser userService;
 
 
 
@@ -94,6 +97,10 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             user.setStatus(UserStatus.PENDING);
             user.setAuthProvider(AuthProvider.LOCAL);
             user.setRole(UserRole.US);
+            user.setCreatedAt(LocalDateTime.now());
+            user.setStorageLimit(2L * 1024 * 1024 * 1024);
+            user.setStorageUsed(0L);
+            user.setTotalScore(0L);
             user = userRepo.save(user);
         }
 
@@ -156,11 +163,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             // so we never hand the client a token that wouldn't pass authentication.
             tokenService.verifyAccessToken(accessToken);
 
-            UserResponse userResponse = userMapper.toUserResponse(user);
-            userResponse.setAccessToken(accessToken);
-            userResponse.setRole(user.getRole());
-
-            return userResponse;
+            return userService.buildUserProfileResponse(user, accessToken);
 
         } catch (LockedException exception) {
             throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
@@ -203,9 +206,10 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         otpVerificationRepo.save(otp);
 
         user.setStatus(UserStatus.ACTIVE);
-        userRepo.save(user);
+        user = userRepo.save(user);
 
-        return userMapper.toUserResponse(user);
+        String accessToken = tokenService.generateAccessToken(user);
+        return userService.buildUserProfileResponse(user, accessToken);
     }
 
     @Override
@@ -284,6 +288,10 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                     newUser.setAuthProvider(AuthProvider.GOOGLE);
                     newUser.setRole(UserRole.US);
                     newUser.setStatus(UserStatus.ACTIVE);
+                    newUser.setCreatedAt(LocalDateTime.now());
+                    newUser.setStorageLimit(2L * 1024 * 1024 * 1024);
+                    newUser.setStorageUsed(0L);
+                    newUser.setTotalScore(0L);
                     return userRepo.save(newUser);
                 });
 
@@ -293,11 +301,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         // so we never hand the client a token that wouldn't pass authentication.
         tokenService.verifyAccessToken(accessToken);
 
-        UserResponse userResponse = userMapper.toUserResponse(user);
-        userResponse.setAccessToken(accessToken);
-        userResponse.setRole(user.getRole());
-
-        return userResponse;
+        return userService.buildUserProfileResponse(user, accessToken);
     }
 
     @Override
@@ -308,10 +312,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
         }
 
-        UserResponse userResponse = userMapper.toUserResponse(user);
-        userResponse.setAccessToken(request.getToken());
-        userResponse.setRole(user.getRole());
-        return userResponse;
+        return userService.buildUserProfileResponse(user, request.getToken());
     }
 
     @Override

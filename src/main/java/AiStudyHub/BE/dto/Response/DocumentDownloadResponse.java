@@ -29,6 +29,12 @@ public class DocumentDownloadResponse {
 
     String ownerName;
 
+    Long originalUploaderId;
+
+    String originalUploaderName;
+
+    String originalUploaderAvatar;
+
     Boolean firstDownload;
 
     Integer addedPoint;
@@ -38,4 +44,7 @@ public class DocumentDownloadResponse {
     String publicOwnerName;
 
     LocalDateTime downloadedAt;
+    UserRankResponse ownerCurrentRank;
+    String ownerNextRank;
+    Double ownerProgressPercent;
 }

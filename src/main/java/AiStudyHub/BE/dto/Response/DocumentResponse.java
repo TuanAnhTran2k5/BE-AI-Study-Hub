@@ -22,6 +22,10 @@ public class DocumentResponse {
     String ownerName;
     String ownerAvatar;
 
+    Long originalUploaderId;
+    String originalUploaderName;
+    String originalUploaderAvatar;
+
     Long subjectId;
     String subjectCode;
     String subjectName;

@@ -4,6 +4,7 @@ import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.constraint.ModerationStatus;
 import AiStudyHub.BE.constraint.VisibilityStatus;
 import AiStudyHub.BE.constraint.UploadStatus;
+import AiStudyHub.BE.constraint.ScoreTypeCode;
 import AiStudyHub.BE.dto.Request.DocumentUpdateRequest;
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
 import AiStudyHub.BE.dto.Response.*;
@@ -12,16 +13,20 @@ import AiStudyHub.BE.entity.Download;
 import AiStudyHub.BE.entity.RagDocument;
 import AiStudyHub.BE.entity.Subject;
 import AiStudyHub.BE.entity.User;
+import AiStudyHub.BE.entity.ScoreLog;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.mapper.DocumentMapper;
 import AiStudyHub.BE.repository.*;
 import AiStudyHub.BE.security.SecurityUtils;
 import AiStudyHub.BE.service.IDocument;
+import AiStudyHub.BE.service.IUser;
 import AiStudyHub.BE.service.IGamification;
 import AiStudyHub.BE.service.IRagSystem;
 import AiStudyHub.BE.service.IStorageService;
 import AiStudyHub.BE.service.ISupabaseStorage;
 import AiStudyHub.BE.service.IDuplicateCheck;
+import AiStudyHub.BE.utils.SimHashUtil;
+import AiStudyHub.BE.utils.TextExtractionUtil;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -67,6 +72,9 @@ public class DocumentService implements IDocument {
     ScoreLogRepo scoreLogRepo;
     NotificationRepo notificationRepo;
     ChatSessionDocumentRepo chatSessionDocumentRepo;
+    IUser userService;
+    SimHashUtil simHashUtil;
+    TextExtractionUtil textExtractionUtil;
 
     @Autowired
     @Lazy
@@ -147,7 +155,15 @@ public class DocumentService implements IDocument {
             log.info("Upload process finished successfully for documentId: {}", document.getDocumentId());
 
             DocumentUploadResponse response = documentMapper.toDocumentUploadResponse(document);
-            response.setMessage("Upload và xử lý tài liệu thành công");
+            response.setMessage("Upload and process document successfully");
+            try {
+                UserResponse profile = userService.getProfile(owner.getUserId());
+                response.setStorageUsed(profile.getStorageUsed());
+                response.setStorageRemaining(profile.getStorageRemaining());
+                response.setStorageUsagePercent(profile.getStorageUsagePercent());
+            } catch (Exception ex) {
+                log.warn("Failed to populate updated storage info in upload response: {}", ex.getMessage());
+            }
             return response;
 
         } catch (Exception e) {
@@ -180,17 +196,12 @@ public class DocumentService implements IDocument {
         User owner = document.getOwner();
         String fileUrl = document.getFileUrl();
 
-        // 1. Delete associated RAG resources (Qdrant vectors, chunks, rag_document metadata)
-        //    in the SAME transaction. If RAG cleanup fails, the whole delete rolls back, so we
-        //    never leave document/RAG data inconsistent (and never hit a FK violation).
         RagDocument ragDoc = ragDocumentRepository.findByDocumentDocumentId(documentId).orElse(null);
         if (ragDoc != null) {
             log.info("Deleting RAG resources for document ID: {}", documentId);
             ragSystemService.deleteDocument(documentId);
         }
 
-        // Delete child records to avoid FK constraint violations (pure camelCase methods)
-        scoreLogRepo.deleteByDocumentDocumentId(documentId);
         notificationRepo.deleteByDocumentDocumentId(documentId);
         downloadRepo.deleteByDocumentDocumentId(documentId);
         ratingRepo.deleteByDocumentDocumentId(documentId);
@@ -199,7 +210,24 @@ public class DocumentService implements IDocument {
         reportRepo.deleteByDocumentDocumentId(documentId);
         reportCaseRepo.deleteByDocumentDocumentId(documentId);
 
-        // Do all DB work first so the transaction can roll back cleanly if anything fails.
+        // Deduct points from owner for all score logs associated with this document (bookmarks, downloads, ratings, upload, etc.)
+        List<ScoreLog> docScoreLogs = scoreLogRepo.findByDocumentId(documentId);
+        int totalDeduction = docScoreLogs.stream()
+                .mapToInt(ScoreLog::getScoreChange)
+                .sum();
+
+        if (totalDeduction != 0) {
+            long currentScore = owner.getTotalScore() == null ? 0L : owner.getTotalScore();
+            owner.setTotalScore(currentScore - totalDeduction);
+            userRepo.save(owner);
+
+            gamificationService.addWeeklyScore(owner.getUserId(), -totalDeduction);
+            gamificationService.updateUserRank(owner.getUserId());
+        }
+        if (!docScoreLogs.isEmpty()) {
+            scoreLogRepo.deleteAll(docScoreLogs);
+        }
+
         long deletedRows = documentRepo.deleteByDocumentId(documentId);
 
         if (deletedRows == 0) {
@@ -208,10 +236,16 @@ public class DocumentService implements IDocument {
 
         storageService.decreaseStorage(owner, fileSize);
         userRepo.save(owner);
-
-        // External storage deletion happens LAST: if it throws, the DB transaction
-        // rolls back and the document row + file both remain (consistent state).
         supabaseStorageService.deleteFile(fileUrl);
+
+        try {
+            UserResponse profile = userService.getProfile(owner.getUserId());
+            response.setStorageUsed(profile.getStorageUsed());
+            response.setStorageRemaining(profile.getStorageRemaining());
+            response.setStorageUsagePercent(profile.getStorageUsagePercent());
+        } catch (Exception ex) {
+            log.warn("Failed to populate updated storage info in delete response: {}", ex.getMessage());
+        }
 
         return response;
     }
@@ -226,6 +260,10 @@ public class DocumentService implements IDocument {
 
         if (!document.getOwner().getUserId().equals(currentUser.getUserId())) { // 403 if not owner
             throw new GlobalException(ErrorCode.FORBIDDEN_UPDATE_DOCUMENT);
+        }
+
+        if (document.getSourceDocument() != null) {
+            throw new GlobalException(ErrorCode.CANNOT_EDIT_DOWNLOADED_DOCUMENT);
         }
 
         applyPartialUpdate(document, request);
@@ -244,13 +282,25 @@ public class DocumentService implements IDocument {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<DocumentResponse> getMyDocuments(Long userId) {
         return documentRepo.findByOwnerUserId(userId).stream()
-                .map(documentMapper::toDocumentResponse)
+                .map(doc -> {
+                    DocumentResponse resp = documentMapper.toDocumentResponse(doc);
+                    Document source = doc.getSourceDocument();
+                    if (source != null) {
+                        User originalOwner = source.getOwner();
+                        resp.setOwnerName(originalOwner.getFullName());
+                        resp.setOwnerAvatar(originalOwner.getAvatarUrl());
+                        resp.setOriginalUploaderName(originalOwner.getFullName());
+                    }
+                    return resp;
+                })
                 .collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public DocumentResponse getDocumentDetail(Long documentId) {
         Document document = documentRepo.findById(documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
@@ -269,7 +319,7 @@ public class DocumentService implements IDocument {
 
         DocumentResponse response = documentMapper.toDocumentResponse(document);
 
-        // Populate isBookmarked and myRating if the user is authenticated
+        // Populate isBookmarked, myRating, and originalUploaderName if the user is authenticated
         try {
             User currentUser = SecurityUtils.getCurrentUser();
             if (currentUser != null && currentUser.getUserId() != null) {
@@ -282,6 +332,22 @@ public class DocumentService implements IDocument {
         } catch (Exception e) {
             log.debug("Unauthenticated user accessing document detail: {}", e.getMessage());
         }
+
+        User uploader;
+
+        if (document.getSourceDocument() != null) {
+
+            uploader = document.getSourceDocument().getOwner();
+
+        } else {
+
+            uploader = document.getOwner();
+
+        }
+
+        response.setOriginalUploaderId(uploader.getUserId());
+        response.setOriginalUploaderName(uploader.getFullName());
+        response.setOriginalUploaderAvatar(uploader.getAvatarUrl());
 
         return response;
     }
@@ -323,10 +389,21 @@ public class DocumentService implements IDocument {
                 publicDocument.getFileType()
         );
 
-        // The copy already exists in storage. If any DB step below fails, the
-        // transaction rolls back but the copied file would be orphaned, so we
-        // remove it in the compensating catch block.
         try {
+            String resolvedSimHash = publicDocument.getSimHashContent();
+            if (resolvedSimHash == null) {
+                try {
+                    String text = textExtractionUtil.extractText(
+                            new java.io.ByteArrayInputStream(fileBytes));
+                    if (text != null && !text.trim().isEmpty()) {
+                        resolvedSimHash = simHashUtil.calculateSimHash(text);
+                    }
+                } catch (Exception hashEx) {
+                    log.warn("Could not compute simHash for download copy of documentId={}: {}",
+                            documentId, hashEx.getMessage());
+                }
+            }
+
             Document privateDocument = Document.builder()
                     .owner(currentUser)
                     .subject(publicDocument.getSubject())
@@ -338,20 +415,31 @@ public class DocumentService implements IDocument {
                     .fileUrl(uploadResponse.getPublicUrl())
                     .fileType(uploadResponse.getContentType())
                     .fileSize(uploadResponse.getFileSize())
-                    .simHashContent(publicDocument.getSimHashContent())
+                    .simHashContent(resolvedSimHash)
+                    .sourceDocument(publicDocument)
                     .build();
 
             privateDocument = documentRepo.save(privateDocument);
             storageService.increaseStorage(currentUser, uploadResponse.getFileSize());
             userRepo.save(currentUser);
 
+            // Index the downloaded copy into Qdrant so the owner can use AI chat on it.
+            // Re-use the already-downloaded fileBytes — no extra network call needed.
+            documentRagIndexer.autoIndexIfSupported(privateDocument, fileBytes);
+
+            // Mark as COMPLETED after RAG indexing (mirrors the uploadDocument flow).
+            privateDocument.setUploadStatus(UploadStatus.COMPLETED);
+            privateDocument = documentRepo.save(privateDocument);
+
             boolean firstDownload = !downloadRepo.existsByUserAndDocument(currentUser, publicDocument);
             Integer addedPoint = 0;
 
-            publicDocument.setDownloadCount(
-                    publicDocument.getDownloadCount() == null ? 1 : publicDocument.getDownloadCount() + 1
-            );
-            documentRepo.save(publicDocument);
+            if (firstDownload) {
+                publicDocument.setDownloadCount(
+                        publicDocument.getDownloadCount() == null ? 1 : publicDocument.getDownloadCount() + 1
+                );
+                documentRepo.save(publicDocument);
+            }
 
             Download download = Download.builder()
                     .user(currentUser)
@@ -361,14 +449,19 @@ public class DocumentService implements IDocument {
 
             if (firstDownload) {
                 if (!publicOwner.getUserId().equals(currentUser.getUserId())) {
-                    addedPoint = gamificationService.awardScore(
-                            publicOwner,
-                            publicDocument,
-                            new IGamification.ScoreTypeSpec("DOC_DOWNLOAD", "Document Download", 5,
-                                    "Score awarded when another user downloads your document"),
-                            5,
-                            "Awarded 5 points because " + currentUser.getFullName()
-                                    + " downloaded your document: " + publicDocument.getTitle());
+                    int points = gamificationService.getPoints(ScoreTypeCode.DOC_DOWNLOAD.name(), 5);
+                    String desc = "Awarded " + points + " points because " + currentUser.getFullName()
+                                    + " downloaded your document: " + publicDocument.getTitle();
+                    addedPoint = gamificationService.awardScore(ScoreContextResponse.builder()
+                            .receiverUserId(publicOwner.getUserId())
+                            .documentId(publicDocument.getDocumentId())
+                            .documentTitle(publicDocument.getTitle())
+                            .spec(new IGamification.ScoreTypeSpec(ScoreTypeCode.DOC_DOWNLOAD.name(), "Document Download", points,
+                                    "Score awarded when another user downloads your document"))
+                            .scoreChange(points)
+                            .description(desc)
+                            .actorUserId(currentUser.getUserId())
+                            .build());
 
                     download.setScoreAwarded(true);
 
@@ -392,6 +485,21 @@ public class DocumentService implements IDocument {
             );
 
             response.setPublicOwnerName(publicOwnerName);
+
+            response.setOriginalUploaderId(publicOwner.getUserId());
+            response.setOriginalUploaderName(publicOwner.getFullName());
+            response.setOriginalUploaderAvatar(publicOwner.getAvatarUrl());
+
+            try {
+                UserResponse ownerProfile = userService.getProfile(publicOwner.getUserId());
+                response.setOwnerCurrentRank(ownerProfile.getCurrentRank());
+                if (ownerProfile.getRankProgress() != null) {
+                    response.setOwnerNextRank(ownerProfile.getRankProgress().getNextRank());
+                    response.setOwnerProgressPercent(ownerProfile.getRankProgress().getProgressPercent());
+                }
+            } catch (Exception ex) {
+                log.warn("Failed to populate owner rank progress in download response: {}", ex.getMessage());
+            }
 
             return response;
 
@@ -482,7 +590,28 @@ public class DocumentService implements IDocument {
 
         // visibilityStatus: null → skip
         if (request.getVisibilityStatus() != null) {
-            document.setVisibilityStatus(request.getVisibilityStatus());
+            VisibilityStatus newStatus = request.getVisibilityStatus();
+
+            if (newStatus == VisibilityStatus.PUBLIC
+                    && document.getVisibilityStatus() == VisibilityStatus.PRIVATE
+                    && document.getSimHashContent() != null) {
+
+                boolean stillDuplicate = documentRepo
+                        .findByOwnerUserId(document.getOwner().getUserId())
+                        .stream()
+                        .filter(d -> d.getSimHashContent() != null)
+                        .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
+                        .filter(d -> !d.getDocumentId().equals(document.getDocumentId()))
+                        .anyMatch(d -> simHashUtil.calculateHammingDistance(
+                                document.getSimHashContent(), d.getSimHashContent()) <= 3);
+
+                if (stillDuplicate) {
+                    throw new GlobalException(400,
+                            "Cannot make document public: it is a duplicate of an existing public document.");
+                }
+            }
+
+            document.setVisibilityStatus(newStatus);
         }
     }
 

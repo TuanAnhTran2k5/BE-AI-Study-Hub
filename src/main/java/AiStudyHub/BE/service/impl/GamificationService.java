@@ -6,6 +6,7 @@ import AiStudyHub.BE.constraint.UploadStatus;
 import AiStudyHub.BE.dto.Request.RatingRequest;
 import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.*;
+import AiStudyHub.BE.constraint.ScoreTypeCode;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.mapper.RatingMapper;
 import AiStudyHub.BE.repository.*;
@@ -66,29 +67,41 @@ public class GamificationService implements IGamification {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public int awardScore(User user, Document document, ScoreTypeSpec spec, int scoreChange, String description) {
-        ScoreType type = scoreTypeCache.computeIfAbsent(spec.code(), code ->
+    public int awardScore(ScoreContextResponse context) {
+        ScoreType type = scoreTypeCache.computeIfAbsent(context.getSpec().code(), code ->
                 scoreTypeRepo.findByTypeCode(code)
                         .orElseGet(() -> scoreTypeRepo.save(ScoreType.builder()
                                 .typeCode(code)
-                                .typeName(spec.name())
-                                .defaultPoint(spec.defaultPoint())
-                                .description(spec.description())
+                                .typeName(context.getSpec().name())
+                                .defaultPoint(context.getSpec().defaultPoint())
+                                .description(context.getSpec().description())
                                 .build())));
 
-        long current = user.getTotalScore() == null ? 0L : user.getTotalScore();
-        user.setTotalScore(current + scoreChange);
-        userRepo.save(user);
+        User receiver = userRepo.findById(context.getReceiverUserId())
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
+        long current = receiver.getTotalScore() == null ? 0L : receiver.getTotalScore();
+        receiver.setTotalScore(current + context.getScoreChange());
+        userRepo.save(receiver);
+
+        // Generate uniqueActionKey for non-repeatable score types
+        String uniqueKey = null;
+        if (ScoreTypeCode.BOOKMARK.name().equals(context.getSpec().code()) || ScoreTypeCode.DOC_DOWNLOAD.name().equals(context.getSpec().code())) {
+            uniqueKey = context.getSpec().code() + ":" + context.getActorUserId() + ":" + context.getDocumentId();
+        }
 
         scoreLogRepo.save(ScoreLog.builder()
-                .user(user)
-                .document(document)
+                .user(receiver)
+                .documentId(context.getDocumentId())
+                .documentTitle(context.getDocumentTitle())
                 .scoreType(type)
-                .scoreChange(scoreChange)
-                .description(description)
+                .scoreChange(context.getScoreChange())
+                .description(context.getDescription())
+                .actorUserId(context.getActorUserId())
+                .uniqueActionKey(uniqueKey)
                 .build());
 
-        return scoreChange;
+        return context.getScoreChange();
     }
 
     // ==========================================
@@ -222,7 +235,7 @@ public class GamificationService implements IGamification {
                         .badgeName(badge.getBadgeName())
                         .description(badge.getDescription())
                         .conditionText(badge.getConditionText())
-                        .iconUrl(badge.getIconUrl())
+                        .iconUrl(badge.getIconUrl() == null || badge.getIconUrl().isBlank() ? null : badge.getIconUrl())
                         .build()
         ).toList();
     }
@@ -231,25 +244,37 @@ public class GamificationService implements IGamification {
     public UserRankResponse getUserRank(Long userId) {
         User user = userRepo.findById(userId).orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
+        long score = user.getTotalScore() == null ? 0L : user.getTotalScore();
+        List<Ranking> allRanks = rankingRepo.findAll();
+        Ranking rankObj = allRanks.stream()
+                .filter(r -> r.getMinScore() <= score)
+                .max(Comparator.comparingLong(Ranking::getMinScore))
+                .orElseGet(() -> allRanks.stream()
+                        .filter(r -> r.getMinScore() == 0 || "Bronze".equalsIgnoreCase(r.getRankName()))
+                        .findFirst()
+                        .orElse(null));
+
         List<UserRank> history = userRankRepo.findByUser(user);
-        return history.stream()
+        UserRank currentRankEntity = history.stream()
                 .max(Comparator.comparing(UserRank::getAchievedAt))
-                .map(ur ->
-                        UserRankResponse.builder()
-                                .userRankId(ur.getUserRankId())
-                                .userId(user.getUserId())
-                                .achievedAt(ur.getAchievedAt())
-                                .updatedAt(ur.getUpdatedAt())
-                                .rank(RankingResponse.builder()
-                                        .rankId(ur.getRank().getRankId())
-                                        .rankName(ur.getRank().getRankName())
-                                        .minScore(ur.getRank().getMinScore())
-                                        .maxScore(ur.getRank().getMaxScore())
-                                        .storageBonus(ur.getRank().getStorageBonus())
-                                        .displayPriority(ur.getRank().getDisplayPriority())
-                                        .build())
-                                .build()
-        ).orElse(null);
+                .orElse(null);
+
+        if (rankObj == null) return null;
+
+        return UserRankResponse.builder()
+                .userRankId(currentRankEntity != null ? currentRankEntity.getUserRankId() : null)
+                .userId(user.getUserId())
+                .achievedAt(currentRankEntity != null ? currentRankEntity.getAchievedAt() : user.getCreatedAt())
+                .updatedAt(currentRankEntity != null ? currentRankEntity.getUpdatedAt() : user.getCreatedAt())
+                .rank(RankingResponse.builder()
+                        .rankId(rankObj.getRankId())
+                        .rankName(rankObj.getRankName())
+                        .minScore(rankObj.getMinScore())
+                        .maxScore(rankObj.getMaxScore())
+                        .storageBonus(rankObj.getStorageBonus())
+                        .displayPriority(rankObj.getDisplayPriority())
+                        .build())
+                .build();
     }
 
     @Override
@@ -266,7 +291,7 @@ public class GamificationService implements IGamification {
                                 .badgeName(ub.getBadge().getBadgeName())
                                 .description(ub.getBadge().getDescription())
                                 .conditionText(ub.getBadge().getConditionText())
-                                .iconUrl(ub.getBadge().getIconUrl())
+                                .iconUrl(ub.getBadge().getIconUrl() == null || ub.getBadge().getIconUrl().isBlank() ? null : ub.getBadge().getIconUrl())
                                 .build())
                         .build()
         ).toList();
@@ -414,12 +439,15 @@ public class GamificationService implements IGamification {
         int change = ReputationPolicy.tierScore(avg, count);
 
         User owner = doc.getOwner();
-        self.awardScore(
-                owner,
-                doc,
-                new IGamification.ScoreTypeSpec(RATING_REPUTATION, "Rating Reputation", 0, "Daily reputation score derived from document ratings"),
-                change,
-                "Reputation " + (change >= 0 ? "+" : "") + change + " for avg=" + avg + ", count=" + count);
+        self.awardScore(ScoreContextResponse.builder()
+                .receiverUserId(owner.getUserId())
+                .documentId(doc.getDocumentId())
+                .documentTitle(doc.getTitle())
+                .spec(new IGamification.ScoreTypeSpec(ScoreTypeCode.RATING_REPUTATION.name(), "Rating Reputation", 0, "Daily reputation score derived from document ratings"))
+                .scoreChange(change)
+                .description("Reputation " + (change >= 0 ? "+" : "") + change + " for avg=" + avg + ", count=" + count)
+                .build()
+        );
 
         self.updateUserRank(owner.getUserId());
         self.addWeeklyScore(owner.getUserId(), change);
@@ -503,5 +531,10 @@ public class GamificationService implements IGamification {
         return java.math.BigDecimal.valueOf(value)
                 .setScale(2, java.math.RoundingMode.HALF_UP)
                 .doubleValue();
+    }
+
+    @Override
+    public long getEventCount(ScoreTypeCode code) {
+        return scoreLogRepo.countByScoreTypeTypeCode(code.name());
     }
 }

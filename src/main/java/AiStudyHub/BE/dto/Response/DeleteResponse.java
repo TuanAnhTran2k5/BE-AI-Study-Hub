@@ -19,4 +19,7 @@ public class DeleteResponse {
     String entityName;
     String entityIdentifier;
     LocalDateTime deletedAt;
+    Long storageUsed;
+    Long storageRemaining;
+    Double storageUsagePercent;
 }

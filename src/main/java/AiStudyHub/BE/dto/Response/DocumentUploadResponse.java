@@ -38,4 +38,7 @@ public class DocumentUploadResponse {
     LocalDateTime createdAt;
 
     String message;
+    Long storageUsed;
+    Long storageRemaining;
+    Double storageUsagePercent;
 }

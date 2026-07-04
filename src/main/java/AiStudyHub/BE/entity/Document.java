@@ -60,6 +60,10 @@ public class Document {
     @Column(columnDefinition = "TEXT")
     String simHashContent;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_document_id")
+    Document sourceDocument;
+
     @Builder.Default
     Integer ratingCount = 0;
 

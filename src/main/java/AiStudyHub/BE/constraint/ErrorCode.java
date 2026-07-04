@@ -44,6 +44,7 @@ public enum ErrorCode {
     DOCUMENT_NOT_PUBLIC("Document is not public", HttpStatus.FORBIDDEN),
     FORBIDDEN_DOWNLOAD_CLOUD_DOCUMENT( "You can only download documents from your own cloud storage", HttpStatus.FORBIDDEN),
     FORBIDDEN_UPDATE_DOCUMENT("You can only update your own documents", HttpStatus.FORBIDDEN),
+    CANNOT_EDIT_DOWNLOADED_DOCUMENT("Downloaded documents cannot be edited", HttpStatus.FORBIDDEN),
 
     // Authentication
     EMAIL_ALREADY_EXISTS("Email already exists", HttpStatus.BAD_REQUEST),
@@ -59,6 +60,9 @@ public enum ErrorCode {
     // File storage
     FILE_TOO_LARGE("File exceeds 20MB", HttpStatus.BAD_REQUEST),
     STORAGE_LIMIT_EXCEEDED("2GB storage capacity exceeded", HttpStatus.BAD_REQUEST),
+    INVALID_IMAGE_SIZE("Image exceeds 5MB", HttpStatus.BAD_REQUEST),
+    UNSUPPORTED_IMAGE_TYPE("Only image files (JPG, PNG, WEBP, GIF, AVIF, etc.) are supported", HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+    INVALID_IMAGE_FILE("Corrupted or invalid image file", HttpStatus.BAD_REQUEST),
 
     // Rating
     INVALID_RATING_VALUE("Rating value must be an integer between 1 and 5", HttpStatus.BAD_REQUEST),

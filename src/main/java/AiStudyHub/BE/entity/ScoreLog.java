@@ -24,13 +24,21 @@ public class ScoreLog {
     @JoinColumn(name = "userId", nullable = false)
     User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "documentId")
-    Document document;
+    @Column(name = "documentId")
+    Long documentId;
+
+    @Column(name = "documentTitle")
+    String documentTitle;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "scoreTypeId", nullable = false)
     ScoreType scoreType;
+
+    @Column(name = "actorUserId")
+    Long actorUserId;
+
+    @Column(name = "unique_action_key", unique = true)
+    String uniqueActionKey;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reportId")
