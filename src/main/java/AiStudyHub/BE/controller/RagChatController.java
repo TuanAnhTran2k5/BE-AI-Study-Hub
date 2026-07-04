@@ -28,15 +28,6 @@ public class RagChatController {
 
     IRagSystem ragChatService;
 
-    @PostMapping("/ask")
-    public ResponseEntity<APIResponse<ChatResponse>> askQuestion(@RequestBody @Valid ChatRequest request) {
-        log.info("API Request: Ask question '{}'", request.getQuestion());
-        ChatResponse response = ragChatService.askQuestion(request);
-        return ResponseEntity.ok(
-                APIResponse.response(200, "Answer generated successfully", response)
-        );
-    }
-
     @PostMapping("/sessions")
     public ResponseEntity<APIResponse<ChatSessionResponse>> createSession(@RequestBody @Valid CreateSessionRequest request) {
         log.info("API Request: Create chat session");

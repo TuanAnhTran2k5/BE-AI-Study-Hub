@@ -330,6 +330,46 @@ public class GamificationService implements IGamification {
         rating = ratingRepo.save(rating);
 
         return ratingMapper.toRatingResponse(rating, document);
+        RatingResponse response = ratingMapper.toRatingResponse(rating, document);
+        response.setMyRating(ratingValue);
+        return response;
+    }
+
+    @Override
+    public int getPoints(String typeCode, int defaultFallback) {
+        return scoreTypeRepo.findByTypeCode(typeCode)
+                .map(ScoreType::getDefaultPoint)
+                .orElse(defaultFallback);
+    }
+
+    @Override
+    @Transactional
+    public int awardBookmarkScore(Long actorUserId, String actorFullName, Long receiverUserId, Long documentId, String documentTitle, String visibilityStatus) {
+        // 1. Kiểm tra lịch sử đã được cộng điểm cho tài liệu này chưa
+        if (scoreLogRepo.existsByActorUserIdAndDocumentIdAndScoreTypeTypeCode(
+                actorUserId, documentId, ScoreTypeCode.BOOKMARK.name())) {
+            return 0; 
+        }
+
+        // 2. Lấy cấu hình điểm động từ DB
+        int points = this.getPoints(ScoreTypeCode.BOOKMARK.name(), 3);
+        String desc = "Awarded " + points + " points because " + actorFullName + " bookmarked your document: " + documentTitle;
+
+        // 3. Thực hiện cộng điểm qua ScoreContext decoupled
+        this.awardScore(ScoreContextResponse.builder()
+                .receiverUserId(receiverUserId)
+                .documentId(documentId)
+                .documentTitle(documentTitle)
+                .spec(new IGamification.ScoreTypeSpec(ScoreTypeCode.BOOKMARK.name(), "Document bookmarked", points, "Score awarded when another user bookmarks your document"))
+                .scoreChange(points)
+                .description(desc)
+                .actorUserId(actorUserId)
+                .build()
+        );
+        this.updateUserRank(receiverUserId);
+        this.addWeeklyScore(receiverUserId, points);
+
+        return points;
     }
 
     // ==========================================

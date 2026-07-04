@@ -18,6 +18,11 @@ public interface IGamification {
     record ScoreTypeSpec(String code, String name, int defaultPoint, String description) {}
     int awardScore(User user, Document document, ScoreTypeSpec spec, int scoreChange, String description);
 
+    int awardScore(ScoreContextResponse context);
+    int getPoints(String typeCode, int defaultFallback);
+
+    int awardBookmarkScore(Long actorUserId, String actorFullName, Long receiverUserId, Long documentId, String documentTitle, String visibilityStatus);
+
     // --- RANKING & BADGE ---
     boolean checkAndAwardBadges(Long userId);
     boolean updateUserRank(Long userId);
