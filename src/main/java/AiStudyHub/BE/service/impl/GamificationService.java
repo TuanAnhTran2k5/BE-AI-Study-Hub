@@ -235,7 +235,7 @@ public class GamificationService implements IGamification {
                         .badgeName(badge.getBadgeName())
                         .description(badge.getDescription())
                         .conditionText(badge.getConditionText())
-                        .iconUrl(badge.getIconUrl())
+                        .iconUrl(badge.getIconUrl() == null || badge.getIconUrl().isBlank() ? null : badge.getIconUrl())
                         .build()
         ).toList();
     }
@@ -244,25 +244,37 @@ public class GamificationService implements IGamification {
     public UserRankResponse getUserRank(Long userId) {
         User user = userRepo.findById(userId).orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
+        long score = user.getTotalScore() == null ? 0L : user.getTotalScore();
+        List<Ranking> allRanks = rankingRepo.findAll();
+        Ranking rankObj = allRanks.stream()
+                .filter(r -> r.getMinScore() <= score)
+                .max(Comparator.comparingLong(Ranking::getMinScore))
+                .orElseGet(() -> allRanks.stream()
+                        .filter(r -> r.getMinScore() == 0 || "Bronze".equalsIgnoreCase(r.getRankName()))
+                        .findFirst()
+                        .orElse(null));
+
         List<UserRank> history = userRankRepo.findByUser(user);
-        return history.stream()
+        UserRank currentRankEntity = history.stream()
                 .max(Comparator.comparing(UserRank::getAchievedAt))
-                .map(ur ->
-                        UserRankResponse.builder()
-                                .userRankId(ur.getUserRankId())
-                                .userId(user.getUserId())
-                                .achievedAt(ur.getAchievedAt())
-                                .updatedAt(ur.getUpdatedAt())
-                                .rank(RankingResponse.builder()
-                                        .rankId(ur.getRank().getRankId())
-                                        .rankName(ur.getRank().getRankName())
-                                        .minScore(ur.getRank().getMinScore())
-                                        .maxScore(ur.getRank().getMaxScore())
-                                        .storageBonus(ur.getRank().getStorageBonus())
-                                        .displayPriority(ur.getRank().getDisplayPriority())
-                                        .build())
-                                .build()
-        ).orElse(null);
+                .orElse(null);
+
+        if (rankObj == null) return null;
+
+        return UserRankResponse.builder()
+                .userRankId(currentRankEntity != null ? currentRankEntity.getUserRankId() : null)
+                .userId(user.getUserId())
+                .achievedAt(currentRankEntity != null ? currentRankEntity.getAchievedAt() : user.getCreatedAt())
+                .updatedAt(currentRankEntity != null ? currentRankEntity.getUpdatedAt() : user.getCreatedAt())
+                .rank(RankingResponse.builder()
+                        .rankId(rankObj.getRankId())
+                        .rankName(rankObj.getRankName())
+                        .minScore(rankObj.getMinScore())
+                        .maxScore(rankObj.getMaxScore())
+                        .storageBonus(rankObj.getStorageBonus())
+                        .displayPriority(rankObj.getDisplayPriority())
+                        .build())
+                .build();
     }
 
     @Override
@@ -279,7 +291,7 @@ public class GamificationService implements IGamification {
                                 .badgeName(ub.getBadge().getBadgeName())
                                 .description(ub.getBadge().getDescription())
                                 .conditionText(ub.getBadge().getConditionText())
-                                .iconUrl(ub.getBadge().getIconUrl())
+                                .iconUrl(ub.getBadge().getIconUrl() == null || ub.getBadge().getIconUrl().isBlank() ? null : ub.getBadge().getIconUrl())
                                 .build())
                         .build()
         ).toList();

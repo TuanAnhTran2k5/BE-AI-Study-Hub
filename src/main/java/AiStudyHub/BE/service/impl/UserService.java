@@ -62,9 +62,14 @@ public class UserService implements IUser {
         if (request.getAvatar() != null && !request.getAvatar().isEmpty()) {
             org.springframework.web.multipart.MultipartFile avatarFile = request.getAvatar();
             
-            // Validate content type
+            // Validate content type and file extension
             String contentType = avatarFile.getContentType();
-            if (contentType == null || (!contentType.equals("image/jpeg") && !contentType.equals("image/png") && !contentType.equals("image/webp"))) {
+            String filename = avatarFile.getOriginalFilename();
+            boolean isImage = (contentType != null && contentType.toLowerCase().startsWith("image/"))
+                    || (filename != null && (filename.toLowerCase().endsWith(".jpg") || filename.toLowerCase().endsWith(".jpeg")
+                    || filename.toLowerCase().endsWith(".png") || filename.toLowerCase().endsWith(".webp")
+                    || filename.toLowerCase().endsWith(".gif") || filename.toLowerCase().endsWith(".avif")));
+            if (!isImage) {
                 throw new GlobalException(ErrorCode.UNSUPPORTED_IMAGE_TYPE);
             }
             // Validate file size (max 5MB)
@@ -131,19 +136,15 @@ public class UserService implements IUser {
             // Calculate global rank for this user
             int rank = (int) (userRepo.countByTotalScoreGreaterThan(u.getTotalScore() == null ? 0L : u.getTotalScore()) + 1);
             
-            // Find current rank object for style
-            UserRank currentRankEntity = userRankRepo.findByUser(u).stream()
-                    .max(Comparator.comparing(UserRank::getAchievedAt))
-                    .orElse(null);
-            Ranking rankObj = null;
-            if (currentRankEntity != null) {
-                rankObj = currentRankEntity.getRank();
-            } else {
-                rankObj = allRankings.stream()
-                        .filter(r -> r.getMinScore() == 0 || "Bronze".equalsIgnoreCase(r.getRankName()))
-                        .findFirst()
-                        .orElse(null);
-            }
+            // Calculate rank object based on totalScore
+            long userScore = u.getTotalScore() == null ? 0L : u.getTotalScore();
+            Ranking rankObj = allRankings.stream()
+                    .filter(r -> r.getMinScore() <= userScore)
+                    .max(Comparator.comparingLong(Ranking::getMinScore))
+                    .orElseGet(() -> allRankings.stream()
+                            .filter(r -> r.getMinScore() == 0 || "Bronze".equalsIgnoreCase(r.getRankName()))
+                            .findFirst()
+                            .orElse(null));
             
             RankingResponse mappedRank = mapToRankingResponse(rankObj);
             
@@ -196,21 +197,20 @@ public class UserService implements IUser {
             }
         }
 
-        // 4. Rank mapping with fallback to Bronze
+        // 4. Rank mapping based on totalScore (with fallback to Bronze)
+        long userScore = user.getTotalScore() == null ? 0L : user.getTotalScore();
+        List<Ranking> allRankings = rankingRepo.findAll();
+        Ranking rankObj = allRankings.stream()
+                .filter(r -> r.getMinScore() <= userScore)
+                .max(Comparator.comparingLong(Ranking::getMinScore))
+                .orElseGet(() -> allRankings.stream()
+                        .filter(r -> r.getMinScore() == 0 || "Bronze".equalsIgnoreCase(r.getRankName()))
+                        .findFirst()
+                        .orElse(null));
+
         UserRank currentRankEntity = userRankRepo.findByUser(user).stream()
                 .max(Comparator.comparing(UserRank::getAchievedAt))
                 .orElse(null);
-                
-        Ranking rankObj = null;
-        if (currentRankEntity != null) {
-            rankObj = currentRankEntity.getRank();
-        } else {
-            // Find default Bronze rank
-            rankObj = rankingRepo.findAll().stream()
-                    .filter(r -> r.getMinScore() == 0 || "Bronze".equalsIgnoreCase(r.getRankName()))
-                    .findFirst()
-                    .orElse(null);
-        }
 
         UserRankResponse currentRankResponse = null;
         if (rankObj != null) {
@@ -226,7 +226,7 @@ public class UserService implements IUser {
         // 5. Rank progress
         UserResponse.RankProgress progress = null;
         if (rankObj != null) {
-            progress = calculateRankProgress(user.getTotalScore() == null ? 0L : user.getTotalScore(), rankObj, new ArrayList<>(rankingRepo.findAll()));
+            progress = calculateRankProgress(user.getTotalScore() == null ? 0L : user.getTotalScore(), rankObj, new ArrayList<>(allRankings));
         }
 
         // 6. Badges (always default to [])
@@ -240,7 +240,7 @@ public class UserService implements IUser {
                                 .badgeName(ub.getBadge().getBadgeName())
                                 .description(ub.getBadge().getDescription())
                                 .conditionText(ub.getBadge().getConditionText())
-                                .iconUrl(ub.getBadge().getIconUrl() == null || ub.getBadge().getIconUrl().isBlank() ? "default_badge_icon" : ub.getBadge().getIconUrl())
+                                .iconUrl(ub.getBadge().getIconUrl() == null || ub.getBadge().getIconUrl().isBlank() ? null : ub.getBadge().getIconUrl())
                                 .build())
                         .build()
         ).collect(Collectors.toList());

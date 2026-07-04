@@ -12,4 +12,5 @@ public interface ScoreLogRepo extends JpaRepository<ScoreLog, Long> {
     boolean existsByActorUserIdAndDocumentIdAndScoreTypeTypeCode(Long actorUserId, Long documentId, String typeCode);
     long countByScoreTypeTypeCode(String typeCode);
     List<ScoreLog> findByDocumentIdAndScoreTypeTypeCode(Long documentId, String typeCode);
+    List<ScoreLog> findByDocumentId(Long documentId);
 }

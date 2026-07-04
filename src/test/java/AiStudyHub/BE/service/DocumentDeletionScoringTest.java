@@ -113,7 +113,7 @@ public class DocumentDeletionScoringTest {
         when(ragDocumentRepository.findByDocumentDocumentId(eq(100L))).thenReturn(Optional.empty());
         when(documentRepo.deleteByDocumentId(eq(100L))).thenReturn(1L);
 
-        when(scoreLogRepo.findByDocumentIdAndScoreTypeTypeCode(eq(100L), eq(ScoreTypeCode.BOOKMARK.name())))
+        when(scoreLogRepo.findByDocumentId(eq(100L)))
                 .thenReturn(bookmarkLogs);
 
         // Act
