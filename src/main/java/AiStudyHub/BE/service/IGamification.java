@@ -27,6 +27,11 @@ public interface IGamification {
      */
     int awardBookmarkScore(Long actorUserId, String actorFullName, Long receiverUserId, Long documentId, String documentTitle, String visibilityStatus);
 
+    int awardScore(ScoreContextResponse context);
+    int getPoints(String typeCode, int defaultFallback);
+
+    int awardBookmarkScore(Long actorUserId, String actorFullName, Long receiverUserId, Long documentId, String documentTitle, String visibilityStatus);
+
     // --- RANKING & BADGE ---
     boolean checkAndAwardBadges(Long userId);
     boolean updateUserRank(Long userId);

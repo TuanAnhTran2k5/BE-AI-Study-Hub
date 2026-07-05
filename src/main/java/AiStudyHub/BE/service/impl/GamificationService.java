@@ -354,6 +354,7 @@ public class GamificationService implements IGamification {
         rating.setComment(request.getComment());
         rating = ratingRepo.save(rating);
 
+        return ratingMapper.toRatingResponse(rating, document);
         RatingResponse response = ratingMapper.toRatingResponse(rating, document);
         response.setMyRating(ratingValue);
         return response;
@@ -367,6 +368,7 @@ public class GamificationService implements IGamification {
     }
 
     @Override
+    @Transactional
     public int awardBookmarkScore(Long actorUserId, String actorFullName, Long receiverUserId, Long documentId, String documentTitle, String visibilityStatus) {
         // 1. Kiểm tra lịch sử đã được cộng điểm cho tài liệu này chưa
         if (scoreLogRepo.existsByActorUserIdAndDocumentIdAndScoreTypeTypeCode(

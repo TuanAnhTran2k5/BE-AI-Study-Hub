@@ -16,7 +16,6 @@ import java.util.List;
 
 public interface IRagSystem {
     // --- CHAT ---
-    ChatResponse askQuestion(ChatRequest request);
     String buildContext(List<Document> documents);
     List<Document> retrieveRelevantChunks(String question);
     List<String> suggestPrompts(SuggestPromptsRequest request);
