@@ -57,6 +57,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 
 @Service
@@ -175,6 +177,13 @@ public class RagSystemService implements IRagSystem {
                     String fileName = "Unknown File";
                     if (doc.getMetadata() != null && doc.getMetadata().containsKey("originalFileName")) {
                         fileName = (String) doc.getMetadata().get("originalFileName");
+                    } else if (doc.getMetadata() != null && doc.getMetadata().containsKey("documentType")) {
+                        String docType = (String) doc.getMetadata().get("documentType");
+                        if ("SYSTEM_SYLLABUS".equals(docType)) {
+                            String subjectCode = (String) doc.getMetadata().get("subjectCode");
+                            String section = (String) doc.getMetadata().get("section");
+                            return "[System Syllabus - Subject: " + subjectCode + " - Section: " + section + "]\n" + doc.getText();
+                        }
                     }
                     return "[Source File: " + fileName + "]\n" + doc.getText();
                 })
@@ -190,59 +199,92 @@ public class RagSystemService implements IRagSystem {
         try {
             log.info("Searching vector store for query: {}", question);
 
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            List<Long> accessibleIds;
-            if (auth != null && auth.getPrincipal() instanceof User currentUser) {
-                accessibleIds = documentRepo.findByOwnerUserIdOrVisibilityStatus(currentUser.getUserId(), VisibilityStatus.PUBLIC)
-                        .stream()
-                        .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
-                        .map(AiStudyHub.BE.entity.Document::getDocumentId)
-                        .toList();
-            } else {
-                accessibleIds = documentRepo.findByVisibilityStatus(VisibilityStatus.PUBLIC)
-                        .stream()
-                        .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
-                        .map(AiStudyHub.BE.entity.Document::getDocumentId)
-                        .toList();
+            // 1. Detect any FPT subject codes (e.g. CSI106, PRJ301) in user query using Regex
+            Pattern pattern = Pattern.compile("\\b[A-Za-z]{3,4}[0-9]{3}\\b");
+            Matcher matcher = pattern.matcher(question);
+            List<String> detectedSubjectCodes = new ArrayList<>();
+            while (matcher.find()) {
+                detectedSubjectCodes.add(matcher.group().toUpperCase());
             }
 
-            if (accessibleIds.isEmpty()) {
-                log.info("No documents are accessible to the user. Returning empty chunks.");
-                return List.of();
-            }
-
-            List<Long> targetIds;
-            if (sessionDocIds != null) {
-                if (sessionDocIds.isEmpty()) {
-                    log.info("Session has no attached documents. Returning empty chunks for general AI mode.");
-                    return List.of();
+            // 2. Query user uploaded documents if applicable
+            List<Document> userDocChunks = new ArrayList<>();
+            if (sessionDocIds == null || !sessionDocIds.isEmpty()) {
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                List<Long> accessibleIds;
+                if (auth != null && auth.getPrincipal() instanceof User currentUser) {
+                    accessibleIds = documentRepo.findByOwnerUserIdOrVisibilityStatus(currentUser.getUserId(), VisibilityStatus.PUBLIC)
+                            .stream()
+                            .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
+                            .map(AiStudyHub.BE.entity.Document::getDocumentId)
+                            .toList();
+                } else {
+                    accessibleIds = documentRepo.findByVisibilityStatus(VisibilityStatus.PUBLIC)
+                            .stream()
+                            .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
+                            .map(AiStudyHub.BE.entity.Document::getDocumentId)
+                            .toList();
                 }
-                targetIds = sessionDocIds.stream()
-                        .filter(accessibleIds::contains)
-                        .toList();
-            } else {
-                targetIds = accessibleIds;
+
+                if (!accessibleIds.isEmpty()) {
+                    List<Long> targetIds;
+                    if (sessionDocIds != null) {
+                        targetIds = sessionDocIds.stream()
+                                .filter(accessibleIds::contains)
+                                .toList();
+                    } else {
+                        targetIds = accessibleIds;
+                    }
+
+                    if (!targetIds.isEmpty()) {
+                        List<String> targetIdStrings = targetIds.stream()
+                                .map(Object::toString)
+                                .toList();
+
+                        FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
+                        Filter.Expression filterExpression = filterBuilder.in("documentId", targetIdStrings.toArray(new String[0])).build();
+
+                        SearchRequest searchRequest = SearchRequest.builder()
+                                .query(question)
+                                .filterExpression(filterExpression)
+                                .similarityThreshold(0.0)
+                                .topK(10)
+                                .build();
+                        userDocChunks = vectorStore.similaritySearch(searchRequest);
+                        log.info("Retrieved {} chunks from user documents", userDocChunks.size());
+                    }
+                }
             }
 
-            if (targetIds.isEmpty()) {
-                log.info("No matching target documents for similarity search. Returning empty chunks.");
-                return List.of();
+            // 3. Query system syllabus documents if subject codes were detected
+            List<Document> syllabusChunks = new ArrayList<>();
+            if (!detectedSubjectCodes.isEmpty()) {
+                try {
+                    FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
+                    Filter.Expression filterExpression = filterBuilder.and(
+                            filterBuilder.eq("documentType", "SYSTEM_SYLLABUS"),
+                            filterBuilder.in("subjectCode", detectedSubjectCodes.toArray(new String[0]))
+                    ).build();
+
+                    SearchRequest searchRequest = SearchRequest.builder()
+                            .query(question)
+                            .filterExpression(filterExpression)
+                            .similarityThreshold(0.0)
+                            .topK(5)
+                            .build();
+                    syllabusChunks = vectorStore.similaritySearch(searchRequest);
+                    log.info("Retrieved {} syllabus chunks for subject codes: {}", syllabusChunks.size(), detectedSubjectCodes);
+                } catch (Exception e) {
+                    log.error("Failed to query syllabus chunks from Qdrant", e);
+                }
             }
 
-            List<String> targetIdStrings = targetIds.stream()
-                    .map(Object::toString)
-                    .toList();
+            // 4. Merge all retrieved chunks
+            List<Document> allChunks = new ArrayList<>();
+            allChunks.addAll(userDocChunks);
+            allChunks.addAll(syllabusChunks);
+            return allChunks;
 
-            FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
-            Filter.Expression filterExpression = filterBuilder.in("documentId", targetIdStrings.toArray(new String[0])).build();
-
-            SearchRequest searchRequest = SearchRequest.builder()
-                    .query(question)
-                    .filterExpression(filterExpression)
-                    .similarityThreshold(0.0)
-                    .topK(10)
-                    .build();
-            return vectorStore.similaritySearch(searchRequest);
         } catch (Exception e) {
             log.error("Error searching vector store for query: {}", question, e);
             throw new GlobalException(500, "Failed to search similar chunks in vector store", e);
