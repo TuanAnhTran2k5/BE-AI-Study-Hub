@@ -38,9 +38,6 @@ public class Rating {
 
     Integer ratingValue;
 
-    @Column(columnDefinition = "Text")
-    String comment;
-
     LocalDateTime ratedAt;
 
     @PrePersist

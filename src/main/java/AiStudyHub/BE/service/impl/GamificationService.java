@@ -351,7 +351,6 @@ public class GamificationService implements IGamification {
                         .document(document)
                         .build());
         rating.setRatingValue(ratingValue);
-        rating.setComment(request.getComment());
         rating = ratingRepo.save(rating);
         RatingResponse response = ratingMapper.toRatingResponse(rating, document);
         response.setMyRating(ratingValue);
