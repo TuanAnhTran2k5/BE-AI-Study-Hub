@@ -12,4 +12,5 @@ import java.util.List;
 public interface UserBadgeRepo extends JpaRepository<UserBadge, Long> {
     boolean existsByUserAndBadge(User user, Badge badge);
     List<UserBadge> findByUser(User user);
+    long deleteByBadge(Badge badge);
 }

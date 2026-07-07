@@ -19,7 +19,7 @@ public class MaxFileSizeValidator implements ConstraintValidator<MaxFileSize, Mu
 
     @Override
     public boolean isValid(MultipartFile file, ConstraintValidatorContext context) {
-        if (file == null || file.isEmpty()) {
+        if (file == null || file.isEmpty() || file.getSize() == 0) {
             return true; // Let presence annotations handle empty files
         }
         return file.getSize() <= maxBytes;

@@ -233,6 +233,7 @@ public class UserService implements IUser {
                                 .description(ub.getBadge().getDescription())
                                 .conditionText(ub.getBadge().getConditionText())
                                 .iconUrl(ub.getBadge().getIconUrl() == null || ub.getBadge().getIconUrl().isBlank() ? null : ub.getBadge().getIconUrl())
+                                .requiredDownloads(ub.getBadge().getRequiredDownloads())
                                 .build())
                         .build()
         ).collect(Collectors.toList());
