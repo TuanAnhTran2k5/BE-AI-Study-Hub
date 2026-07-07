@@ -11,4 +11,5 @@ public interface ISyllabusService {
     SubjectSyllabus updateSyllabus(Long subjectId, String jsonContent, String adminUsername, String reason);
     List<SubjectSyllabusHistory> getHistory(Long subjectId);
     SubjectSyllabus rollback(Long subjectId, Long historyId, String adminUsername);
+    void deleteSyllabus(Long subjectId);
 }

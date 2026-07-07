@@ -424,6 +424,52 @@ public class SyllabusService implements ISyllabusService {
         return syllabus;
     }
 
+    @Override
+    @Transactional
+    public void deleteSyllabus(Long subjectId) {
+        log.info("Deleting syllabus for subject ID: {}", subjectId);
+        SubjectSyllabus syllabus = subjectSyllabusRepo.findBySubjectSubjectId(subjectId)
+                .orElseThrow(() -> new GlobalException(404, "Syllabus not found for subject ID: " + subjectId));
+
+        String subjectCode = syllabus.getSubject().getSubjectCode();
+
+        // 1. Build list of vector IDs to delete from Qdrant
+        List<String> vectorIds = new ArrayList<>();
+        vectorIds.add(generateStableVectorId(subjectCode, "general"));
+        vectorIds.add(generateStableVectorId(subjectCode, "materials"));
+        vectorIds.add(generateStableVectorId(subjectCode, "clo"));
+        vectorIds.add(generateStableVectorId(subjectCode, "assessments"));
+
+        try {
+            JsonNode rootNode = objectMapper.readTree(syllabus.getJsonContent());
+            JsonNode sessionsNode = rootNode.get("sessions");
+            if (sessionsNode != null && sessionsNode.isArray()) {
+                int size = sessionsNode.size();
+                for (int i = 0; i < size; i += 15) {
+                    int end = Math.min(i + 15, size);
+                    vectorIds.add(generateStableVectorId(subjectCode, "sessions_" + (i + 1) + "_" + end));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse json content for vector cleanup: {}", e.getMessage());
+        }
+
+        // 2. Delete from Qdrant
+        try {
+            log.info("Deleting Qdrant vectors for subject {}: {}", subjectCode, vectorIds);
+            vectorStore.delete(vectorIds);
+        } catch (Exception e) {
+            log.error("Failed to delete vectors from Qdrant for subject: {}", subjectCode, e);
+        }
+
+        // 3. Delete history records
+        subjectSyllabusHistoryRepo.deleteBySubjectSyllabusId(syllabus.getId());
+
+        // 4. Delete the syllabus record itself
+        subjectSyllabusRepo.delete(syllabus);
+        log.info("Syllabus and its history deleted successfully for subject ID: {}", subjectId);
+    }
+
     // ==========================================
     //            HELPER METHODS
     // ==========================================

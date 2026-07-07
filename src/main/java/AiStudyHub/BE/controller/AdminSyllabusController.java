@@ -15,6 +15,7 @@ import AiStudyHub.BE.service.ISupabaseStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -32,7 +33,7 @@ public class AdminSyllabusController {
     ISupabaseStorage supabaseStorage;
     SubjectSyllabusRepo subjectSyllabusRepo;
 
-    @PostMapping("/upload/{subjectId}")
+    @PostMapping(value = "/upload/{subjectId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<APIResponse<SyllabusResponse>> uploadSyllabus(
             @PathVariable Long subjectId,
             @RequestParam("file") MultipartFile file) {
@@ -119,6 +120,14 @@ public class AdminSyllabusController {
 
         return ResponseEntity.ok(
                 APIResponse.response(200, "Syllabus rolled back successfully and AI Sync triggered", toResponse(syllabus))
+        );
+    }
+
+    @DeleteMapping("/{subjectId}")
+    public ResponseEntity<APIResponse<Void>> deleteSyllabus(@PathVariable Long subjectId) {
+        syllabusService.deleteSyllabus(subjectId);
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Syllabus deleted successfully from database and vector store", null)
         );
     }
 

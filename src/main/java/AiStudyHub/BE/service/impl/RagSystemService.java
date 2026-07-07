@@ -21,11 +21,13 @@ import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.security.SecurityUtils;
 import AiStudyHub.BE.mapper.RagDocumentMapper;
 import AiStudyHub.BE.repository.DocumentRepo;
+import AiStudyHub.BE.repository.SubjectRepo;
 import AiStudyHub.BE.repository.RagChunkRepository;
 import AiStudyHub.BE.repository.RagDocumentRepository;
 import AiStudyHub.BE.repository.ChatSessionRepository;
 import AiStudyHub.BE.repository.ChatMessageRepository;
 import AiStudyHub.BE.repository.ChatSessionDocumentRepository;
+import AiStudyHub.BE.entity.Subject;
 import AiStudyHub.BE.service.IRagSystem;
 import AiStudyHub.BE.service.ISupabaseStorage;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -70,6 +72,7 @@ public class RagSystemService implements IRagSystem {
     VectorStore vectorStore;
     ChatClient chatClient;
     DocumentRepo documentRepo;
+    SubjectRepo subjectRepo;
     RagDocumentRepository ragDocumentRepository;
     RagChunkRepository ragChunkRepository;
     TokenTextSplitter textSplitter;
@@ -87,9 +90,9 @@ public class RagSystemService implements IRagSystem {
             Your responsibilities & Knowledge Rules:
             1. Help users understand, summarize, explain, and analyze information from uploaded documents as well as general academic and study topics.
             2. Prioritize Provided Context: Treat the provided Context as the primary and authoritative reference when answering questions related to the user's documents.
-            3. Combine & Expand: You are strongly encouraged to combine the provided Context with your pre-trained general knowledge (knowledge trained by your developers) to explain concepts more clearly, provide relevant examples, draw connections, and answer related or extended questions.
-            4. Flexible Answering: If the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED" or does not contain enough information to answer a general, academic, conceptual, or practical question, answer fully and accurately using your pre-trained general knowledge. Do NOT refuse to answer or state that information is missing just because it is not in the Context.
-            5. Document-Specific Queries: Only if the user specifically asks about private or unique details of an un-retrieved document (e.g., "What does my uploaded report say in section 2?"), state clearly what is in the Context or politely inform them if that specific document content is missing while offering relevant general knowledge.
+            3. Context-Only Answering: You must rely STRICTLY on the provided Context to answer the user's question. Do not answer questions that require external academic or general knowledge unless that knowledge directly explains or clarifies the provided Context.
+            4. Strict Refusal if Context is Missing: If the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED" or does not contain enough information to answer the question, you MUST politely refuse to answer. Explain to the user in their dominant language that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer or make up (hallucinate) details using your general knowledge.
+            5. Refusal for Missing Documents: If the user specifically asks about details of an un-retrieved document or syllabus, politely inform them that the document content is missing while refusing to answer.
             6. Temporal Accuracy: The current system date and time is {currentDate}. Always use this exact current date when answering any time-related questions (such as "today", "current year", "now", or comparing dates). Never claim your knowledge or date is restricted to an old pre-training cutoff date.
 
             Language Rules (CRITICAL & HIGHEST PRIORITY):
@@ -108,7 +111,7 @@ public class RagSystemService implements IRagSystem {
             2. For all regular questions, conversational messages, explanations, or Q&A that are NOT explicit summary requests, DO NOT structure your answer with those 4 headings. Respond naturally using paragraphs, clear bullet points, or conversational style suitable for the prompt.
 
             Conversation Rules:
-            1. If the user's message is a general conversation (e.g., greetings, introductions, small talk) or general inquiry, answer naturally and helpfully without mentioning the Context.
+            1. If the user's message is a general conversation (e.g., greetings, introductions, small talk), answer naturally and warmly. If the user's message is a question about a course, syllabus, subject, or academic topic, and the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED", you MUST refuse to answer. Explain to the user in their dominant language that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer using general knowledge.
             
             Context:
             {context}
@@ -134,14 +137,14 @@ public class RagSystemService implements IRagSystem {
             
             Knowledge & Flexibility Rules:            
             1. Prioritize Provided Context: Treat the provided Context as the primary reference when answering questions related to user documents.
-            2. Combine with General Training Knowledge: You are strongly encouraged to combine the Context with your pre-trained general AI knowledge (knowledge trained by your developers) to provide deeper explanations, analogies, practical examples, or answer related questions that extend beyond the exact wording of the documents.
-            3. Flexible Answering: If the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED" or does not contain enough information for a general or academic study question, answer fully and accurately using your general training knowledge. Do NOT refuse or say "I do not have data" for general study/knowledge questions.
-            4. Document-Specific Queries: Only if the user specifically inquires about private/specific content from a document not present in Context, politely inform them that the specific document section is unavailable while offering any relevant general knowledge.
+            2. Context-Only Answering: You must rely STRICTLY on the provided Context to answer the user's question. Do not answer questions that require external academic or general knowledge unless that knowledge directly explains or clarifies the provided Context.
+            3. Strict Refusal if Context is Missing: If the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED" or does not contain enough information to answer the question, you MUST politely refuse to answer. Explain to the user in their dominant language that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer or make up (hallucinate) details using your general knowledge.
+            4. Refusal for Missing Documents: If the user specifically asks about details of an un-retrieved document or syllabus, politely inform them that the document content is missing while refusing to answer.
             5. Conversation History: Use Previous Conversation History to maintain conversation flow, understand references ("this", "that", "the previous topic"), and support a natural multi-turn chat experience.
             6. Temporal Accuracy: The current system date and time is {currentDate}. Always use this exact current date when answering any time-related questions (such as "today", "current year", "now"). Never claim your knowledge or date is restricted to an old pre-training cutoff date when discussing dates.
             
             Formatting & Conversation Rules:            
-            1. If the user's message is a general greeting or casual conversation (e.g., "Hello", "How are you?", "What is your name?"), respond naturally and warmly without forcing document structure.
+            1. If the user's message is a general greeting or casual conversation (e.g., "Hello", "How are you?", "What is your name?"), respond naturally and warmly. If the user's message is a question about a course, syllabus, subject, or academic topic, and the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED", you MUST refuse to answer. Explain to the user in their dominant language that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer using general knowledge.
             2. ONLY when the user explicitly asks to summarize a document or topic (using words like "summarize", "tóm tắt"), provide 4 sections dynamically translated into the dominant language of the Current User Question:
                 2.1 [Translate heading meaning: Main Topic]
                 2.2 [Translate heading meaning: Purpose]
@@ -205,6 +208,23 @@ public class RagSystemService implements IRagSystem {
             List<String> detectedSubjectCodes = new ArrayList<>();
             while (matcher.find()) {
                 detectedSubjectCodes.add(matcher.group().toUpperCase());
+            }
+
+            // 1.5. If no full subject codes detected, scan for prefixes (like "CSI", "PRJ") and map them to full codes
+            if (detectedSubjectCodes.isEmpty()) {
+                try {
+                    List<String> allSubjectCodes = subjectRepo.findAll().stream()
+                            .map(s -> s.getSubjectCode().toUpperCase())
+                            .toList();
+                    for (String code : allSubjectCodes) {
+                        String prefix = code.replaceAll("[0-9]", "");
+                        if (!prefix.isEmpty() && question.toUpperCase().matches(".*\\b" + prefix + "\\b.*")) {
+                            detectedSubjectCodes.add(code);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to map subject code prefixes", e);
+                }
             }
 
             // 2. Query user uploaded documents if applicable
