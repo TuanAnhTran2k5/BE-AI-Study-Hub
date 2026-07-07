@@ -302,7 +302,7 @@ public class GamificationService implements IGamification {
         }
 
         String description = isValidString(request.getDescription()) ? request.getDescription().trim() : null;
-        String conditionText = "Downloads: " + (request.getRequiredDownloads() == null ? 0 : request.getRequiredDownloads()) + " lượt";
+        String conditionText = "Downloads: " + (request.getRequiredDownloads() == null ? 0 : request.getRequiredDownloads()) + " slot";
 
         Badge badge = Badge.builder()
                 .badgeName(request.getBadgeName().trim())
@@ -336,7 +336,7 @@ public class GamificationService implements IGamification {
 
         if (request.getRequiredDownloads() != null) {
             badge.setRequiredDownloads(request.getRequiredDownloads());
-            badge.setConditionText("Downloads: " + request.getRequiredDownloads() + " lượt");
+            badge.setConditionText("Downloads: " + request.getRequiredDownloads() + " slot");
         }
 
         if (isValidFile(request.getIconFile())) {
