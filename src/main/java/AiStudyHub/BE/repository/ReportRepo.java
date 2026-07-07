@@ -5,6 +5,7 @@ import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.Report;
 import AiStudyHub.BE.entity.ReportCase;
 import AiStudyHub.BE.entity.User;
+import AiStudyHub.BE.entity.ReportReason;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -25,4 +26,8 @@ public interface ReportRepo extends JpaRepository<Report, Long> {
     List<Report> findAllByReportCase(ReportCase reportCase);
 
     long deleteByDocumentDocumentId(Long documentId);
+
+    List<Report> findAllByReporterOrderByCreatedAtDesc(User reporter);
+
+    boolean existsByReason(ReportReason reason);
 }
