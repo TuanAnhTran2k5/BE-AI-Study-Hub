@@ -19,6 +19,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
+import AiStudyHub.BE.dto.Request.ReportReasonRequest;
+import AiStudyHub.BE.entity.ReportReason;
+import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.Operation;
 import java.util.List;
 
 @RestController
@@ -88,6 +92,29 @@ public class ReportAdminController {
     ) {
         ReportCase rc = reportService.adminResolveCase(caseId, request.getAdminId(), request.getDecision(), request.getNote());
         return ResponseEntity.ok(APIResponse.response(200, "Resolve report case successfully", toCaseAdminView(rc)));
+    }
+
+    @PostMapping("/reasons")
+    @Operation(summary = "Create a new report reason (Admin)")
+    public ResponseEntity<APIResponse<ReportReason>> createReason(@Valid @RequestBody ReportReasonRequest request) {
+        ReportReason reason = reportService.createReason(request);
+        return ResponseEntity.ok(APIResponse.response(201, "Create report reason successfully", reason));
+    }
+
+    @PutMapping("/reasons/{reasonId}")
+    @Operation(summary = "Update an existing report reason (Admin)")
+    public ResponseEntity<APIResponse<ReportReason>> updateReason(
+            @PathVariable Long reasonId,
+            @Valid @RequestBody ReportReasonRequest request) {
+        ReportReason reason = reportService.updateReason(reasonId, request);
+        return ResponseEntity.ok(APIResponse.response(200, "Update report reason successfully", reason));
+    }
+
+    @DeleteMapping("/reasons/{reasonId}")
+    @Operation(summary = "Delete an existing report reason (Admin)")
+    public ResponseEntity<APIResponse<Void>> deleteReason(@PathVariable Long reasonId) {
+        reportService.deleteReason(reasonId);
+        return ResponseEntity.ok(APIResponse.response(200, "Delete report reason successfully", null));
     }
 
     private ReportCaseAdminResponse toCaseAdminView(ReportCase rc) {

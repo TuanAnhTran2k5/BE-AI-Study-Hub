@@ -7,6 +7,7 @@ import AiStudyHub.BE.repository.*;
 import AiStudyHub.BE.service.INotification;
 import AiStudyHub.BE.service.IReport;
 import AiStudyHub.BE.service.IGamification;
+import AiStudyHub.BE.dto.Request.ReportReasonRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -327,5 +328,57 @@ public class ReportService implements IReport {
                 reportCaseRepo.save(rc);
             }
         }
+    }
+
+    @Override
+    public List<ReportReason> getAllReasons() {
+        return reportReasonRepo.findAll();
+    }
+
+    @Override
+    public List<Report> getReportsByReporter(Long reporterId) {
+        User reporter = userRepo.findById(reporterId)
+                .orElseThrow(() -> new GlobalException(404, "User not found"));
+        return reportRepo.findAllByReporterOrderByCreatedAtDesc(reporter);
+    }
+
+    @Override
+    @Transactional
+    public ReportReason createReason(ReportReasonRequest request) {
+        ReportReason reason = ReportReason.builder()
+                .reasonName(request.getReasonName())
+                .severityLevel(request.getSeverityLevel())
+                .description(request.getDescription())
+                .reportThreshold(request.getReportThreshold())
+                .penaltyScore(request.getPenaltyScore())
+                .build();
+        return reportReasonRepo.save(reason);
+    }
+
+    @Override
+    @Transactional
+    public ReportReason updateReason(Long reasonId, ReportReasonRequest request) {
+        ReportReason reason = reportReasonRepo.findById(reasonId)
+                .orElseThrow(() -> new GlobalException(404, "Report reason not found"));
+        reason.setReasonName(request.getReasonName());
+        reason.setSeverityLevel(request.getSeverityLevel());
+        reason.setDescription(request.getDescription());
+        reason.setReportThreshold(request.getReportThreshold());
+        reason.setPenaltyScore(request.getPenaltyScore());
+        return reportReasonRepo.save(reason);
+    }
+
+    @Override
+    @Transactional
+    public void deleteReason(Long reasonId) {
+        ReportReason reason = reportReasonRepo.findById(reasonId)
+                .orElseThrow(() -> new GlobalException(404, "Report reason not found"));
+
+        boolean isReferenced = reportCaseRepo.existsByReason(reason) || reportRepo.existsByReason(reason);
+        if (isReferenced) {
+            throw new GlobalException(400, "Cannot delete report reason because it is already associated with existing reports.");
+        }
+
+        reportReasonRepo.delete(reason);
     }
 }
