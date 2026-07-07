@@ -19,9 +19,12 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -58,32 +61,21 @@ public class UserService implements IUser {
 
         userMapper.updateUserFromRequest(request, user);
 
-        // Upload avatar if a new one is provided in form-data
+        // Save avatar as Base64 Data URI if a new one is provided in form-data
         if (request.getAvatar() != null && !request.getAvatar().isEmpty()) {
-            org.springframework.web.multipart.MultipartFile avatarFile = request.getAvatar();
-            
-            // Validate content type and file extension
-            String contentType = avatarFile.getContentType();
-            String filename = avatarFile.getOriginalFilename();
-            boolean isImage = (contentType != null && contentType.toLowerCase().startsWith("image/"))
-                    || (filename != null && (filename.toLowerCase().endsWith(".jpg") || filename.toLowerCase().endsWith(".jpeg")
-                    || filename.toLowerCase().endsWith(".png") || filename.toLowerCase().endsWith(".webp")
-                    || filename.toLowerCase().endsWith(".gif") || filename.toLowerCase().endsWith(".avif")));
-            if (!isImage) {
-                throw new GlobalException(ErrorCode.UNSUPPORTED_IMAGE_TYPE);
-            }
-            // Validate file size (max 5MB)
-            if (avatarFile.getSize() > 5L * 1024 * 1024) {
-                throw new GlobalException(ErrorCode.INVALID_IMAGE_SIZE);
-            }
+            MultipartFile avatarFile = request.getAvatar();
             
             try {
-                // Upload file to Supabase in the avatars directory
-                FileUploadResponse uploadRes = supabaseStorage.uploadFile(avatarFile, "avatars");
+                String contentType = avatarFile.getContentType();
+                if (contentType == null || contentType.isBlank() || contentType.equals("application/octet-stream")) {
+                    contentType = "image/png";
+                }
+                byte[] bytes = avatarFile.getBytes();
+                String base64Image = "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(bytes);
                 
-                // Delete old custom avatar if it exists
+                // Delete old custom avatar from Supabase if it was previously stored there
                 String oldAvatarUrl = user.getAvatarUrl();
-                if (oldAvatarUrl != null && !oldAvatarUrl.isBlank() && !oldAvatarUrl.contains("googleusercontent.com")) {
+                if (oldAvatarUrl != null && !oldAvatarUrl.isBlank() && !oldAvatarUrl.contains("googleusercontent.com") && !oldAvatarUrl.startsWith("data:")) {
                     try {
                         supabaseStorage.deleteFile(oldAvatarUrl);
                     } catch (Exception e) {
@@ -91,9 +83,9 @@ public class UserService implements IUser {
                     }
                 }
                 
-                user.setAvatarUrl(uploadRes.getPublicUrl());
+                user.setAvatarUrl(base64Image);
             } catch (Exception e) {
-                log.error("Failed to upload new avatar: {}", e.getMessage());
+                log.error("Failed to process new avatar: {}", e.getMessage());
                 throw new GlobalException(ErrorCode.FILE_UPLOAD_FAILED);
             }
         }
@@ -374,7 +366,7 @@ public class UserService implements IUser {
 
     private LocalDate calculateWeekStart(LocalDate date) {
         LocalDate current = date;
-        while (current.getDayOfWeek() != java.time.DayOfWeek.SUNDAY) {
+        while (current.getDayOfWeek() != DayOfWeek.SUNDAY) {
             current = current.minusDays(1);
         }
         return current;
