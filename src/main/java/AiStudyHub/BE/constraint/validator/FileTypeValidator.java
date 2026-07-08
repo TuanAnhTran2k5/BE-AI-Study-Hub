@@ -7,10 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * Validator implementation for {@link ValidFileType}.
- * Ensures the uploaded file's content type is within the permitted list.
- */
+
 public class FileTypeValidator implements ConstraintValidator<ValidFileType, MultipartFile> {
 
     private List<String> allowedTypes;

@@ -24,5 +24,10 @@ public class Badge {
     String description;
 
     String conditionText;
+
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     String iconUrl;
+
+    Integer requiredDownloads;
 }

@@ -1,5 +1,5 @@
 BadgeName,Description,ConditionText,IconUrl
-First Upload,User upload file đầu tiên,Upload 1 document,first_upload_icon
-Helpful Student,Tài liệu đạt 50 lượt tải,Any document reaches 50 downloads,helpful_student_icon
-Trusted Author,Tổng lượt tải đạt 500,Total downloads reach 500,trusted_author_icon
-Top Weekly Contributor,Top 3 điểm hoạt động tuần dựa trên Reputation Score,Top 3 weekly scores,top_weekly_icon
+First Upload,User upload first file,Upload 1 document,first_upload_icon
+Helpful Student,Documents reach 50 downloads,Any document reaches 50 downloads,helpful_student_icon
+Trusted Author,Total downloads reach 500,Total downloads reach 500,trusted_author_icon
+Top Weekly Contributor,Top 3 weekly scores,Top 3 weekly scores,top_weekly_icon

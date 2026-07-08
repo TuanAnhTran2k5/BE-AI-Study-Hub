@@ -22,8 +22,13 @@ public class ImageFileValidator implements ConstraintValidator<ValidImageFile, M
 
     @Override
     public boolean isValid(MultipartFile file, ConstraintValidatorContext context) {
-        if (file == null || file.isEmpty()) {
+        if (file == null || file.isEmpty() || file.getSize() == 0) {
             return true; // Let presence annotations (e.g. @NotNull) handle empty files
+        }
+
+        String filename = file.getOriginalFilename();
+        if (filename != null && (filename.trim().isEmpty() || filename.trim().equalsIgnoreCase("string") || filename.trim().equalsIgnoreCase("null"))) {
+            return true;
         }
 
         String contentType = file.getContentType();
@@ -31,7 +36,6 @@ public class ImageFileValidator implements ConstraintValidator<ValidImageFile, M
             return true;
         }
 
-        String filename = file.getOriginalFilename();
         if (filename != null) {
             String lowerFilename = filename.toLowerCase();
             for (String ext : ALLOWED_EXTENSIONS) {
