@@ -2,8 +2,10 @@ package AiStudyHub.BE.service;
 
 import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.NotificationResponse;
+import AiStudyHub.BE.entity.Badge;
 import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.Notification;
+import AiStudyHub.BE.entity.Ranking;
 import AiStudyHub.BE.entity.User;
 import org.springframework.data.domain.Page;
 
@@ -25,6 +27,37 @@ public interface INotification {
             Document document,
             int penaltyScore,
             String explanation
+    );
+
+    Notification sendDocumentDownloadNotification(
+            User owner,
+            User downloader,
+            Document document,
+            int pointsAwarded
+    );
+
+    Notification sendDocumentBookmarkNotification(
+            User owner,
+            User bookmarker,
+            Document document,
+            int pointsAwarded
+    );
+
+    Notification sendDocumentRatingNotification(
+            User owner,
+            User rater,
+            Document document,
+            int ratingValue
+    );
+
+    Notification sendRankUpNotification(
+            User user,
+            Ranking newRank
+    );
+
+    Notification sendBadgeAwardedNotification(
+            User user,
+            Badge badge
     );
 
     Page<NotificationResponse> getMyNotifications(int page, Boolean isRead, String type);

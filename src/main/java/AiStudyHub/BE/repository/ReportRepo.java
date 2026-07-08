@@ -17,6 +17,8 @@ public interface ReportRepo extends JpaRepository<Report, Long> {
 
     boolean existsByReporterAndDocument(User reporter, Document document);
 
+    long countByDocument(Document document);
+
     long countByReporterAndReasonSeverityLevelAndCreatedAtAfter(
             User reporter,
             ReportSeverity severityLevel,

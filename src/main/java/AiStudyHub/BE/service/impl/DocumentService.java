@@ -25,6 +25,7 @@ import AiStudyHub.BE.service.IRagSystem;
 import AiStudyHub.BE.service.IStorageService;
 import AiStudyHub.BE.service.ISupabaseStorage;
 import AiStudyHub.BE.service.IDuplicateCheck;
+import AiStudyHub.BE.service.INotification;
 import AiStudyHub.BE.utils.SimHashUtil;
 import AiStudyHub.BE.utils.TextExtractionUtil;
 import lombok.AccessLevel;
@@ -73,13 +74,10 @@ public class DocumentService implements IDocument {
     NotificationRepo notificationRepo;
     ChatSessionDocumentRepo chatSessionDocumentRepo;
     IUser userService;
+    INotification notificationService;
     SimHashUtil simHashUtil;
     TextExtractionUtil textExtractionUtil;
 
-    @Autowired
-    @Lazy
-    @NonFinal
-    IDocument self;
 
     // --- UPLOAD & UPDATE & DELETE ---
 
@@ -514,6 +512,10 @@ public class DocumentService implements IDocument {
                 // Re-evaluate rank due to score change
                 gamificationService.updateUserRank(publicOwner.getUserId());
                 gamificationService.addWeeklyScore(publicOwner.getUserId(), addedPoint);
+
+                if (addedPoint != null && addedPoint > 0) {
+                    notificationService.sendDocumentDownloadNotification(publicOwner, currentUser, publicDocument, addedPoint);
+                }
             }
 
             downloadRepo.save(download);

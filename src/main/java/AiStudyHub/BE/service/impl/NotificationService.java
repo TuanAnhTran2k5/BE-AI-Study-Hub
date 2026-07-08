@@ -2,8 +2,10 @@ package AiStudyHub.BE.service.impl;
 
 import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.NotificationResponse;
+import AiStudyHub.BE.entity.Badge;
 import AiStudyHub.BE.entity.Document;
 import AiStudyHub.BE.entity.Notification;
+import AiStudyHub.BE.entity.Ranking;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.repository.NotificationRepo;
@@ -112,6 +114,153 @@ public class NotificationService implements INotification {
                 .message(content)
                 .type("SYSTEM")
                 .notificationCase("FALSE_REPORT_PENALTY")
+                .isRead(false)
+                .build();
+        return notificationRepo.save(notification);
+    }
+
+    @Override
+    public Notification sendDocumentDownloadNotification(
+            User owner,
+            User downloader,
+            Document document,
+            int pointsAwarded
+    ) {
+        if (owner == null || downloader == null || document == null) return null;
+        if (owner.getUserId().equals(downloader.getUserId())) return null;
+
+        log.info("Sending download notification to document owner {} (ID: {}) by downloader {}",
+                owner.getEmail(), owner.getUserId(), downloader.getEmail());
+
+        String subject = "[AI Study Hub] Document Downloaded: " + document.getTitle();
+        String content = String.format(
+                "User %s has downloaded your document \"%s\". You earned +%d reputation points!",
+                downloader.getFullName(), document.getTitle(), pointsAwarded
+        );
+
+        Notification notification = Notification.builder()
+                .user(owner)
+                .document(document)
+                .title(subject)
+                .message(content)
+                .type("REWARD")
+                .notificationCase("DOCUMENT_DOWNLOAD")
+                .isRead(false)
+                .build();
+        return notificationRepo.save(notification);
+    }
+
+    @Override
+    public Notification sendDocumentBookmarkNotification(
+            User owner,
+            User bookmarker,
+            Document document,
+            int pointsAwarded
+    ) {
+        if (owner == null || bookmarker == null || document == null) return null;
+        if (owner.getUserId().equals(bookmarker.getUserId())) return null;
+
+        log.info("Sending bookmark notification to document owner {} (ID: {}) by bookmarker {}",
+                owner.getEmail(), owner.getUserId(), bookmarker.getEmail());
+
+        String subject = "[AI Study Hub] Document Bookmarked: " + document.getTitle();
+        String content = String.format(
+                "User %s has bookmarked your document \"%s\". You earned +%d reputation points!",
+                bookmarker.getFullName(), document.getTitle(), pointsAwarded
+        );
+
+        Notification notification = Notification.builder()
+                .user(owner)
+                .document(document)
+                .title(subject)
+                .message(content)
+                .type("REWARD")
+                .notificationCase("DOCUMENT_BOOKMARK")
+                .isRead(false)
+                .build();
+        return notificationRepo.save(notification);
+    }
+
+    @Override
+    public Notification sendDocumentRatingNotification(
+            User owner,
+            User rater,
+            Document document,
+            int ratingValue
+    ) {
+        if (owner == null || rater == null || document == null) return null;
+        if (owner.getUserId().equals(rater.getUserId())) return null;
+
+        log.info("Sending rating notification to document owner {} (ID: {}) by rater {}",
+                owner.getEmail(), owner.getUserId(), rater.getEmail());
+
+        String subject = "[AI Study Hub] New Document Rating: " + document.getTitle();
+        String content = String.format(
+                "User %s rated your document \"%s\" with %d stars!",
+                rater.getFullName(), document.getTitle(), ratingValue
+        );
+
+        Notification notification = Notification.builder()
+                .user(owner)
+                .document(document)
+                .title(subject)
+                .message(content)
+                .type("SOCIAL")
+                .notificationCase("DOCUMENT_RATING")
+                .isRead(false)
+                .build();
+        return notificationRepo.save(notification);
+    }
+
+    @Override
+    public Notification sendRankUpNotification(
+            User user,
+            Ranking newRank
+    ) {
+        if (user == null || newRank == null) return null;
+
+        log.info("Sending rank up notification to user {} (ID: {}) for new rank {}",
+                user.getEmail(), user.getUserId(), newRank.getRankName());
+
+        String subject = "[AI Study Hub] Congratulations! Rank Up: " + newRank.getRankName();
+        String content = String.format(
+                "Congratulations %s! You have achieved the rank of \"%s\". Keep contributing to earn more rewards and storage limits!",
+                user.getFullName(), newRank.getRankName()
+        );
+
+        Notification notification = Notification.builder()
+                .user(user)
+                .title(subject)
+                .message(content)
+                .type("REWARD")
+                .notificationCase("RANK_UP")
+                .isRead(false)
+                .build();
+        return notificationRepo.save(notification);
+    }
+
+    @Override
+    public Notification sendBadgeAwardedNotification(
+            User user,
+            Badge badge
+    ) {
+        if (user == null || badge == null) return null;
+
+        log.info("Sending badge awarded notification to user {} (ID: {}) for badge {}",
+                user.getEmail(), user.getUserId(), badge.getBadgeName());
+
+        String subject = "[AI Study Hub] Congratulations! Badge Awarded: " + badge.getBadgeName();
+        String content = String.format(
+                "Congratulations %s! You have earned the badge \"%s\" (%s). Check out your profile to view your badges!",
+                user.getFullName(), badge.getBadgeName(), badge.getDescription() != null ? badge.getDescription() : "New achievement"
+        );
+
+        Notification notification = Notification.builder()
+                .user(user)
+                .title(subject)
+                .message(content)
+                .type("REWARD")
+                .notificationCase("BADGE_AWARDED")
                 .isRead(false)
                 .build();
         return notificationRepo.save(notification);

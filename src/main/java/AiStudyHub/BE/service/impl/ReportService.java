@@ -101,6 +101,11 @@ public class ReportService implements IReport {
                 .build();
         report = reportRepo.save(report);
 
+        // Update document reportCount in DB
+        long totalReports = reportRepo.countByDocument(targetDocument);
+        targetDocument.setReportCount((int) totalReports);
+        documentRepo.save(targetDocument);
+
         // 6. Process Report Case count & warnings
         reportCase.setReportCount(reportCase.getReportCount() + 1);
         processCase(reportCase);
