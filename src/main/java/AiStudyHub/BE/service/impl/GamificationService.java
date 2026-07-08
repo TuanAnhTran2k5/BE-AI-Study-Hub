@@ -23,12 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
-import java.util.Base64;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -116,39 +114,53 @@ public class GamificationService implements IGamification {
     @Transactional
     public boolean checkAndAwardBadges(Long userId) {
         User user = userRepo.findById(userId).orElse(null);
-        if (user == null) return false;
+        if (user == null) {
+            return false;
+        }
 
         List<Document> userDocs = documentRepo.findByOwner(user);
 
-        // 1. First Upload
+        int totalDownloads = userDocs.stream()
+                .mapToInt(doc -> doc.getDownloadCount() == null ? 0 : doc.getDownloadCount())
+                .sum();
+
+        // Static Badge
         if (!userDocs.isEmpty()) {
             awardBadgeNotExist(user, "First Upload");
         }
 
-        // 2. Helpful Student
-        boolean hasHelpfulDoc = userDocs.stream().anyMatch(doc -> doc.getDownloadCount() != null && doc.getDownloadCount() >= 50);
-        if (hasHelpfulDoc) {
+        if (userDocs.stream().anyMatch(doc ->
+                doc.getDownloadCount() != null && doc.getDownloadCount() >= 50)) {
             awardBadgeNotExist(user, "Helpful Student");
         }
 
-        // 3. Trusted Author & Dynamic Badges by requiredDownloads
-        int totalDownloads = userDocs.stream().mapToInt(doc -> doc.getDownloadCount() == null ? 0 : doc.getDownloadCount()).sum();
         if (totalDownloads >= 500) {
             awardBadgeNotExist(user, "Trusted Author");
         }
 
-        // Check dynamic badges created/configured by Admin with requiredDownloads
+        // ===== Dynamic Badge =====
+
+        Set<Long> ownedBadgeIds = userBadgeRepo.findByUser(user)
+                .stream()
+                .map(ub -> ub.getBadge().getBadgeId())
+                .collect(Collectors.toSet());
+
+        // Check Dynamic Badges
         List<Badge> allBadges = badgeRepo.findAll();
+
         for (Badge badge : allBadges) {
-            if (badge.getRequiredDownloads() != null && badge.getRequiredDownloads() > 0) {
-                if (totalDownloads >= badge.getRequiredDownloads()) {
-                    if (!userBadgeRepo.existsByUserAndBadge(user, badge)) {
-                        userBadgeRepo.save(UserBadge.builder()
-                                .user(user)
-                                .badge(badge)
-                                .build());
-                    }
-                }
+
+            if (badge.getRequiredDownloads() == null || badge.getRequiredDownloads() <= 0) {
+                continue;
+            }
+
+            if (totalDownloads >= badge.getRequiredDownloads()
+                    && !ownedBadgeIds.contains(badge.getBadgeId())) {
+
+                userBadgeRepo.save(UserBadge.builder()
+                        .user(user)
+                        .badge(badge)
+                        .build());
             }
         }
 
@@ -160,7 +172,7 @@ public class GamificationService implements IGamification {
     public boolean updateUserRank(Long userId) {
         User user = userRepo.findById(userId).orElse(null);
         if (user == null) return false;
-        
+
         int score = user.getTotalScore() == null ? 0 : user.getTotalScore().intValue();
 
         List<Ranking> allRanks = rankingRepo.findAll();
@@ -179,7 +191,7 @@ public class GamificationService implements IGamification {
             UserRank current = currentUserRankOpt.get();
             int currentPriority = Integer.parseInt(current.getRank().getDisplayPriority());
             int newPriority = Integer.parseInt(newRank.getDisplayPriority());
-            
+
             if (newPriority != currentPriority) {
                 userRankRepo.save(UserRank.builder()
                         .user(user)
@@ -314,6 +326,12 @@ public class GamificationService implements IGamification {
                 .build();
 
         badge = badgeRepo.save(badge);
+
+        List<User> users = userRepo.findAll();
+        for (User user : users) {
+            self.checkAndAwardBadges(user.getUserId());
+        }
+
         return toBadgeResponse(badge);
     }
 
@@ -335,7 +353,7 @@ public class GamificationService implements IGamification {
             badge.setDescription(request.getDescription().trim());
         }
 
-        if (request.getRequiredDownloads() != null) {
+        if (request.getRequiredDownloads() != null && request.getRequiredDownloads() > 0) {
             badge.setRequiredDownloads(request.getRequiredDownloads());
             badge.setConditionText("Downloads: " + request.getRequiredDownloads() + " slot");
         }
@@ -351,6 +369,12 @@ public class GamificationService implements IGamification {
         }
 
         badge = badgeRepo.save(badge);
+
+        List<User> users = userRepo.findAll();
+        for (User user : users) {
+            self.checkAndAwardBadges(user.getUserId());
+        }
+
         return toBadgeResponse(badge);
     }
 
@@ -502,7 +526,7 @@ public class GamificationService implements IGamification {
         // 1. Kiểm tra lịch sử đã được cộng điểm cho tài liệu này chưa
         if (scoreLogRepo.existsByActorUserIdAndDocumentIdAndScoreTypeTypeCode(
                 actorUserId, documentId, ScoreTypeCode.BOOKMARK.name())) {
-            return 0; 
+            return 0;
         }
 
         // 2. Lấy cấu hình điểm động từ DB
@@ -621,7 +645,7 @@ public class GamificationService implements IGamification {
     private boolean awardBadgeNotExist(User user, String badgeName) {
         Optional<Badge> badgeOpt = badgeRepo.findByBadgeName(badgeName);
         if (badgeOpt.isEmpty()) return false;
-        
+
         Badge badge = badgeOpt.get();
         if (!userBadgeRepo.existsByUserAndBadge(user, badge)) {
             userBadgeRepo.save(UserBadge.builder()
@@ -638,9 +662,9 @@ public class GamificationService implements IGamification {
         long baseLimit = 2L * 1024 * 1024 * 1024; // 2GB
         long bonus = rank.getStorageBonus() != null ? rank.getStorageBonus().longValue() : 0L;
         long newLimit = baseLimit + bonus;
-        
+
         long currentLimit = user.getStorageLimit() == null ? baseLimit : user.getStorageLimit();
-        
+
         if (newLimit > currentLimit) {
             user.setStorageLimit(newLimit);
             userRepo.save(user);

@@ -32,4 +32,9 @@ public class ReputationController {
     public ResponseEntity<APIResponse<Boolean>> updateRank(@PathVariable Long userId) {
         return ResponseEntity.ok(APIResponse.response(200, "Reputation job executed", gamificationService.updateUserRank(userId)));
     }
+
+    @PostMapping("/admin/badges/update/{userId}")
+    public ResponseEntity<APIResponse<Boolean>> updateBadges(@PathVariable Long userId) {
+        return ResponseEntity.ok(APIResponse.response(200, "Reputation job executed", gamificationService.checkAndAwardBadges(userId)));
+    }
 }
