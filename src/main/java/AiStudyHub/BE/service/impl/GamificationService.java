@@ -13,6 +13,7 @@ import AiStudyHub.BE.repository.*;
 import AiStudyHub.BE.service.IGamification;
 import AiStudyHub.BE.service.impl.ReputationPolicy;
 import lombok.extern.slf4j.Slf4j;
+import java.math.BigDecimal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
