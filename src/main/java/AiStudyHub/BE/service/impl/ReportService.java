@@ -40,6 +40,10 @@ public class ReportService implements IReport {
                 .orElseThrow(() -> new GlobalException(404, "Reporter not found"));
         Document document = documentRepo.findById(documentId)
                 .orElseThrow(() -> new GlobalException(404, "Document not found"));
+
+        // If this is a copy, report the original public document
+        Document targetDocument = document.getSourceDocument() != null ? document.getSourceDocument() : document;
+
         ReportReason reason = reportReasonRepo.findById(reasonId)
                 .orElseThrow(() -> new GlobalException(404, "ReportReason not found"));
 
@@ -47,10 +51,10 @@ public class ReportService implements IReport {
         if (reporter.getTotalScore() < 0) {
             throw new GlobalException(403, "Your account has been restricted from submitting reports due to a negative reputation score.");
         }
-        if (document.getVisibilityStatus() != VisibilityStatus.PUBLIC) {
+        if (targetDocument.getVisibilityStatus() != VisibilityStatus.PUBLIC) {
             throw new GlobalException(400, "This document is private and cannot be reported.");
         }
-        if (document.getOwner().getUserId().equals(reporter.getUserId())) {
+        if (targetDocument.getOwner().getUserId().equals(reporter.getUserId())) {
             throw new GlobalException(400, "You cannot report your own document.");
         }
 
@@ -66,16 +70,16 @@ public class ReportService implements IReport {
         }
 
         // 3. Check if user has already reported this document
-        if (reportRepo.existsByReporterAndDocument(reporter, document)) {
+        if (reportRepo.existsByReporterAndDocument(reporter, targetDocument)) {
             throw new GlobalException(400, "You have already submitted a report for this document.");
         }
 
         // 4. Find open case with Pessimistic Lock to prevent concurrency issues
         List<CaseStatus> openStatuses = List.of(CaseStatus.OPEN, CaseStatus.WARNING_1, CaseStatus.WARNING_2);
-        ReportCase reportCase = reportCaseRepo.findFirstByDocumentAndReasonAndCaseStatusIn(document, reason, openStatuses)
+        ReportCase reportCase = reportCaseRepo.findFirstByDocumentAndReasonAndCaseStatusIn(targetDocument, reason, openStatuses)
                 .orElseGet(() -> {
                     ReportCase newCase = ReportCase.builder()
-                            .document(document)
+                            .document(targetDocument)
                             .reason(reason)
                             .caseLevel(reason.getSeverityLevel())
                             .reportCount(0)
@@ -88,7 +92,7 @@ public class ReportService implements IReport {
         // 5. Create Report
         Report report = Report.builder()
                 .reporter(reporter)
-                .document(document)
+                .document(targetDocument)
                 .reason(reason)
                 .reportCase(reportCase)
                 .description(description)

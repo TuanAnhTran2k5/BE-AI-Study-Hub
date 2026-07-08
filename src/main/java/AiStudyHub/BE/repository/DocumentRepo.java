@@ -33,4 +33,6 @@ public interface DocumentRepo extends JpaRepository<Document, Long> {
 
     @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(d.downloadCount), 0) FROM Document d WHERE d.owner.userId = :userId")
     long sumDownloadCountByOwnerUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
+
+    List<Document> findBySourceDocumentDocumentId(Long sourceDocumentId);
 }

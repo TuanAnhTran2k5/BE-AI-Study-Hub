@@ -196,21 +196,34 @@ public class DocumentService implements IDocument {
         User owner = document.getOwner();
         String fileUrl = document.getFileUrl();
 
+        // === BƯỚC 1: Xóa RAG resources (nếu có) ===
         RagDocument ragDoc = ragDocumentRepository.findByDocumentDocumentId(documentId).orElse(null);
         if (ragDoc != null) {
             log.info("Deleting RAG resources for document ID: {}", documentId);
             ragSystemService.deleteDocument(documentId);
         }
 
+        // === BƯỚC 2: Xóa download record đúng cách ===
+        if (document.getSourceDocument() != null) {
+            // Đang xóa BẢN COPY → xóa download record trỏ vào tài liệu GỐC cho user hiện tại
+            downloadRepo.deleteByUserUserIdAndDocumentDocumentId(
+                currentUser.getUserId(),
+                document.getSourceDocument().getDocumentId()
+            );
+        } else {
+            // Đang xóa TÀI LIỆU GỐC → xóa tất cả download records trỏ vào nó
+            downloadRepo.deleteByDocumentDocumentId(documentId);
+        }
+
+        // === BƯỚC 3: Xóa các quan hệ khác ===
         notificationRepo.deleteByDocumentDocumentId(documentId);
-        downloadRepo.deleteByDocumentDocumentId(documentId);
         ratingRepo.deleteByDocumentDocumentId(documentId);
         bookmarkRepo.deleteByDocumentDocumentId(documentId);
         chatSessionDocumentRepo.deleteByDocumentDocumentId(documentId);
         reportRepo.deleteByDocumentDocumentId(documentId);
         reportCaseRepo.deleteByDocumentDocumentId(documentId);
 
-        // Deduct points from owner for all score logs associated with this document (bookmarks, downloads, ratings, upload, etc.)
+        // === BƯỚC 4: Xử lý score logs (giữ nguyên logic hiện tại) ===
         List<ScoreLog> docScoreLogs = scoreLogRepo.findByDocumentId(documentId);
         int totalDeduction = docScoreLogs.stream()
                 .mapToInt(ScoreLog::getScoreChange)
@@ -228,6 +241,16 @@ public class DocumentService implements IDocument {
             scoreLogRepo.deleteAll(docScoreLogs);
         }
 
+        // === BƯỚC 5: Gỡ FK source_document_id từ các bản copy (chỉ khi xóa TÀI LIỆU GỐC) ===
+        if (document.getSourceDocument() == null) {
+            List<Document> copies = documentRepo.findBySourceDocumentDocumentId(documentId);
+            for (Document copy : copies) {
+                copy.setSourceDocument(null);
+            }
+            documentRepo.saveAll(copies);
+        }
+
+        // === BƯỚC 6: Xóa document ===
         long deletedRows = documentRepo.deleteByDocumentId(documentId);
 
         if (deletedRows == 0) {
@@ -281,21 +304,42 @@ public class DocumentService implements IDocument {
                 .collect(Collectors.toList());
     }
 
+    private DocumentResponse enrichDocumentResponse(Document doc) {
+        DocumentResponse resp = documentMapper.toDocumentResponse(doc);
+        Document source = doc.getSourceDocument();
+        if (source != null) {
+            // Đồng bộ stats từ tài liệu gốc
+            resp.setDownloadCount(source.getDownloadCount());
+            resp.setBookmarkCount(source.getBookmarkCount());
+            resp.setAverageRating(source.getAverageRating());
+            resp.setRatingCount(source.getRatingCount());
+            
+            // Gán thông tin uploader gốc
+            User originalOwner = source.getOwner();
+            if (originalOwner != null) {
+                resp.setOriginalUploaderId(originalOwner.getUserId());
+                resp.setOriginalUploaderName(originalOwner.getFullName());
+                resp.setOriginalUploaderAvatar(originalOwner.getAvatarUrl());
+                resp.setOwnerName(originalOwner.getFullName());
+                resp.setOwnerAvatar(originalOwner.getAvatarUrl());
+            }
+        } else {
+            // Tự upload hoặc tài liệu gốc đã bị xóa
+            User owner = doc.getOwner();
+            if (owner != null) {
+                resp.setOriginalUploaderId(owner.getUserId());
+                resp.setOriginalUploaderName(owner.getFullName());
+                resp.setOriginalUploaderAvatar(owner.getAvatarUrl());
+            }
+        }
+        return resp;
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<DocumentResponse> getMyDocuments(Long userId) {
         return documentRepo.findByOwnerUserId(userId).stream()
-                .map(doc -> {
-                    DocumentResponse resp = documentMapper.toDocumentResponse(doc);
-                    Document source = doc.getSourceDocument();
-                    if (source != null) {
-                        User originalOwner = source.getOwner();
-                        resp.setOwnerName(originalOwner.getFullName());
-                        resp.setOwnerAvatar(originalOwner.getAvatarUrl());
-                        resp.setOriginalUploaderName(originalOwner.getFullName());
-                    }
-                    return resp;
-                })
+                .map(this::enrichDocumentResponse)
                 .collect(Collectors.toList());
     }
 
@@ -317,37 +361,24 @@ public class DocumentService implements IDocument {
             }
         }
 
-        DocumentResponse response = documentMapper.toDocumentResponse(document);
+        DocumentResponse response = enrichDocumentResponse(document);
 
-        // Populate isBookmarked, myRating, and originalUploaderName if the user is authenticated
+        // Populate isBookmarked, myRating if the user is authenticated
         try {
             User currentUser = SecurityUtils.getCurrentUser();
             if (currentUser != null && currentUser.getUserId() != null) {
-                boolean isBookmarked = bookmarkRepo.existsByUserUserIdAndDocumentDocumentId(currentUser.getUserId(), documentId);
+                Long targetDocId = document.getSourceDocument() != null ? document.getSourceDocument().getDocumentId() : documentId;
+
+                boolean isBookmarked = bookmarkRepo.existsByUserUserIdAndDocumentDocumentId(currentUser.getUserId(), targetDocId)
+                        || bookmarkRepo.existsByUserUserIdAndDocumentDocumentId(currentUser.getUserId(), documentId);
                 response.setIsBookmarked(isBookmarked);
 
-                ratingRepo.findByUserUserIdAndDocumentDocumentId(currentUser.getUserId(), documentId)
+                ratingRepo.findByUserUserIdAndDocumentDocumentId(currentUser.getUserId(), targetDocId)
                         .ifPresent(rating -> response.setMyRating(rating.getRatingValue()));
             }
         } catch (Exception e) {
             log.debug("Unauthenticated user accessing document detail: {}", e.getMessage());
         }
-
-        User uploader;
-
-        if (document.getSourceDocument() != null) {
-
-            uploader = document.getSourceDocument().getOwner();
-
-        } else {
-
-            uploader = document.getOwner();
-
-        }
-
-        response.setOriginalUploaderId(uploader.getUserId());
-        response.setOriginalUploaderName(uploader.getFullName());
-        response.setOriginalUploaderAvatar(uploader.getAvatarUrl());
 
         return response;
     }
@@ -375,6 +406,16 @@ public class DocumentService implements IDocument {
 
         User publicOwner = publicDocument.getOwner();
         String publicOwnerName = publicOwner.getFullName();
+
+        // Block owner from downloading their own document
+        if (publicOwner.getUserId().equals(currentUser.getUserId())) {
+            throw new GlobalException(ErrorCode.CANNOT_DOWNLOAD_OWN_DOCUMENT);
+        }
+
+        // Early duplicate check (UX layer — clean error before any file I/O)
+        if (downloadRepo.existsByUserAndDocument(currentUser, publicDocument)) {
+            throw new GlobalException(ErrorCode.DOCUMENT_ALREADY_DOWNLOADED);
+        }
 
         byte[] fileBytes = supabaseStorageService.downloadFile(publicDocument.getFileUrl());
 
@@ -411,7 +452,7 @@ public class DocumentService implements IDocument {
                     .visibilityStatus(VisibilityStatus.PRIVATE)
                     .moderationStatus(publicDocument.getModerationStatus())
                     .averageRating(0.0)
-                    .fileName(uploadResponse.getStoredFileName())
+                    .fileName(publicDocument.getFileName())
                     .fileUrl(uploadResponse.getPublicUrl())
                     .fileType(uploadResponse.getContentType())
                     .fileSize(uploadResponse.getFileSize())
@@ -431,10 +472,15 @@ public class DocumentService implements IDocument {
             privateDocument.setUploadStatus(UploadStatus.COMPLETED);
             privateDocument = documentRepo.save(privateDocument);
 
-            boolean firstDownload = !downloadRepo.existsByUserAndDocument(currentUser, publicDocument);
+            boolean isFirstTimeEver = !scoreLogRepo.existsByActorUserIdAndDocumentIdAndScoreTypeTypeCode(
+                    currentUser.getUserId(),
+                    publicDocument.getDocumentId(),
+                    ScoreTypeCode.DOC_DOWNLOAD.name()
+            );
+
             Integer addedPoint = 0;
 
-            if (firstDownload) {
+            if (isFirstTimeEver) {
                 publicDocument.setDownloadCount(
                         publicDocument.getDownloadCount() == null ? 1 : publicDocument.getDownloadCount() + 1
                 );
@@ -447,28 +493,27 @@ public class DocumentService implements IDocument {
                     .scoreAwarded(false)
                     .build();
 
-            if (firstDownload) {
-                if (!publicOwner.getUserId().equals(currentUser.getUserId())) {
-                    int points = gamificationService.getPoints(ScoreTypeCode.DOC_DOWNLOAD.name(), 5);
-                    String desc = "Awarded " + points + " points because " + currentUser.getFullName()
-                                    + " downloaded your document: " + publicDocument.getTitle();
-                    addedPoint = gamificationService.awardScore(ScoreContextResponse.builder()
-                            .receiverUserId(publicOwner.getUserId())
-                            .documentId(publicDocument.getDocumentId())
-                            .documentTitle(publicDocument.getTitle())
-                            .spec(new IGamification.ScoreTypeSpec(ScoreTypeCode.DOC_DOWNLOAD.name(), "Document Download", points,
-                                    "Score awarded when another user downloads your document"))
-                            .scoreChange(points)
-                            .description(desc)
-                            .actorUserId(currentUser.getUserId())
-                            .build());
+            if (isFirstTimeEver) {
+                // Owner check already done above, so publicOwner != currentUser here
+                int points = gamificationService.getPoints(ScoreTypeCode.DOC_DOWNLOAD.name(), 5);
+                String desc = "Awarded " + points + " points because " + currentUser.getFullName()
+                                + " downloaded your document: " + publicDocument.getTitle();
+                addedPoint = gamificationService.awardScore(ScoreContextResponse.builder()
+                        .receiverUserId(publicOwner.getUserId())
+                        .documentId(publicDocument.getDocumentId())
+                        .documentTitle(publicDocument.getTitle())
+                        .spec(new IGamification.ScoreTypeSpec(ScoreTypeCode.DOC_DOWNLOAD.name(), "Document Download", points,
+                                "Score awarded when another user downloads your document"))
+                        .scoreChange(points)
+                        .description(desc)
+                        .actorUserId(currentUser.getUserId())
+                        .build());
 
-                    download.setScoreAwarded(true);
+                download.setScoreAwarded(true);
 
-                    // Re-evaluate rank due to score change
-                    gamificationService.updateUserRank(publicOwner.getUserId());
-                    gamificationService.addWeeklyScore(publicOwner.getUserId(), addedPoint);
-                }
+                // Re-evaluate rank due to score change
+                gamificationService.updateUserRank(publicOwner.getUserId());
+                gamificationService.addWeeklyScore(publicOwner.getUserId(), addedPoint);
             }
 
             downloadRepo.save(download);
@@ -478,7 +523,7 @@ public class DocumentService implements IDocument {
 
             DocumentDownloadResponse response = documentMapper.toDocumentDownloadResponse(
                     privateDocument,
-                    firstDownload,
+                    true,
                     addedPoint,
                     publicOwner.getTotalScore(),
                     LocalDateTime.now()
@@ -503,6 +548,10 @@ public class DocumentService implements IDocument {
 
             return response;
 
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            // Race condition: unique constraint caught duplicate — rollback + cleanup
+            safeDeleteFile(uploadResponse.getPublicUrl());
+            throw new GlobalException(ErrorCode.DOCUMENT_ALREADY_DOWNLOADED);
         } catch (Exception ex) {
             // Compensating action: remove the orphaned copied file from storage.
             safeDeleteFile(uploadResponse.getPublicUrl());

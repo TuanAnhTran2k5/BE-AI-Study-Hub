@@ -16,4 +16,6 @@ public interface DownloadRepo extends JpaRepository<Download, Long> {
     boolean existsByUserUserIdAndDocumentSimHashContent(Long userId, String simHashContent);
 
     Optional<Download> findFirstByUserUserIdAndDocumentSimHashContent(Long userId, String simHashContent);
+
+    long deleteByUserUserIdAndDocumentDocumentId(Long userId, Long documentId);
 }

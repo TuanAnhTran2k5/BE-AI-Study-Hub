@@ -462,25 +462,28 @@ public class GamificationService implements IGamification {
         Document document = documentRepo.findById(documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
 
-        if (document.getVisibilityStatus() != VisibilityStatus.PUBLIC) {
+        // If this is a copy, apply the rating to the original source document
+        Document targetDocument = document.getSourceDocument() != null ? document.getSourceDocument() : document;
+
+        if (targetDocument.getVisibilityStatus() != VisibilityStatus.PUBLIC) {
             throw new GlobalException(ErrorCode.DOCUMENT_NOT_PUBLIC);
         }
 
         User user = userRepo.findById(authUser.getUserId())
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
-        if (document.getOwner().getUserId().equals(user.getUserId())) {
+        if (targetDocument.getOwner().getUserId().equals(user.getUserId())) {
             throw new GlobalException(ErrorCode.CANNOT_RATE_OWN_DOCUMENT);
         }
 
-        Rating rating = ratingRepo.findByUserAndDocument(user, document)
+        Rating rating = ratingRepo.findByUserAndDocument(user, targetDocument)
                 .orElseGet(() -> Rating.builder()
                         .user(user)
-                        .document(document)
+                        .document(targetDocument)
                         .build());
         rating.setRatingValue(ratingValue);
         rating = ratingRepo.save(rating);
-        RatingResponse response = ratingMapper.toRatingResponse(rating, document);
+        RatingResponse response = ratingMapper.toRatingResponse(rating, targetDocument);
         response.setMyRating(ratingValue);
         return response;
     }

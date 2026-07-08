@@ -45,41 +45,43 @@ public class BookmarkService implements IBookmark {
         Document document = documentRepo.findById(request.getDocumentId())
                 .orElseThrow(() -> new GlobalException(ErrorCode.NOT_FOUND));
 
+        // If this is a copy, bookmark the original public document
+        Document targetDocument = document.getSourceDocument() != null ? document.getSourceDocument() : document;
+
         // Check if already bookmarked to prevent duplicate insertions
-        if (bookmarkRepo.existsByUserUserIdAndDocumentDocumentId(userId, request.getDocumentId())) {
+        if (bookmarkRepo.existsByUserUserIdAndDocumentDocumentId(userId, targetDocument.getDocumentId())) {
             throw new GlobalException(400, "Document already bookmarked");
         }
 
         Bookmark bookmark = Bookmark.builder()
                 .user(user)
-                .document(document)
+                .document(targetDocument)
                 .build();
 
         bookmark = bookmarkRepo.saveAndFlush(bookmark);
 
-        // Update the document's bookmarkCount cache
-        int currentCount = document.getBookmarkCount() != null ? document.getBookmarkCount() : 0;
-        document.setBookmarkCount(currentCount + 1);
-        documentRepo.save(document);
+        // Update the target document's bookmarkCount cache
+        int currentCount = targetDocument.getBookmarkCount() != null ? targetDocument.getBookmarkCount() : 0;
+        targetDocument.setBookmarkCount(currentCount + 1);
+        documentRepo.save(targetDocument);
 
         // Award points if the original document is PUBLIC and not owned by the bookmarking user
-        Document targetDoc = document.getSourceDocument() != null ? document.getSourceDocument() : document;
-        boolean isPublic = targetDoc.getVisibilityStatus() == VisibilityStatus.PUBLIC;
-        boolean isNotSelf = !targetDoc.getOwner().getUserId().equals(userId);
+        boolean isPublic = targetDocument.getVisibilityStatus() == VisibilityStatus.PUBLIC;
+        boolean isNotSelf = !targetDocument.getOwner().getUserId().equals(userId);
 
         if (isPublic && isNotSelf) {
             gamificationService.awardBookmarkScore(
                     user.getUserId(),
                     user.getFullName(),
-                    targetDoc.getOwner().getUserId(),
-                    targetDoc.getDocumentId(),
-                    targetDoc.getTitle(),
-                    targetDoc.getVisibilityStatus().name()
+                    targetDocument.getOwner().getUserId(),
+                    targetDocument.getDocumentId(),
+                    targetDocument.getTitle(),
+                    targetDocument.getVisibilityStatus().name()
             );
         }
 
         BookmarkResponse response = bookmarkMapper.toResponse(bookmark);
-        response.setBookmarkCount((long) document.getBookmarkCount());
+        response.setBookmarkCount((long) targetDocument.getBookmarkCount());
         response.setIsBookmarked(true);
         return response;
     }
@@ -87,17 +89,22 @@ public class BookmarkService implements IBookmark {
     @Override
     @Transactional
     public DeleteResponse removeBookmark(Long userId, Long documentId) {
-        Bookmark bookmark = bookmarkRepo.findByUserUserIdAndDocumentDocumentId(userId, documentId)
+        Document document = documentRepo.findById(documentId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.NOT_FOUND));
+        
+        // If this is a copy, resolve to the original public document
+        Document targetDocument = document.getSourceDocument() != null ? document.getSourceDocument() : document;
+
+        Bookmark bookmark = bookmarkRepo.findByUserUserIdAndDocumentDocumentId(userId, targetDocument.getDocumentId())
                 .orElseThrow(() -> new GlobalException(ErrorCode.NOT_FOUND));
 
         bookmarkRepo.delete(bookmark);
 
-        // Update the document's bookmarkCount cache
-        Document document = bookmark.getDocument();
-        int currentCount = document.getBookmarkCount() != null ? document.getBookmarkCount() : 0;
+        // Update the target document's bookmarkCount cache
+        int currentCount = targetDocument.getBookmarkCount() != null ? targetDocument.getBookmarkCount() : 0;
         if (currentCount > 0) {
-            document.setBookmarkCount(currentCount - 1);
-            documentRepo.save(document);
+            targetDocument.setBookmarkCount(currentCount - 1);
+            documentRepo.save(targetDocument);
         }
         
         return DeleteResponse.builder()
