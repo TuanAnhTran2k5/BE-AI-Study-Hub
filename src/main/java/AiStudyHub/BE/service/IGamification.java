@@ -1,5 +1,6 @@
 package AiStudyHub.BE.service;
 
+import AiStudyHub.BE.dto.Request.BadgeRequest;
 import AiStudyHub.BE.dto.Request.RatingRequest;
 import AiStudyHub.BE.dto.Response.BadgeResponse;
 import AiStudyHub.BE.dto.Response.RankingResponse;
@@ -20,11 +21,6 @@ public interface IGamification {
     int awardScore(ScoreContextResponse context);
     int getPoints(String typeCode, int defaultFallback);
 
-    /**
-     * Precondition: Requires bookmark persistence completed.
-     * Ràng buộc UNIQUE(userId, documentId) trên bảng Bookmark và uniqueActionKey trên ScoreLog là chốt chặn chính.
-     * Vui lòng chỉ gọi sau khi thực thể Bookmark tương ứng đã được lưu và flush xuống DB thành công.
-     */
     int awardBookmarkScore(Long actorUserId, String actorFullName, Long receiverUserId, Long documentId, String documentTitle, String visibilityStatus);
 
     // --- RANKING & BADGE ---
@@ -34,6 +30,11 @@ public interface IGamification {
     boolean addWeeklyScore(Long userId, int scoreChange);
     List<RankingResponse> getAllRanks();
     List<BadgeResponse> getAllBadges();
+    BadgeResponse getBadgeById(Long badgeId);
+    BadgeResponse createBadge(BadgeRequest request) throws Exception;
+    BadgeResponse updateBadge(Long badgeId, BadgeRequest request) throws Exception;
+    BadgeResponse deleteBadge(Long badgeId);
+    List<BadgeResponse> searchBadgesByName(String keyword);
     UserRankResponse getUserRank(Long userId);
     List<UserBadgeResponse> getUserBadges(Long userId);
     List<WeeklyScoreResponse> getTopWeeklyContributors(int limit);

@@ -14,4 +14,5 @@ public class BadgeResponse {
     String description;
     String conditionText;
     String iconUrl;
+    Integer requiredDownloads;
 }

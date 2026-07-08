@@ -67,6 +67,14 @@ public enum ErrorCode {
     // Rating
     INVALID_RATING_VALUE("Rating value must be an integer between 1 and 5", HttpStatus.BAD_REQUEST),
     CANNOT_RATE_OWN_DOCUMENT("You cannot rate your own document", HttpStatus.FORBIDDEN),
+
+    // Badge
+    BADGE_NOT_FOUND("Badge not found", HttpStatus.NOT_FOUND),
+    BADGE_ALREADY_EXISTS("Badge name already exists", HttpStatus.BAD_REQUEST),
+
+    // Download
+    DOCUMENT_ALREADY_DOWNLOADED("You have already downloaded this document", HttpStatus.BAD_REQUEST),
+    CANNOT_DOWNLOAD_OWN_DOCUMENT("You cannot download your own document", HttpStatus.BAD_REQUEST),
     ;
 
 

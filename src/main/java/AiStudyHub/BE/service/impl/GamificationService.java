@@ -3,6 +3,7 @@ package AiStudyHub.BE.service.impl;
 import AiStudyHub.BE.constraint.ErrorCode;
 import AiStudyHub.BE.constraint.VisibilityStatus;
 import AiStudyHub.BE.constraint.UploadStatus;
+import AiStudyHub.BE.dto.Request.BadgeRequest;
 import AiStudyHub.BE.dto.Request.RatingRequest;
 import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.*;
@@ -19,8 +20,10 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -128,10 +131,25 @@ public class GamificationService implements IGamification {
             awardBadgeNotExist(user, "Helpful Student");
         }
 
-        // 3. Trusted Author
+        // 3. Trusted Author & Dynamic Badges by requiredDownloads
         int totalDownloads = userDocs.stream().mapToInt(doc -> doc.getDownloadCount() == null ? 0 : doc.getDownloadCount()).sum();
         if (totalDownloads >= 500) {
             awardBadgeNotExist(user, "Trusted Author");
+        }
+
+        // Check dynamic badges created/configured by Admin with requiredDownloads
+        List<Badge> allBadges = badgeRepo.findAll();
+        for (Badge badge : allBadges) {
+            if (badge.getRequiredDownloads() != null && badge.getRequiredDownloads() > 0) {
+                if (totalDownloads >= badge.getRequiredDownloads()) {
+                    if (!userBadgeRepo.existsByUserAndBadge(user, badge)) {
+                        userBadgeRepo.save(UserBadge.builder()
+                                .user(user)
+                                .badge(badge)
+                                .build());
+                    }
+                }
+            }
         }
 
         return true;
@@ -228,17 +246,133 @@ public class GamificationService implements IGamification {
         ).toList();
     }
 
+    private BadgeResponse toBadgeResponse(Badge badge) {
+        return BadgeResponse.builder()
+                .badgeId(badge.getBadgeId())
+                .badgeName(badge.getBadgeName())
+                .description(badge.getDescription())
+                .conditionText(badge.getConditionText())
+                .iconUrl(badge.getIconUrl() == null || badge.getIconUrl().isBlank() ? null : badge.getIconUrl())
+                .requiredDownloads(badge.getRequiredDownloads())
+                .build();
+    }
+
     @Override
     public List<BadgeResponse> getAllBadges() {
-        return badgeRepo.findAll().stream().map(badge ->
-                BadgeResponse.builder()
-                        .badgeId(badge.getBadgeId())
-                        .badgeName(badge.getBadgeName())
-                        .description(badge.getDescription())
-                        .conditionText(badge.getConditionText())
-                        .iconUrl(badge.getIconUrl() == null || badge.getIconUrl().isBlank() ? null : badge.getIconUrl())
-                        .build()
-        ).toList();
+        return badgeRepo.findAll().stream()
+                .map(this::toBadgeResponse)
+                .toList();
+    }
+
+    @Override
+    public BadgeResponse getBadgeById(Long badgeId) {
+        Badge badge = badgeRepo.findById(badgeId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.BADGE_NOT_FOUND));
+        return toBadgeResponse(badge);
+    }
+
+    private boolean isValidString(String str) {
+        return str != null && !str.trim().isEmpty()
+                && !str.trim().equalsIgnoreCase("string")
+                && !str.trim().equalsIgnoreCase("null");
+    }
+
+    private boolean isValidFile(MultipartFile file) {
+        return file != null && !file.isEmpty() && file.getSize() > 0;
+    }
+
+    @Override
+    @Transactional
+    public BadgeResponse createBadge(BadgeRequest request) throws Exception {
+        if (!isValidString(request.getBadgeName())) {
+            throw new GlobalException(ErrorCode.FIELD_REQUIRED);
+        }
+        if (badgeRepo.findByBadgeName(request.getBadgeName().trim()).isPresent()) {
+            throw new GlobalException(ErrorCode.BADGE_ALREADY_EXISTS);
+        }
+
+        String iconUrl = null;
+        if (isValidFile(request.getIconFile())) {
+            MultipartFile file = request.getIconFile();
+            String contentType = file.getContentType();
+            if (contentType == null || contentType.isBlank() || contentType.equals("application/octet-stream")) {
+                contentType = "image/png";
+            }
+            byte[] bytes = file.getBytes();
+            iconUrl = "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(bytes);
+        }
+
+        String description = isValidString(request.getDescription()) ? request.getDescription().trim() : null;
+        String conditionText = "Downloads: " + (request.getRequiredDownloads() == null ? 0 : request.getRequiredDownloads()) + " slot";
+
+        Badge badge = Badge.builder()
+                .badgeName(request.getBadgeName().trim())
+                .description(description)
+                .conditionText(conditionText)
+                .requiredDownloads(request.getRequiredDownloads() == null ? 0 : request.getRequiredDownloads())
+                .iconUrl(iconUrl)
+                .build();
+
+        badge = badgeRepo.save(badge);
+        return toBadgeResponse(badge);
+    }
+
+    @Override
+    @Transactional
+    public BadgeResponse updateBadge(Long badgeId, BadgeRequest request) throws Exception {
+        Badge badge = badgeRepo.findById(badgeId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.BADGE_NOT_FOUND));
+
+        if (isValidString(request.getBadgeName())) {
+            Optional<Badge> existingName = badgeRepo.findByBadgeName(request.getBadgeName().trim());
+            if (existingName.isPresent() && !existingName.get().getBadgeId().equals(badgeId)) {
+                throw new GlobalException(ErrorCode.BADGE_ALREADY_EXISTS);
+            }
+            badge.setBadgeName(request.getBadgeName().trim());
+        }
+
+        if (isValidString(request.getDescription())) {
+            badge.setDescription(request.getDescription().trim());
+        }
+
+        if (request.getRequiredDownloads() != null) {
+            badge.setRequiredDownloads(request.getRequiredDownloads());
+            badge.setConditionText("Downloads: " + request.getRequiredDownloads() + " slot");
+        }
+
+        if (isValidFile(request.getIconFile())) {
+            MultipartFile file = request.getIconFile();
+            String contentType = file.getContentType();
+            if (contentType == null || contentType.isBlank() || contentType.equals("application/octet-stream")) {
+                contentType = "image/png";
+            }
+            byte[] bytes = file.getBytes();
+            badge.setIconUrl("data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(bytes));
+        }
+
+        badge = badgeRepo.save(badge);
+        return toBadgeResponse(badge);
+    }
+
+    @Override
+    @Transactional
+    public BadgeResponse deleteBadge(Long badgeId) {
+        Badge badge = badgeRepo.findById(badgeId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.BADGE_NOT_FOUND));
+
+        userBadgeRepo.deleteByBadge(badge);
+        badgeRepo.delete(badge);
+        return toBadgeResponse(badge);
+    }
+
+    @Override
+    public List<BadgeResponse> searchBadgesByName(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return getAllBadges();
+        }
+        return badgeRepo.findByBadgeNameContainingIgnoreCase(keyword.trim()).stream()
+                .map(this::toBadgeResponse)
+                .toList();
     }
 
     @Override
@@ -287,13 +421,7 @@ public class GamificationService implements IGamification {
                         .userBadgeId(ub.getUserBadgeId())
                         .userId(user.getUserId())
                         .achievedAt(ub.getAchievedAt())
-                        .badge(BadgeResponse.builder()
-                                .badgeId(ub.getBadge().getBadgeId())
-                                .badgeName(ub.getBadge().getBadgeName())
-                                .description(ub.getBadge().getDescription())
-                                .conditionText(ub.getBadge().getConditionText())
-                                .iconUrl(ub.getBadge().getIconUrl() == null || ub.getBadge().getIconUrl().isBlank() ? null : ub.getBadge().getIconUrl())
-                                .build())
+                        .badge(toBadgeResponse(ub.getBadge()))
                         .build()
         ).toList();
     }
@@ -335,25 +463,28 @@ public class GamificationService implements IGamification {
         Document document = documentRepo.findById(documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
 
-        if (document.getVisibilityStatus() != VisibilityStatus.PUBLIC) {
+        // If this is a copy, apply the rating to the original source document
+        Document targetDocument = document.getSourceDocument() != null ? document.getSourceDocument() : document;
+
+        if (targetDocument.getVisibilityStatus() != VisibilityStatus.PUBLIC) {
             throw new GlobalException(ErrorCode.DOCUMENT_NOT_PUBLIC);
         }
 
         User user = userRepo.findById(authUser.getUserId())
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
-        if (document.getOwner().getUserId().equals(user.getUserId())) {
+        if (targetDocument.getOwner().getUserId().equals(user.getUserId())) {
             throw new GlobalException(ErrorCode.CANNOT_RATE_OWN_DOCUMENT);
         }
 
-        Rating rating = ratingRepo.findByUserAndDocument(user, document)
+        Rating rating = ratingRepo.findByUserAndDocument(user, targetDocument)
                 .orElseGet(() -> Rating.builder()
                         .user(user)
-                        .document(document)
+                        .document(targetDocument)
                         .build());
         rating.setRatingValue(ratingValue);
         rating = ratingRepo.save(rating);
-        RatingResponse response = ratingMapper.toRatingResponse(rating, document);
+        RatingResponse response = ratingMapper.toRatingResponse(rating, targetDocument);
         response.setMyRating(ratingValue);
         return response;
     }
