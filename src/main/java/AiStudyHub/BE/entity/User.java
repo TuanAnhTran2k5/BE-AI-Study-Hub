@@ -41,16 +41,18 @@ public class User implements UserDetails {
     @Column(columnDefinition = "LONGTEXT")
     String avatarUrl;
 
-    Long totalScore;
+    @Builder.Default
+    Long totalScore = 0L;
 
     @Column(unique = true)
     String email;
 
     String passwordHash;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    UserRole role;
+    UserRole role = UserRole.US;
 
     //Limit Storage
     @Builder.Default
@@ -60,9 +62,10 @@ public class User implements UserDetails {
     @Column(nullable = false)
     Long storageLimit = 2L * 1024 * 1024 * 1024; //2GB
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    UserStatus status;
+    UserStatus status = UserStatus.PENDING;
 
     String banReason;
     LocalDateTime bannedAt;
@@ -76,7 +79,8 @@ public class User implements UserDetails {
 
     String googleId;
 
-    LocalDateTime createdAt;
+    @Builder.Default
+    LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL)
     @ToString.Exclude
@@ -173,7 +177,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return this.status != UserStatus.BANNED;
     }
 
     @Override
