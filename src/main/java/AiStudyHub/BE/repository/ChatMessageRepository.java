@@ -13,4 +13,10 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     Page<ChatMessage> findBySession_SessionIdOrderByCreatedAtDesc(Long sessionId, Pageable pageable);
     List<ChatMessage> findTop10BySession_SessionIdOrderByCreatedAtDesc(Long sessionId);
     long countBySession_SessionId(Long sessionId);
+
+    long countBySenderType(AiStudyHub.BE.constraint.SenderType senderType);
+    long countBySenderTypeAndCreatedAtBetween(
+            AiStudyHub.BE.constraint.SenderType senderType, java.time.LocalDateTime start, java.time.LocalDateTime end);
+
+    java.util.List<Object[]> countAiQueriesByDate(@org.springframework.data.repository.query.Param("since") java.time.LocalDateTime since);
 }

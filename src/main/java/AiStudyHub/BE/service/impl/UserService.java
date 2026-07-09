@@ -1,6 +1,6 @@
 package AiStudyHub.BE.service.impl;
 
-import AiStudyHub.BE.constraint.ErrorCode;
+import AiStudyHub.BE.constraint.*;
 import AiStudyHub.BE.dto.Request.UpdateProfileRequest;
 import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.User;
@@ -13,6 +13,11 @@ import AiStudyHub.BE.repository.*;
 import AiStudyHub.BE.service.IUser;
 import AiStudyHub.BE.service.ISupabaseStorage;
 import lombok.extern.slf4j.Slf4j;
+import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Collections;
+import java.util.Locale;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -43,6 +48,8 @@ public class UserService implements IUser {
     UserBadgeRepo userBadgeRepo;
     @Autowired
     DocumentRepo documentRepo;
+    @Autowired
+    DownloadRepo downloadRepo;
     @Autowired
     BookmarkRepo bookmarkRepo;
     @Autowired
@@ -371,5 +378,147 @@ public class UserService implements IUser {
             current = current.minusDays(1);
         }
         return current;
+    }
+
+    @Override
+    public Page<AdminUserResponse> getUsersForAdmin(String search, String status, int page, int size) {
+        int cappedSize = Math.min(size, 100);
+        if (cappedSize <= 0) cappedSize = 20;
+        int cappedPage = Math.max(page, 0);
+
+        UserStatus parsedStatus = null;
+        if (status != null && !status.trim().isEmpty()) {
+            try {
+                parsedStatus = UserStatus.valueOf(status.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new GlobalException(400, "Invalid status value: '" + status + "'. Allowed values: ACTIVE, BANNED, PENDING");
+            }
+        }
+
+        Pageable pageable = PageRequest.of(cappedPage, cappedSize);
+        Page<User> userPage = userRepo.findUsersForAdmin(
+                (search != null && !search.trim().isEmpty()) ? search.trim() : null,
+                parsedStatus,
+                pageable
+        );
+
+        List<Long> userIds = userPage.getContent().stream()
+                .map(User::getUserId)
+                .collect(Collectors.toList());
+
+        Map<Long, Long> docCounts = new HashMap<>();
+        Map<Long, Long> downloadCounts = new HashMap<>();
+
+        if (!userIds.isEmpty()) {
+            docCounts = toCountMap(documentRepo.countActiveDocumentsGroupByOwnerIds(userIds));
+            downloadCounts = toCountMap(downloadRepo.countDownloadsReceivedGroupByOwnerIds(userIds));
+        }
+
+        final Map<Long, Long> finalDocCounts = docCounts;
+        final Map<Long, Long> finalDownloadCounts = downloadCounts;
+
+        List<AdminUserResponse> responses = userPage.getContent().stream()
+                .map(u -> mapToAdminUserResponse(u, finalDocCounts.getOrDefault(u.getUserId(), 0L), finalDownloadCounts.getOrDefault(u.getUserId(), 0L)))
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(responses, pageable, userPage.getTotalElements());
+    }
+
+    @Override
+    public AdminUserResponse getUserDetailForAdmin(Long userId) {
+        User u = userRepo.findById(userId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
+        List<Long> ids = Collections.singletonList(userId);
+        Map<Long, Long> docCounts = toCountMap(documentRepo.countActiveDocumentsGroupByOwnerIds(ids));
+        Map<Long, Long> downloadCounts = toCountMap(downloadRepo.countDownloadsReceivedGroupByOwnerIds(ids));
+
+        return mapToAdminUserResponse(u, docCounts.getOrDefault(userId, 0L), downloadCounts.getOrDefault(userId, 0L));
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public AdminUserResponse banUser(Long targetUserId, String reason) {
+        User currentLoggedIn = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+        User admin = userRepo.findById(currentLoggedIn.getUserId())
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
+        User target = userRepo.findById(targetUserId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
+        if (target.getUserId().equals(admin.getUserId())) {
+            throw new GlobalException(400, "Cannot ban yourself");
+        }
+        if (target.getRole() == UserRole.AD) {
+            throw new GlobalException(403, "Cannot ban another admin");
+        }
+        if (target.getStatus() == UserStatus.BANNED) {
+            throw new GlobalException(409, "User is already banned");
+        }
+
+        target.setStatus(UserStatus.BANNED);
+        target.setBanReason(reason);
+        target.setBannedAt(LocalDateTime.now());
+        target.setBannedBy(admin);
+        userRepo.save(target);
+
+        List<Long> ids = Collections.singletonList(targetUserId);
+        Map<Long, Long> docCounts = toCountMap(documentRepo.countActiveDocumentsGroupByOwnerIds(ids));
+        Map<Long, Long> downloadCounts = toCountMap(downloadRepo.countDownloadsReceivedGroupByOwnerIds(ids));
+
+        return mapToAdminUserResponse(target, docCounts.getOrDefault(targetUserId, 0L), downloadCounts.getOrDefault(targetUserId, 0L));
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public AdminUserResponse unbanUser(Long targetUserId) {
+        User target = userRepo.findById(targetUserId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
+        if (target.getStatus() != UserStatus.BANNED) {
+            throw new GlobalException(409, "User is not currently banned");
+        }
+
+        target.setStatus(UserStatus.ACTIVE);
+        target.setBanReason(null);
+        target.setBannedAt(null);
+        target.setBannedBy(null);
+        userRepo.save(target);
+
+        List<Long> ids = Collections.singletonList(targetUserId);
+        Map<Long, Long> docCounts = toCountMap(documentRepo.countActiveDocumentsGroupByOwnerIds(ids));
+        Map<Long, Long> downloadCounts = toCountMap(downloadRepo.countDownloadsReceivedGroupByOwnerIds(ids));
+
+        return mapToAdminUserResponse(target, docCounts.getOrDefault(targetUserId, 0L), downloadCounts.getOrDefault(targetUserId, 0L));
+    }
+
+    private AdminUserResponse mapToAdminUserResponse(User u, long activeDocs, long downloadsReceived) {
+        return AdminUserResponse.builder()
+                .userId(u.getUserId())
+                .fullName(u.getFullName())
+                .email(u.getEmail())
+                .avatarUrl(u.getAvatarUrl())
+                .role(u.getRole())
+                .status(u.getStatus())
+                .totalScore(u.getTotalScore() != null ? u.getTotalScore() : 0L)
+                .createdAt(u.getCreatedAt())
+                .banReason(u.getBanReason())
+                .bannedAt(u.getBannedAt())
+                .bannedByName(u.getBannedBy() != null ? u.getBannedBy().getFullName() : null)
+                .activeDocumentCount(activeDocs)
+                .documentDownloadsReceived(downloadsReceived)
+                .build();
+    }
+
+    private Map<Long, Long> toCountMap(List<Object[]> rawList) {
+        Map<Long, Long> map = new HashMap<>();
+        for (Object[] row : rawList) {
+            if (row[0] != null) {
+                Long id = ((Number) row[0]).longValue();
+                Long count = ((Number) row[1]).longValue();
+                map.put(id, count);
+            }
+        }
+        return map;
     }
 }
