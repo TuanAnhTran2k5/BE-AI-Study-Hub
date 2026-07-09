@@ -211,6 +211,9 @@ public class GamificationService implements IGamification {
                 } else {
                     log.info("Downgraded user {} to rank {}", user.getEmail(), newRank.getRankName());
                 }
+            } else {
+                // Auto sync storage limit if user is already at the correct rank but limits are out of sync
+                updateUserStorageLimit(user, newRank);
             }
         } else {
             userRankRepo.save(UserRank.builder()
@@ -689,7 +692,7 @@ public class GamificationService implements IGamification {
 
         long currentLimit = user.getStorageLimit() == null ? baseLimit : user.getStorageLimit();
 
-        if (newLimit > currentLimit) {
+        if (newLimit != currentLimit) {
             user.setStorageLimit(newLimit);
             userRepo.save(user);
         }
