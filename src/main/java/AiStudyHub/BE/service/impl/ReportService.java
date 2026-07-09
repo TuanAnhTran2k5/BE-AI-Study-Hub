@@ -42,10 +42,10 @@ public class ReportService implements IReport {
                 .orElseThrow(() -> new GlobalException(404, "Document not found"));
 
         // If this is a copy, report the original public document
-        Document targetDocument = document.getSourceDocument() != null ? document.getSourceDocument() : document;
+        Document tempTarget = document.getSourceDocument() != null ? document.getSourceDocument() : document;
 
         // Lock the document to prevent concurrency issues and phantom-case races
-        targetDocument = documentRepo.findByDocumentId(targetDocument.getDocumentId())
+        final Document targetDocument = documentRepo.findByDocumentId(tempTarget.getDocumentId())
                 .orElseThrow(() -> new GlobalException(404, "Target document not found"));
 
         ReportReason reason = reportReasonRepo.findById(reasonId)
