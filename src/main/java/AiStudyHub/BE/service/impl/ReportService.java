@@ -126,6 +126,11 @@ public class ReportService implements IReport {
                 document.setModerationStatus(ModerationStatus.HIDDEN);
                 documentRepo.save(document);
                 log.info("ReportCase ID {} (HIGH) threshold met. Temporarily hid document ID {} and set to PENDING_REVIEW.", reportCase.getCaseId(), document.getDocumentId());
+
+                notificationService.sendDocumentModerationNotification(
+                        owner, document, reason.getReasonName(), 0, "HIDDEN (Pending Admin Review)",
+                        "Your document received a high-severity (HIGH) violation report and has been temporarily hidden pending review by our moderation team."
+                );
             }
             return;
         }
@@ -144,8 +149,8 @@ public class ReportService implements IReport {
             deductPoints(owner, penalty, reportCase, "Level 2 violation penalty (Document permanently removed): " + reason.getReasonName());
 
             notificationService.sendDocumentModerationNotification(
-                    owner, document, reason.getReasonName(), penalty, "REMOVED",
-                    "Your document was reported multiple times (reached WARNING_2 threshold) and has been permanently removed."
+                    owner, document, reason.getReasonName(), penalty, "REMOVED (Permanently Removed)",
+                    "Your document received multiple violation reports (reached WARNING_2 threshold) and has been permanently removed from the system."
             );
             log.info("ReportCase ID {} set to WARNING_2. Document ID {} is now REMOVED.", reportCase.getCaseId(), document.getDocumentId());
 
@@ -160,8 +165,8 @@ public class ReportService implements IReport {
             deductPoints(owner, penalty, reportCase, "Level 1 violation penalty (Document temporarily hidden): " + reason.getReasonName());
 
             notificationService.sendDocumentModerationNotification(
-                    owner, document, reason.getReasonName(), penalty, "HIDDEN",
-                    "Your document has been temporarily hidden due to reports (reached WARNING_1 threshold). Please adjust the content accordingly."
+                    owner, document, reason.getReasonName(), penalty, "HIDDEN (Warning Notice)",
+                    "Your document has been temporarily hidden after reaching warning threshold 1 (WARNING_1). Please review and modify your content if needed."
             );
             log.info("ReportCase ID {} set to WARNING_1. Document ID {} is now HIDDEN.", reportCase.getCaseId(), document.getDocumentId());
         }
@@ -247,12 +252,20 @@ public class ReportService implements IReport {
             throw new GlobalException(400, "You must claim the case first before resolving it");
         }
 
+        if (decision != AdminDecision.REJECT &&
+                rc.getCaseStatus() != CaseStatus.PENDING_REVIEW &&
+                rc.getCaseStatus() != CaseStatus.WARNING_1 &&
+                rc.getCaseStatus() != CaseStatus.WARNING_2) {
+            throw new GlobalException(400, "Cannot resolve a case with status: " + rc.getCaseStatus());
+        }
+
         rc.setResolvedBy(admin);
         rc.setResolvedAt(LocalDateTime.now());
         rc.setAdminNote(note);
 
         Document document = rc.getDocument();
         User owner = document.getOwner();
+        List<Report> reports = reportRepo.findAllByReportCase(rc);
 
         if (decision == AdminDecision.BAN) {
             rc.setCaseStatus(CaseStatus.RESOLVED);
@@ -265,6 +278,10 @@ public class ReportService implements IReport {
             owner.setBannedBy(admin);
             userRepo.save(owner);
 
+            notificationService.sendAccountBannedNotification(owner, document, rc.getReason().getReasonName(), note);
+            for (Report report : reports) {
+                notificationService.sendReportApprovedNotification(report.getReporter(), document, note);
+            }
             log.info("Admin ID {} banned User ID {} and removed Document ID {}", adminId, owner.getUserId(), document.getDocumentId());
 
         } else if (decision == AdminDecision.REMOVE_DOCUMENT) {
@@ -276,25 +293,26 @@ public class ReportService implements IReport {
             deductPoints(owner, penalty, rc, "Admin removed document due to violation: " + rc.getReason().getReasonName() + ". Details: " + note);
 
             notificationService.sendDocumentModerationNotification(
-                    owner, document, rc.getReason().getReasonName(), penalty, "REMOVED",
-                    "Admin has reviewed and decided to remove your document due to a severe violation. Details: " + note
+                    owner, document, rc.getReason().getReasonName(), penalty, "REMOVED (Permanently Removed)",
+                    "Our moderation team has reviewed the case and decided to permanently remove your document due to a severe violation. Details: " + note
             );
+            for (Report report : reports) {
+                notificationService.sendReportApprovedNotification(report.getReporter(), document, note);
+            }
             log.info("Admin ID {} removed Document ID {}", adminId, document.getDocumentId());
 
         } else if (decision == AdminDecision.REJECT) {
             rc.setCaseStatus(CaseStatus.REJECTED);
-            document.setModerationStatus(ModerationStatus.NORMAL); // Restore visibility
-            documentRepo.save(document);
 
-            // Counter penalty for spam/false reporting
-            List<Report> reports = reportRepo.findAllByReportCase(rc);
+            // Penalty for spam/false reporting — use configurable defaultPoint from ScoreType
             ScoreType falseReportType = scoreTypeRepo.findByTypeCode("FALSE_REPORT_PENALTY")
                     .orElseThrow(() -> new GlobalException(500, "FALSE_REPORT_PENALTY ScoreType not found"));
+            int falseReportPenalty = Math.abs(falseReportType.getDefaultPoint() != null ? falseReportType.getDefaultPoint() : 10);
 
             for (Report report : reports) {
                 User reporter = report.getReporter();
                 long currentScore = reporter.getTotalScore();
-                reporter.setTotalScore(currentScore - 10);
+                reporter.setTotalScore(currentScore - falseReportPenalty);
                 userRepo.save(reporter);
 
                 ScoreLog logEntry = ScoreLog.builder()
@@ -303,7 +321,7 @@ public class ReportService implements IReport {
                         .documentTitle(document != null ? document.getTitle() : null)
                         .scoreType(falseReportType)
                         .reportCase(rc)
-                        .scoreChange(-10)
+                        .scoreChange(-falseReportPenalty)
                         .description("Penalty for false reporting of document: " + (document != null ? document.getTitle() : ""))
                         .build();
                 scoreLogRepo.save(logEntry);
@@ -312,9 +330,17 @@ public class ReportService implements IReport {
                 rankingBadgeService.checkAndAwardBadges(reporter.getUserId());
 
                 notificationService.sendFalseReportPenaltyNotification(
-                        reporter, document, 10, note
+                        reporter, document, falseReportPenalty, note
                 );
             }
+
+            // Only restore document if it was hidden by a warning, not permanently removed
+            if (document.getModerationStatus() == ModerationStatus.HIDDEN) {
+                document.setModerationStatus(ModerationStatus.NORMAL);
+                documentRepo.save(document);
+            }
+
+            notificationService.sendDocumentRestoredNotification(owner, document, note);
             log.info("Admin ID {} rejected ReportCase ID {}. Restored document and penalized {} false reporters.", adminId, caseId, reports.size());
         }
 

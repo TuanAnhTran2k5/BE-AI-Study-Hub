@@ -19,7 +19,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.core.io.ClassPathResource;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Service
@@ -36,6 +38,34 @@ public class NotificationService implements INotification {
     // Internal helpers used by other services
     // =========================================================
 
+    private String loadAndPopulateEmailTemplate(
+            String title,
+            String userName,
+            String documentInfo,
+            String actionType,
+            String penaltyScoreText,
+            String reason,
+            String explanation
+    ) {
+        try {
+            ClassPathResource resource = new ClassPathResource("report_penalty_template.html");
+            String template = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            return template.replace("{{title}}", title != null ? title : "")
+                    .replace("{{userName}}", userName != null ? userName : "")
+                    .replace("{{documentInfo}}", documentInfo != null ? documentInfo : "N/A")
+                    .replace("{{actionType}}", actionType != null ? actionType : "N/A")
+                    .replace("{{penaltyScore}}", penaltyScoreText != null ? penaltyScoreText : "0 pts")
+                    .replace("{{reason}}", reason != null ? reason : "Community guidelines violation")
+                    .replace("{{explanation}}", explanation != null ? explanation : "No additional notes provided.");
+        } catch (Exception e) {
+            log.warn("Could not load report_penalty_template.html, falling back to basic HTML format: {}", e.getMessage());
+            return String.format(
+                    "<h3>%s</h3><p>Dear %s,</p><p>Reported Object: %s<br>Action Taken: %s<br>Reputation Impact: %s<br>Violation Reason: %s<br>Admin Note: %s</p>",
+                    title, userName, documentInfo, actionType, penaltyScoreText, reason, explanation
+            );
+        }
+    }
+
     @Override
     public Notification sendDocumentModerationNotification(
             User owner,
@@ -49,29 +79,29 @@ public class NotificationService implements INotification {
                 owner.getEmail(), owner.getUserId(), actionType);
 
         String subject = "[AI Study Hub] Document Moderation Warning: " + document.getTitle();
-        String content = String.format(
-                "Hello %s,\n\n" +
-                "Your document \"%s\" has undergone moderation.\n" +
-                "Reason: %s\n" +
-                "Action taken: %s\n" +
-                "Reputation points deducted: %d\n" +
-                "Details/Explanation: %s\n\n" +
-                "Best regards,\nAI Study Hub Administrator.",
+        String penaltyText = penaltyScore > 0 ? "-" + penaltyScore + " pts" : "0 pts";
+        String htmlContent = loadAndPopulateEmailTemplate(
+                "Document Moderation Warning",
                 owner.getFullName(),
                 document.getTitle(),
-                reasonName,
                 actionType,
-                penaltyScore,
-                explanation != null ? explanation : "None"
+                penaltyText,
+                reasonName,
+                explanation
         );
 
-        emailService.sendEmail(owner.getEmail(), subject, content);
+        emailService.sendEmail(owner.getEmail(), subject, htmlContent);
+
+        String plainTextSummary = String.format(
+                "Your document \"%s\" has undergone moderation (%s). Reason: %s. Reputation impact: %s. Details: %s",
+                document.getTitle(), actionType, reasonName, penaltyText, explanation != null ? explanation : "None"
+        );
 
         Notification notification = Notification.builder()
                 .user(owner)
                 .document(document)
                 .title(subject)
-                .message(content)
+                .message(plainTextSummary)
                 .type("SYSTEM")
                 .notificationCase("DOCUMENT_MODERATION")
                 .isRead(false)
@@ -90,30 +120,129 @@ public class NotificationService implements INotification {
                 reporter.getEmail(), reporter.getUserId());
 
         String subject = "[AI Study Hub] Warning Penalty: False Reporting";
-        String content = String.format(
-                "Hello %s,\n\n" +
-                "Your report regarding the document \"%s\" has been rejected after review.\n" +
-                "This behavior has been determined as false reporting or spamming to disrupt the system.\n" +
-                "Action taken: Deducted %d reputation points from your account.\n" +
-                "Reason for rejection: %s\n\n" +
-                "Please note that if your reputation score continues to drop to a negative level, " +
-                "your reporting privileges will be permanently locked.\n\n" +
-                "Best regards,\nAI Study Hub Administrator.",
+        String penaltyText = "-" + penaltyScore + " pts";
+        String htmlContent = loadAndPopulateEmailTemplate(
+                "False Report Penalty Notice",
                 reporter.getFullName(),
-                document.getTitle(),
-                penaltyScore,
-                explanation != null ? explanation : "None"
+                document != null ? document.getTitle() : "Reported document",
+                "Reputation deduction (Spam / False reporting)",
+                penaltyText,
+                "Inaccurate report determined after Admin moderation review",
+                explanation
         );
 
-        emailService.sendEmail(reporter.getEmail(), subject, content);
+        emailService.sendEmail(reporter.getEmail(), subject, htmlContent);
+
+        String plainTextSummary = String.format(
+                "Your report regarding the document \"%s\" has been rejected after moderation review and determined to be false or spam. Deducted %d reputation points. Note: %s",
+                document != null ? document.getTitle() : "", penaltyScore, explanation != null ? explanation : "None"
+        );
 
         Notification notification = Notification.builder()
                 .user(reporter)
                 .document(document)
                 .title(subject)
-                .message(content)
+                .message(plainTextSummary)
                 .type("SYSTEM")
                 .notificationCase("FALSE_REPORT_PENALTY")
+                .isRead(false)
+                .build();
+        return notificationRepo.save(notification);
+    }
+
+    @Override
+    public Notification sendAccountBannedNotification(
+            User owner,
+            Document document,
+            String reasonName,
+            String explanation
+    ) {
+        log.info("Sending account banned notification to owner {} (ID: {})",
+                owner.getEmail(), owner.getUserId());
+
+        String subject = "[AI Study Hub] Account Ban Notice: Severe Policy Violation";
+        String htmlContent = loadAndPopulateEmailTemplate(
+                "Account Ban Notice (BANNED)",
+                owner.getFullName(),
+                document != null ? document.getTitle() : "Personal account",
+                "Account locked (BANNED) & infringing content removed",
+                "Account Banned",
+                reasonName,
+                explanation
+        );
+
+        emailService.sendEmail(owner.getEmail(), subject, htmlContent);
+
+        String plainTextSummary = String.format(
+                "Your account has been locked (BANNED) due to a severe violation of community policies (Document: %s). Reason: %s. Details: %s",
+                document != null ? document.getTitle() : "N/A", reasonName, explanation != null ? explanation : "None"
+        );
+
+        Notification notification = Notification.builder()
+                .user(owner)
+                .document(document)
+                .title(subject)
+                .message(plainTextSummary)
+                .type("SYSTEM")
+                .notificationCase("ACCOUNT_BANNED")
+                .isRead(false)
+                .build();
+        return notificationRepo.save(notification);
+    }
+
+    @Override
+    public Notification sendReportApprovedNotification(
+            User reporter,
+            Document document,
+            String explanation
+    ) {
+        if (reporter == null) return null;
+
+        log.info("Sending report approved notification to reporter {} (ID: {}) for document ID {}",
+                reporter.getEmail(), reporter.getUserId(), document != null ? document.getDocumentId() : "N/A");
+
+        String subject = "[AI Study Hub] Thank You For Your Contribution";
+        String plainTextSummary = String.format(
+                "Thank you for submitting a report regarding the document \"%s\". Our moderation team has reviewed the case and applied appropriate enforcement actions. Your contribution helps keep AI Study Hub safe and trustworthy!",
+                document != null ? document.getTitle() : "Reported document"
+        );
+
+        Notification notification = Notification.builder()
+                .user(reporter)
+                .document(document)
+                .title(subject)
+                .message(plainTextSummary)
+                .type("SYSTEM")
+                .notificationCase("REPORT_APPROVED")
+                .isRead(false)
+                .build();
+        return notificationRepo.save(notification);
+    }
+
+    @Override
+    public Notification sendDocumentRestoredNotification(
+            User owner,
+            Document document,
+            String explanation
+    ) {
+        if (owner == null || document == null) return null;
+
+        log.info("Sending document restored notification to owner {} (ID: {}) for document ID {}",
+                owner.getEmail(), owner.getUserId(), document.getDocumentId());
+
+        String subject = "[AI Study Hub] Document Restored: " + document.getTitle();
+        String plainTextSummary = String.format(
+                "Your document \"%s\" has been reviewed by our moderation team. The related violation reports have been dismissed, and normal visibility of your document has been restored. Note: %s",
+                document.getTitle(), explanation != null ? explanation : "No violation found"
+        );
+
+        Notification notification = Notification.builder()
+                .user(owner)
+                .document(document)
+                .title(subject)
+                .message(plainTextSummary)
+                .type("SYSTEM")
+                .notificationCase("DOCUMENT_RESTORED")
                 .isRead(false)
                 .build();
         return notificationRepo.save(notification);

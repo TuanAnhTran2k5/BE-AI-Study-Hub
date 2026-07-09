@@ -29,6 +29,25 @@ public interface INotification {
             String explanation
     );
 
+    Notification sendAccountBannedNotification(
+            User owner,
+            Document document,
+            String reasonName,
+            String explanation
+    );
+
+    Notification sendReportApprovedNotification(
+            User reporter,
+            Document document,
+            String explanation
+    );
+
+    Notification sendDocumentRestoredNotification(
+            User owner,
+            Document document,
+            String explanation
+    );
+
     Notification sendDocumentDownloadNotification(
             User owner,
             User downloader,
