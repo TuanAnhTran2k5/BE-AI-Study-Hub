@@ -38,7 +38,8 @@ public class ReportAdminController {
 
     @GetMapping("/pending")
     public ResponseEntity<APIResponse<List<ReportCaseAdminResponse>>> getPendingCases() {
-        List<ReportCaseAdminResponse> pendingCases = reportCaseRepo.findAllByCaseStatus(CaseStatus.PENDING_REVIEW)
+        List<CaseStatus> pendingStatuses = List.of(CaseStatus.PENDING_REVIEW, CaseStatus.CLAIMED);
+        List<ReportCaseAdminResponse> pendingCases = reportCaseRepo.findAllByCaseStatusIn(pendingStatuses)
                 .stream()
                 .map(this::toCaseAdminView)
                 .toList();
@@ -47,7 +48,7 @@ public class ReportAdminController {
 
     @GetMapping("/history")
     public ResponseEntity<APIResponse<List<ReportCaseAdminResponse>>> getHistoryCases() {
-        List<CaseStatus> statuses = List.of(CaseStatus.WARNING_1, CaseStatus.WARNING_2, CaseStatus.RESOLVED, CaseStatus.REJECTED);
+        List<CaseStatus> statuses = List.of(CaseStatus.RESOLVED, CaseStatus.REJECTED);
         List<ReportCaseAdminResponse> historyCases = reportCaseRepo.findAllByCaseStatusInOrderByResolvedAtDesc(statuses)
                 .stream()
                 .map(this::toCaseAdminView)

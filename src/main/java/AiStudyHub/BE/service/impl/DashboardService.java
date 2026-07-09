@@ -214,7 +214,9 @@ public class DashboardService implements IDashboard {
 
     @Override
     public ModerationSummaryResponse getModerationSummary() {
-        long pendingReportCases = reportCaseRepo.countByCaseStatus(CaseStatus.PENDING_REVIEW);
+        long pendingReportCases = reportCaseRepo.countByCaseStatusIn(
+                List.of(CaseStatus.PENDING_REVIEW, CaseStatus.CLAIMED)
+        );
         long reportedDocs = documentRepo.countByReportCountGreaterThanAndModerationStatusAndDeletedAtIsNull(
                 0, ModerationStatus.NORMAL);
         long pendingUploads = documentRepo.countByUploadStatusAndDeletedAtIsNull(UploadStatus.PENDING);

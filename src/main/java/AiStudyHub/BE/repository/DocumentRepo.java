@@ -3,10 +3,11 @@ package AiStudyHub.BE.repository;
 import AiStudyHub.BE.constraint.VisibilityStatus;
 import AiStudyHub.BE.entity.Document;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
-
-
+import jakarta.persistence.LockModeType;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface DocumentRepo extends JpaRepository<Document, Long> {
@@ -58,4 +59,7 @@ public interface DocumentRepo extends JpaRepository<Document, Long> {
     long sumFileSizeOfActiveDocuments();
 
     java.util.List<Object[]> countActiveDocumentsGroupByFileType();
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Document> findByDocumentId(Long documentId);
 }

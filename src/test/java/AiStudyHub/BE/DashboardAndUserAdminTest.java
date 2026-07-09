@@ -123,7 +123,7 @@ public class DashboardAndUserAdminTest {
 
     @Test
     public void testGetModerationSummary_Success() {
-        when(reportCaseRepo.countByCaseStatus(CaseStatus.PENDING_REVIEW)).thenReturn(3L);
+        when(reportCaseRepo.countByCaseStatusIn(any())).thenReturn(3L);
         when(documentRepo.countByReportCountGreaterThanAndModerationStatusAndDeletedAtIsNull(anyInt(), any())).thenReturn(5L);
         when(documentRepo.countByUploadStatusAndDeletedAtIsNull(UploadStatus.PENDING)).thenReturn(2L);
         when(userRepo.countByStatus(UserStatus.BANNED)).thenReturn(1L);
