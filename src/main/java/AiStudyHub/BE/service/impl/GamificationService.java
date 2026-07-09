@@ -12,6 +12,7 @@ import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.mapper.RatingMapper;
 import AiStudyHub.BE.repository.*;
 import AiStudyHub.BE.service.IGamification;
+import AiStudyHub.BE.service.INotification;
 import AiStudyHub.BE.service.impl.ReputationPolicy;
 import lombok.extern.slf4j.Slf4j;
 import java.math.BigDecimal;
@@ -60,6 +61,10 @@ public class GamificationService implements IGamification {
     @Autowired
     @Lazy
     private IGamification self;
+
+    @Autowired
+    @Lazy
+    private INotification notificationService;
 
     private Map<String, ScoreType> scoreTypeCache = new ConcurrentHashMap<>();
 
@@ -161,6 +166,8 @@ public class GamificationService implements IGamification {
                         .user(user)
                         .badge(badge)
                         .build());
+                notificationService.sendBadgeAwardedNotification(user, badge);
+                ownedBadgeIds.add(badge.getBadgeId());
             }
         }
 
@@ -200,6 +207,7 @@ public class GamificationService implements IGamification {
                 if (newPriority > currentPriority) {
                     updateUserStorageLimit(user, newRank);
                     log.info("Upgraded user {} to rank {}", user.getEmail(), newRank.getRankName());
+                    notificationService.sendRankUpNotification(user, newRank);
                 } else {
                     log.info("Downgraded user {} to rank {}", user.getEmail(), newRank.getRankName());
                 }
@@ -211,6 +219,7 @@ public class GamificationService implements IGamification {
                     .build());
             updateUserStorageLimit(user, newRank);
             log.info("Assigned user {} to rank {}", user.getEmail(), newRank.getRankName());
+            notificationService.sendRankUpNotification(user, newRank);
         }
 
         return true;
@@ -508,6 +517,20 @@ public class GamificationService implements IGamification {
                         .build());
         rating.setRatingValue(ratingValue);
         rating = ratingRepo.save(rating);
+
+        List<Rating> allRatings = ratingRepo.findByDocument(targetDocument);
+        int count = allRatings.size();
+        double avg = allRatings.stream()
+                .mapToInt(Rating::getRatingValue)
+                .average()
+                .orElse(0.0);
+        avg = Math.round(avg * 10.0) / 10.0;
+
+        targetDocument.setRatingCount(count);
+        targetDocument.setAverageRating(avg);
+        documentRepo.save(targetDocument);
+
+        notificationService.sendDocumentRatingNotification(targetDocument.getOwner(), user, targetDocument, ratingValue);
         RatingResponse response = ratingMapper.toRatingResponse(rating, targetDocument);
         response.setMyRating(ratingValue);
         return response;
@@ -653,6 +676,7 @@ public class GamificationService implements IGamification {
                     .badge(badge)
                     .build());
             log.info("Awarded badge '{}' to user {}", badgeName, user.getEmail());
+            notificationService.sendBadgeAwardedNotification(user, badge);
             return true;
         }
         return false;

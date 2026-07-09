@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Study Hub - Moderation & Policy Notice</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            color: #333333;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .email-wrapper {
+            width: 100%;
+            background-color: #f4f6f9;
+            padding: 40px 15px;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e2e8f0;
+        }
+        .email-header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: #ffffff;
+            padding: 28px 30px;
+            text-align: center;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .email-header .subtitle {
+            margin-top: 5px;
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        .email-body {
+            padding: 35px 30px;
+        }
+        .alert-badge {
+            display: inline-block;
+            background-color: #fee2e2;
+            color: #b91c1c;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #fca5a5;
+        }
+        .greeting {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #1f2937;
+        }
+        .message-intro {
+            font-size: 15px;
+            color: #4b5563;
+            margin-bottom: 25px;
+        }
+        .details-card {
+            background-color: #f8fafc;
+            border-left: 4px solid #ef4444;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .details-table td {
+            padding: 8px 0;
+            vertical-align: top;
+            font-size: 14px;
+        }
+        .details-table td.label {
+            width: 145px;
+            font-weight: 600;
+            color: #64748b;
+        }
+        .details-table td.value {
+            color: #1e293b;
+            font-weight: 500;
+        }
+        .value.penalty {
+            color: #dc2626;
+            font-weight: 700;
+        }
+        .explanation-box {
+            background-color: #fffbeb;
+            border: 1px solid #fef3c7;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 25px;
+        }
+        .explanation-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #92400e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .explanation-text {
+            font-size: 14px;
+            color: #78350f;
+            margin: 0;
+            white-space: pre-line;
+        }
+        .guidelines-notice {
+            font-size: 13px;
+            color: #64748b;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 20px;
+            margin-top: 10px;
+        }
+        .email-footer {
+            background-color: #f8fafc;
+            padding: 20px 30px;
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <h1>AI STUDY HUB</h1>
+                <div class="subtitle">Community Moderation & Warning System</div>
+            </div>
+            <div class="email-body">
+                <div class="alert-badge">{{title}}</div>
+                
+                <div class="greeting">Dear {{userName}},</div>
+                
+                <div class="message-intro">
+                    The AI Study Hub moderation team would like to inform you about a moderation decision regarding your account activity or uploaded content:
+                </div>
+                
+                <div class="details-card">
+                    <table class="details-table">
+                        <tr>
+                            <td class="label">Reported Object:</td>
+                            <td class="value">{{documentInfo}}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Action Taken:</td>
+                            <td class="value">{{actionType}}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Reputation Impact:</td>
+                            <td class="value penalty">{{penaltyScore}}</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Violation Reason:</td>
+                            <td class="value">{{reason}}</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="explanation-box">
+                    <div class="explanation-title">Admin Note / Detailed Explanation</div>
+                    <p class="explanation-text">{{explanation}}</p>
+                </div>
+                
+                <div class="guidelines-notice">
+                    <p style="margin: 0 0 8px 0;"><strong>Important Notice:</strong> If your account's reputation score continues to decline or remains negative, your privileges to upload documents, submit reports, or contribute to the platform may be restricted or permanently disabled.</p>
+                    <p style="margin: 0;">Please adhere to the AI Study Hub Terms of Service and Community Guidelines in all future activities.</p>
+                </div>
+            </div>
+            <div class="email-footer">
+                &copy; 2026 AI Study Hub. All rights reserved.<br>
+                This is an automated system notification from our moderation team. Please do not reply to this email.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

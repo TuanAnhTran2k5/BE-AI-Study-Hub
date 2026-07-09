@@ -15,6 +15,7 @@ import AiStudyHub.BE.repository.DocumentRepo;
 import AiStudyHub.BE.repository.UserRepo;
 import AiStudyHub.BE.service.IBookmark;
 import AiStudyHub.BE.service.IGamification;
+import AiStudyHub.BE.service.INotification;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -35,6 +36,7 @@ public class BookmarkService implements IBookmark {
     DocumentRepo documentRepo;
     BookmarkMapper bookmarkMapper;
     IGamification gamificationService;
+    INotification notificationService;
 
     @Override
     @Transactional
@@ -70,7 +72,7 @@ public class BookmarkService implements IBookmark {
         boolean isNotSelf = !targetDocument.getOwner().getUserId().equals(userId);
 
         if (isPublic && isNotSelf) {
-            gamificationService.awardBookmarkScore(
+            int pointsAwarded = gamificationService.awardBookmarkScore(
                     user.getUserId(),
                     user.getFullName(),
                     targetDocument.getOwner().getUserId(),
@@ -78,6 +80,9 @@ public class BookmarkService implements IBookmark {
                     targetDocument.getTitle(),
                     targetDocument.getVisibilityStatus().name()
             );
+            if (pointsAwarded > 0) {
+                notificationService.sendDocumentBookmarkNotification(targetDocument.getOwner(), user, targetDocument, pointsAwarded);
+            }
         }
 
         BookmarkResponse response = bookmarkMapper.toResponse(bookmark);
