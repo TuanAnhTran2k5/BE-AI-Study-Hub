@@ -238,6 +238,8 @@ public class ReportService implements IReport {
             user.setBannedBy(null); // System automated ban
             userRepo.save(user);
             log.info("User ID {} automatically BANNED due to reputation score falling to {}. Reason: {}", user.getUserId(), user.getTotalScore(), reason);
+
+            notificationService.sendAccountBannedNotification(user, null, "System Auto-Ban", reason);
         }
     }
 
