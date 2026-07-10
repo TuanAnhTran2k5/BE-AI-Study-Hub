@@ -8,6 +8,7 @@ import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.repository.*;
 import AiStudyHub.BE.service.impl.DashboardService;
 import AiStudyHub.BE.service.impl.UserService;
+import AiStudyHub.BE.service.INotification;
 import io.qdrant.client.QdrantClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,8 @@ public class DashboardAndUserAdminTest {
     private QdrantClient qdrantClient;
     @Mock
     private DataSource dataSource;
+    @Mock
+    private INotification notificationService;
 
     @InjectMocks
     private DashboardService dashboardService;

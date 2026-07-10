@@ -12,6 +12,7 @@ import AiStudyHub.BE.mapper.UserMapper;
 import AiStudyHub.BE.repository.*;
 import AiStudyHub.BE.service.IUser;
 import AiStudyHub.BE.service.ISupabaseStorage;
+import AiStudyHub.BE.service.INotification;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -53,6 +54,7 @@ public class UserService implements IUser {
     WeeklyScoreRepo weeklyScoreRepo;
     RankingRepo rankingRepo;
     ISupabaseStorage supabaseStorage;
+    INotification notificationService;
 
     @Override
     public UserResponse updateProfile(Long userId, UpdateProfileRequest request) {
@@ -449,6 +451,8 @@ public class UserService implements IUser {
         target.setBannedAt(LocalDateTime.now());
         target.setBannedBy(admin);
         userRepo.save(target);
+
+        notificationService.sendAccountBannedNotification(target, null, "Violation of community policies / spamming", reason);
 
         List<Long> ids = Collections.singletonList(targetUserId);
         Map<Long, Long> docCounts = toCountMap(documentRepo.countActiveDocumentsGroupByOwnerIds(ids));
