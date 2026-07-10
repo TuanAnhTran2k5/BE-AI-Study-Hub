@@ -18,4 +18,10 @@ public interface DownloadRepo extends JpaRepository<Download, Long> {
     Optional<Download> findFirstByUserUserIdAndDocumentSimHashContent(Long userId, String simHashContent);
 
     long deleteByUserUserIdAndDocumentDocumentId(Long userId, Long documentId);
+
+    long countByDownloadedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+
+    java.util.List<Object[]> countDownloadsByDate(@org.springframework.data.repository.query.Param("since") java.time.LocalDateTime since);
+
+    java.util.List<Object[]> countDownloadsReceivedGroupByOwnerIds(@org.springframework.data.repository.query.Param("ids") java.util.List<Long> ids);
 }

@@ -24,9 +24,24 @@ public interface ReportCaseRepo extends JpaRepository<ReportCase, Long> {
 
     List<ReportCase> findAllByCaseStatus(CaseStatus status);
 
+    List<ReportCase> findAllByCaseStatusIn(List<CaseStatus> statuses);
+
     List<ReportCase> findAllByCaseStatusInOrderByResolvedAtDesc(List<CaseStatus> statuses);
 
     long deleteByDocumentDocumentId(Long documentId);
 
     boolean existsByReason(ReportReason reason);
+
+    long countByCaseStatus(CaseStatus status);
+
+    long countByCaseStatusIn(List<CaseStatus> statuses);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<ReportCase> findByCaseId(Long caseId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<ReportCase> findFirstByDocumentAndCaseStatusIn(
+            Document document,
+            List<CaseStatus> statuses
+    );
 }

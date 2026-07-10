@@ -42,7 +42,11 @@ public class ReportService implements IReport {
                 .orElseThrow(() -> new GlobalException(404, "Document not found"));
 
         // If this is a copy, report the original public document
-        Document targetDocument = document.getSourceDocument() != null ? document.getSourceDocument() : document;
+        Document tempTarget = document.getSourceDocument() != null ? document.getSourceDocument() : document;
+
+        // Lock the document to prevent concurrency issues and phantom-case races
+        final Document targetDocument = documentRepo.findByDocumentId(tempTarget.getDocumentId())
+                .orElseThrow(() -> new GlobalException(404, "Target document not found"));
 
         ReportReason reason = reportReasonRepo.findById(reasonId)
                 .orElseThrow(() -> new GlobalException(404, "ReportReason not found"));
@@ -74,9 +78,9 @@ public class ReportService implements IReport {
             throw new GlobalException(400, "You have already submitted a report for this document.");
         }
 
-        // 4. Find open case with Pessimistic Lock to prevent concurrency issues
-        List<CaseStatus> openStatuses = List.of(CaseStatus.OPEN, CaseStatus.WARNING_1, CaseStatus.WARNING_2);
-        ReportCase reportCase = reportCaseRepo.findFirstByDocumentAndReasonAndCaseStatusIn(targetDocument, reason, openStatuses)
+        // 4. Find active case across ALL reasons to enforce one active case per document
+        List<CaseStatus> activeStatuses = List.of(CaseStatus.OPEN, CaseStatus.WARNING_1, CaseStatus.PENDING_REVIEW, CaseStatus.CLAIMED);
+        ReportCase reportCase = reportCaseRepo.findFirstByDocumentAndCaseStatusIn(targetDocument, activeStatuses)
                 .orElseGet(() -> {
                     ReportCase newCase = ReportCase.builder()
                             .document(targetDocument)
@@ -89,7 +93,12 @@ public class ReportService implements IReport {
                     return reportCaseRepo.save(newCase);
                 });
 
-        // 5. Create Report
+        // Update caseLevel to HIGH if the incoming report has HIGH severity
+        if (reason.getSeverityLevel() == ReportSeverity.HIGH) {
+            reportCase.setCaseLevel(ReportSeverity.HIGH);
+        }
+
+        // 5. Create Report with PENDING status
         Report report = Report.builder()
                 .reporter(reporter)
                 .document(targetDocument)
@@ -97,7 +106,7 @@ public class ReportService implements IReport {
                 .reportCase(reportCase)
                 .description(description)
                 .evidenceUrl(evidenceUrl)
-                .status(ReportStatus.APPROVED)
+                .status(ReportStatus.PENDING)
                 .build();
         report = reportRepo.save(report);
 
@@ -115,13 +124,32 @@ public class ReportService implements IReport {
     }
 
     private void processCase(ReportCase reportCase) {
+        // Exit immediately if PENDING_REVIEW, CLAIMED, or terminal (RESOLVED, REJECTED)
+        if (reportCase.getCaseStatus() == CaseStatus.PENDING_REVIEW ||
+                reportCase.getCaseStatus() == CaseStatus.CLAIMED ||
+                reportCase.getCaseStatus() == CaseStatus.RESOLVED ||
+                reportCase.getCaseStatus() == CaseStatus.REJECTED) {
+            return;
+        }
+
         Document document = reportCase.getDocument();
         User owner = document.getOwner();
         ReportReason reason = reportCase.getReason();
 
         if (reportCase.getCaseLevel() == ReportSeverity.HIGH) {
-            // High severity auto-hides document and goes to Admin PENDING_REVIEW immediately
-            if (reportCase.getCaseStatus() != CaseStatus.PENDING_REVIEW) {
+            // HIGH Severity
+            // Rule 1: If currentStatus is WARNING_1, immediately escalate to PENDING_REVIEW (ignore HIGH threshold count)
+            if (reportCase.getCaseStatus() == CaseStatus.WARNING_1) {
+                reportCase.setCaseStatus(CaseStatus.PENDING_REVIEW);
+                document.setModerationStatus(ModerationStatus.HIDDEN);
+                documentRepo.save(document);
+                log.info("ReportCase ID {} (HIGH upgrade from WARNING_1) escalated. Document ID {} is HIDDEN.", reportCase.getCaseId(), document.getDocumentId());
+                return;
+            }
+
+            // Rule 2: If currentStatus is OPEN, check safety threshold Math.max(2, requiredThreshold)
+            int threshold = Math.max(2, reportCase.getRequiredThreshold());
+            if (reportCase.getReportCount() >= threshold && reportCase.getCaseStatus() != CaseStatus.PENDING_REVIEW) {
                 reportCase.setCaseStatus(CaseStatus.PENDING_REVIEW);
                 document.setModerationStatus(ModerationStatus.HIDDEN);
                 documentRepo.save(document);
@@ -129,7 +157,7 @@ public class ReportService implements IReport {
 
                 notificationService.sendDocumentModerationNotification(
                         owner, document, reason.getReasonName(), 0, "HIDDEN (Pending Admin Review)",
-                        "Your document received a high-severity (HIGH) violation report and has been temporarily hidden pending review by our moderation team."
+                        "Your document received multiple high-severity (HIGH) violation reports and has been temporarily hidden pending review by our moderation team."
                 );
             }
             return;
@@ -139,20 +167,24 @@ public class ReportService implements IReport {
         int threshold = reportCase.getRequiredThreshold();
         int count = reportCase.getReportCount();
 
-        if (count >= threshold * 2 && reportCase.getCaseStatus() != CaseStatus.WARNING_2) {
-            // Trigger WARNING_2: Hide permanently (REMOVED) and penalise points
-            reportCase.setCaseStatus(CaseStatus.WARNING_2);
-            document.setModerationStatus(ModerationStatus.REMOVED);
+        if (count >= threshold * 2 && reportCase.getCaseStatus() != CaseStatus.PENDING_REVIEW) {
+            // Transition to PENDING_REVIEW (WARNING_2 is historical now)
+            reportCase.setCaseStatus(CaseStatus.PENDING_REVIEW);
+            document.setModerationStatus(ModerationStatus.HIDDEN);
             documentRepo.save(document);
 
-            int penalty = reason.getPenaltyScore() != null ? reason.getPenaltyScore() : 10;
-            deductPoints(owner, penalty, reportCase, "Level 2 violation penalty (Document permanently removed): " + reason.getReasonName());
+            // Double check: if case somehow skipped WARNING_1, apply warning penalty first
+            if (reportCase.getFirstWarningAt() == null) {
+                reportCase.setFirstWarningAt(LocalDateTime.now());
+                int penalty = reason.getPenaltyScore() != null ? reason.getPenaltyScore() : 10;
+                deductPoints(owner, penalty, reportCase, "Level 1 violation penalty (Document temporarily hidden): " + reason.getReasonName());
+            }
 
             notificationService.sendDocumentModerationNotification(
-                    owner, document, reason.getReasonName(), penalty, "REMOVED (Permanently Removed)",
-                    "Your document received multiple violation reports (reached WARNING_2 threshold) and has been permanently removed from the system."
+                    owner, document, reason.getReasonName(), 0, "HIDDEN (Pending Admin Review)",
+                    "Your document received multiple violation reports (reached WARNING_2 threshold) and has been temporarily hidden pending review by our moderation team."
             );
-            log.info("ReportCase ID {} set to WARNING_2. Document ID {} is now REMOVED.", reportCase.getCaseId(), document.getDocumentId());
+            log.info("ReportCase ID {} set to PENDING_REVIEW (threshold*2 met). Document ID {} is now HIDDEN.", reportCase.getCaseId(), document.getDocumentId());
 
         } else if (count >= threshold && reportCase.getCaseStatus() == CaseStatus.OPEN) {
             // Trigger WARNING_1: Hide temporarily (HIDDEN) and penalise points
@@ -167,7 +199,7 @@ public class ReportService implements IReport {
             notificationService.sendDocumentModerationNotification(
                     owner, document, reason.getReasonName(), penalty, "HIDDEN (Warning Notice)",
                     "Your document has been temporarily hidden after reaching warning threshold 1 (WARNING_1). Please review and modify your content if needed."
-            );
+                );
             log.info("ReportCase ID {} set to WARNING_1. Document ID {} is now HIDDEN.", reportCase.getCaseId(), document.getDocumentId());
         }
     }
@@ -176,6 +208,8 @@ public class ReportService implements IReport {
         long currentScore = user.getTotalScore();
         user.setTotalScore(currentScore - points);
         userRepo.save(user);
+
+        checkAndAutoBan(user, "System Auto-Ban: Reputation score fell below -30 due to moderation violations.");
 
         ScoreType penaltyType = scoreTypeRepo.findByTypeCode("REPORT_PENALTY")
                 .orElseThrow(() -> new GlobalException(500, "REPORT_PENALTY ScoreType not found"));
@@ -196,10 +230,21 @@ public class ReportService implements IReport {
         rankingBadgeService.checkAndAwardBadges(user.getUserId());
     }
 
+    private void checkAndAutoBan(User user, String reason) {
+        if (user.getTotalScore() <= -30 && user.getStatus() != UserStatus.BANNED) {
+            user.setStatus(UserStatus.BANNED);
+            user.setBanReason(reason);
+            user.setBannedAt(LocalDateTime.now());
+            user.setBannedBy(null); // System automated ban
+            userRepo.save(user);
+            log.info("User ID {} automatically BANNED due to reputation score falling to {}. Reason: {}", user.getUserId(), user.getTotalScore(), reason);
+        }
+    }
+
     @Override
     @Transactional
     public ReportCase claimCase(Long caseId, Long adminId) {
-        ReportCase rc = reportCaseRepo.findById(caseId)
+        ReportCase rc = reportCaseRepo.findByCaseId(caseId)
                 .orElseThrow(() -> new GlobalException(404, "ReportCase not found"));
         User admin = userRepo.findById(adminId)
                 .orElseThrow(() -> new GlobalException(404, "Admin not found"));
@@ -216,31 +261,33 @@ public class ReportService implements IReport {
 
         rc.setClaimedBy(admin);
         rc.setClaimedAt(LocalDateTime.now());
+        rc.setCaseStatus(CaseStatus.CLAIMED);
         return reportCaseRepo.save(rc);
     }
 
     @Override
     @Transactional
     public ReportCase unclaimCase(Long caseId, Long adminId) {
-        ReportCase rc = reportCaseRepo.findById(caseId)
+        ReportCase rc = reportCaseRepo.findByCaseId(caseId)
                 .orElseThrow(() -> new GlobalException(404, "ReportCase not found"));
 
         if (rc.getClaimedBy() == null || !rc.getClaimedBy().getUserId().equals(adminId)) {
             throw new GlobalException(400, "You can only unclaim your own claimed cases");
         }
-        if (rc.getCaseStatus() != CaseStatus.PENDING_REVIEW) {
-            throw new GlobalException(400, "Only PENDING_REVIEW cases can be unclaimed");
+        if (rc.getCaseStatus() != CaseStatus.CLAIMED) {
+            throw new GlobalException(400, "Only CLAIMED cases can be unclaimed");
         }
 
         rc.setClaimedBy(null);
         rc.setClaimedAt(null);
+        rc.setCaseStatus(CaseStatus.PENDING_REVIEW);
         return reportCaseRepo.save(rc);
     }
 
     @Override
     @Transactional
     public ReportCase adminResolveCase(Long caseId, Long adminId, AdminDecision decision, String note) {
-        ReportCase rc = reportCaseRepo.findById(caseId)
+        ReportCase rc = reportCaseRepo.findByCaseId(caseId)
                 .orElseThrow(() -> new GlobalException(404, "ReportCase not found"));
         User admin = userRepo.findById(adminId)
                 .orElseThrow(() -> new GlobalException(404, "Admin not found"));
@@ -251,11 +298,7 @@ public class ReportService implements IReport {
         if (rc.getClaimedBy() == null || !rc.getClaimedBy().getUserId().equals(adminId)) {
             throw new GlobalException(400, "You must claim the case first before resolving it");
         }
-
-        if (decision != AdminDecision.REJECT &&
-                rc.getCaseStatus() != CaseStatus.PENDING_REVIEW &&
-                rc.getCaseStatus() != CaseStatus.WARNING_1 &&
-                rc.getCaseStatus() != CaseStatus.WARNING_2) {
+        if (rc.getCaseStatus() != CaseStatus.CLAIMED) {
             throw new GlobalException(400, "Cannot resolve a case with status: " + rc.getCaseStatus());
         }
 
@@ -280,6 +323,8 @@ public class ReportService implements IReport {
 
             notificationService.sendAccountBannedNotification(owner, document, rc.getReason().getReasonName(), note);
             for (Report report : reports) {
+                report.setStatus(ReportStatus.RESOLVED);
+                reportRepo.save(report);
                 notificationService.sendReportApprovedNotification(report.getReporter(), document, note);
             }
             log.info("Admin ID {} banned User ID {} and removed Document ID {}", adminId, owner.getUserId(), document.getDocumentId());
@@ -297,6 +342,8 @@ public class ReportService implements IReport {
                     "Our moderation team has reviewed the case and decided to permanently remove your document due to a severe violation. Details: " + note
             );
             for (Report report : reports) {
+                report.setStatus(ReportStatus.RESOLVED);
+                reportRepo.save(report);
                 notificationService.sendReportApprovedNotification(report.getReporter(), document, note);
             }
             log.info("Admin ID {} removed Document ID {}", adminId, document.getDocumentId());
@@ -304,16 +351,46 @@ public class ReportService implements IReport {
         } else if (decision == AdminDecision.REJECT) {
             rc.setCaseStatus(CaseStatus.REJECTED);
 
+            // Refund owner warning penalty points if warning was applied (firstWarningAt != null)
+            if (rc.getFirstWarningAt() != null) {
+                int penalty = rc.getReason().getPenaltyScore() != null ? rc.getReason().getPenaltyScore() : 10;
+                long currentScore = owner.getTotalScore();
+                owner.setTotalScore(currentScore + penalty);
+                userRepo.save(owner);
+
+                ScoreType penaltyType = scoreTypeRepo.findByTypeCode("REPORT_PENALTY")
+                        .orElseThrow(() -> new GlobalException(500, "REPORT_PENALTY ScoreType not found"));
+
+                ScoreLog refundLog = ScoreLog.builder()
+                        .user(owner)
+                        .documentId(document != null ? document.getDocumentId() : null)
+                        .documentTitle(document != null ? document.getTitle() : null)
+                        .scoreType(penaltyType)
+                        .reportCase(rc)
+                        .scoreChange(penalty)
+                        .description("Refund of warning penalty after report case was rejected by admin: " + rc.getReason().getReasonName())
+                        .build();
+                scoreLogRepo.save(refundLog);
+
+                rankingBadgeService.updateUserRank(owner.getUserId());
+                rankingBadgeService.checkAndAwardBadges(owner.getUserId());
+            }
+
             // Penalty for spam/false reporting — use configurable defaultPoint from ScoreType
             ScoreType falseReportType = scoreTypeRepo.findByTypeCode("FALSE_REPORT_PENALTY")
                     .orElseThrow(() -> new GlobalException(500, "FALSE_REPORT_PENALTY ScoreType not found"));
             int falseReportPenalty = Math.abs(falseReportType.getDefaultPoint() != null ? falseReportType.getDefaultPoint() : 10);
 
             for (Report report : reports) {
+                report.setStatus(ReportStatus.REJECTED);
+                reportRepo.save(report);
+
                 User reporter = report.getReporter();
                 long currentScore = reporter.getTotalScore();
                 reporter.setTotalScore(currentScore - falseReportPenalty);
                 userRepo.save(reporter);
+
+                checkAndAutoBan(reporter, "System Auto-Ban: Reputation score fell below -30 due to false/spam reports.");
 
                 ScoreLog logEntry = ScoreLog.builder()
                         .user(reporter)
@@ -334,7 +411,7 @@ public class ReportService implements IReport {
                 );
             }
 
-            // Only restore document if it was hidden by a warning, not permanently removed
+            // Restore document status to NORMAL if and only if currently HIDDEN
             if (document.getModerationStatus() == ModerationStatus.HIDDEN) {
                 document.setModerationStatus(ModerationStatus.NORMAL);
                 documentRepo.save(document);
@@ -352,14 +429,15 @@ public class ReportService implements IReport {
     @Transactional
     public void releaseExpiredClaims() {
         log.info("Running cron job to release expired claims...");
-        List<ReportCase> pendingCases = reportCaseRepo.findAllByCaseStatus(CaseStatus.PENDING_REVIEW);
+        List<ReportCase> claimedCases = reportCaseRepo.findAllByCaseStatus(CaseStatus.CLAIMED);
         LocalDateTime thresholdTime = LocalDateTime.now().minusDays(1);
 
-        for (ReportCase rc : pendingCases) {
+        for (ReportCase rc : claimedCases) {
             if (rc.getClaimedBy() != null && rc.getClaimedAt() != null && rc.getClaimedAt().isBefore(thresholdTime)) {
                 log.info("Releasing expired claim for ReportCase ID {}", rc.getCaseId());
                 rc.setClaimedBy(null);
                 rc.setClaimedAt(null);
+                rc.setCaseStatus(CaseStatus.PENDING_REVIEW);
                 reportCaseRepo.save(rc);
             }
         }

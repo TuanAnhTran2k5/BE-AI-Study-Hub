@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-mappings xmlns="https://jakarta.ee/xml/ns/persistence/orm"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence/orm https://jakarta.ee/xml/ns/persistence/orm/orm_3_0.xsd"
+                 version="3.0">
+
+    <!-- User Queries -->
+    <named-query name="User.findUsersForAdmin">
+        <query><![CDATA[
+            SELECT u FROM User u LEFT JOIN FETCH u.bannedBy WHERE 
+            (:search IS NULL OR u.fullName LIKE CONCAT('%', :search, '%') OR u.email LIKE CONCAT('%', :search, '%')) 
+            AND (:status IS NULL OR u.status = :status) ORDER BY u.createdAt DESC
+        ]]></query>
+    </named-query>
+
+    <named-native-query name="User.countSignupsByDate">
+        <query><![CDATA[
+            SELECT DATE(CONVERT_TZ(created_at, '+00:00', '+07:00')) as dt, COUNT(*) as cnt 
+            FROM user WHERE created_at >= :since GROUP BY dt ORDER BY dt
+        ]]></query>
+    </named-native-query>
+
+    <!-- Document Queries -->
+    <named-query name="Document.sumDownloadCountByOwnerUserId">
+        <query><![CDATA[
+            SELECT COALESCE(SUM(d.downloadCount), 0) FROM Document d WHERE d.owner.userId = :userId
+        ]]></query>
+    </named-query>
+
+    <named-query name="Document.countDocumentsGroupBySubject">
+        <query><![CDATA[
+            SELECT d.subject.subjectId, COUNT(d) FROM Document d 
+            WHERE d.uploadStatus = 'COMPLETED' AND d.moderationStatus = 'NORMAL' 
+            AND d.deletedAt IS NULL GROUP BY d.subject.subjectId ORDER BY COUNT(d) DESC
+        ]]></query>
+    </named-query>
+
+    <named-query name="Document.findPopularDocuments">
+        <query><![CDATA[
+            SELECT d FROM Document d WHERE d.uploadStatus = 'COMPLETED' AND d.moderationStatus = 'NORMAL' 
+            AND d.deletedAt IS NULL ORDER BY d.downloadCount DESC, d.ratingCount DESC, d.documentId ASC
+        ]]></query>
+    </named-query>
+
+    <named-query name="Document.countActiveDocumentsGroupByOwnerIds">
+        <query><![CDATA[
+            SELECT d.owner.userId, COUNT(d) FROM Document d 
+            WHERE d.owner.userId IN :ids 
+            AND d.uploadStatus = 'COMPLETED' AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL 
+            GROUP BY d.owner.userId
+        ]]></query>
+    </named-query>
+
+    <named-query name="Document.sumFileSizeOfActiveDocuments">
+        <query><![CDATA[
+            SELECT COALESCE(SUM(d.fileSize), 0) FROM Document d 
+            WHERE d.uploadStatus = 'COMPLETED' AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL
+        ]]></query>
+    </named-query>
+
+    <named-query name="Document.countActiveDocumentsGroupByFileType">
+        <query><![CDATA[
+            SELECT d.fileType, COUNT(d) FROM Document d 
+            WHERE d.uploadStatus = 'COMPLETED' AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL 
+            GROUP BY d.fileType
+        ]]></query>
+    </named-query>
+
+    <named-native-query name="Document.countNewDocumentsByDate">
+        <query><![CDATA[
+            SELECT DATE(CONVERT_TZ(created_at, '+00:00', '+07:00')) as dt, COUNT(*) as cnt 
+            FROM document WHERE created_at >= :since AND upload_status='COMPLETED' 
+            AND moderation_status='NORMAL' AND deleted_at IS NULL 
+            GROUP BY dt ORDER BY dt
+        ]]></query>
+    </named-native-query>
+
+    <!-- Download Queries -->
+    <named-query name="Download.countDownloadsReceivedGroupByOwnerIds">
+        <query><![CDATA[
+            SELECT d.document.owner.userId, COUNT(d) FROM Download d 
+            WHERE d.document.owner.userId IN :ids GROUP BY d.document.owner.userId
+        ]]></query>
+    </named-query>
+
+    <named-native-query name="Download.countDownloadsByDate">
+        <query><![CDATA[
+            SELECT DATE(CONVERT_TZ(downloaded_at, '+00:00', '+07:00')) as dt, COUNT(*) as cnt 
+            FROM download WHERE downloaded_at >= :since GROUP BY dt ORDER BY dt
+        ]]></query>
+    </named-native-query>
+
+    <!-- ChatMessage Queries -->
+    <named-native-query name="ChatMessage.countAiQueriesByDate">
+        <query><![CDATA[
+            SELECT DATE(CONVERT_TZ(created_at, '+00:00', '+07:00')) as dt, COUNT(*) as cnt 
+            FROM chat_message WHERE sender_type = 'USER' AND created_at >= :since 
+            GROUP BY dt ORDER BY dt
+        ]]></query>
+    </named-native-query>
+
+</entity-mappings>

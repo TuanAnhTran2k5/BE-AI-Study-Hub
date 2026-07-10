@@ -12,4 +12,8 @@ public interface IUser {
     GlobalLeaderboardResponse getMyLeaderboardRank(Long userId);
     Page<LeaderboardResponse> getGlobalLeaderboard(int page, int size);
     UserResponse buildUserProfileResponse(AiStudyHub.BE.entity.User user, String accessToken);
+    org.springframework.data.domain.Page<AiStudyHub.BE.dto.Response.AdminUserResponse> getUsersForAdmin(String search, String status, int page, int size);
+    AiStudyHub.BE.dto.Response.AdminUserResponse getUserDetailForAdmin(Long userId);
+    AiStudyHub.BE.dto.Response.AdminUserResponse banUser(Long targetUserId, String reason);
+    AiStudyHub.BE.dto.Response.AdminUserResponse unbanUser(Long targetUserId);
 }
