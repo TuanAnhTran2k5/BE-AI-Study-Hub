@@ -69,7 +69,7 @@ public class DashboardService implements IDashboard {
                 log.error("Failed to warm dashboard caches: {}", e.getMessage(), e);
             }
         } else {
-            log.info("Inactivity threshold reached (last accessed {}s ago). Skipping dashboard cache warming.", diff / 1000);
+            log.debug("Inactivity threshold reached (last accessed {}s ago). Skipping dashboard cache warming.", diff / 1000);
         }
     }
 
