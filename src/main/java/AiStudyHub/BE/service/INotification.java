@@ -36,6 +36,8 @@ public interface INotification {
             String explanation
     );
 
+    Notification sendAccountUnbannedNotification(User user);
+
     Notification sendReportApprovedNotification(
             User reporter,
             Document document,
