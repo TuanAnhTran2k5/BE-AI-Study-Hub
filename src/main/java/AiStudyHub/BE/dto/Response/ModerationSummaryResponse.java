@@ -13,4 +13,5 @@ public class ModerationSummaryResponse {
     long reportedDocumentsCount;
     long pendingUploadDocumentsCount;
     long totalBannedUsersCount;
+    long totalPendingUsersCount;
 }

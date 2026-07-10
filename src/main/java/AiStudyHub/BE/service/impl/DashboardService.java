@@ -8,9 +8,11 @@ import AiStudyHub.BE.service.IDashboard;
 import io.qdrant.client.QdrantClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -42,20 +44,43 @@ public class DashboardService implements IDashboard {
     private final RankingRepo rankingRepo;
     private final QdrantClient qdrantClient;
     private final DataSource dataSource;
+    private final CacheManager cacheManager;
 
-    @Scheduled(fixedRate = 300000)
-    @Caching(evict = {
-        @CacheEvict(value = "dashboard_statistics", allEntries = true),
-        @CacheEvict(value = "dashboard_subject_dist", allEntries = true),
-        @CacheEvict(value = "dashboard_storage", allEntries = true)
-    })
-    public void evictDashboardCaches() {
-        log.info("Evicting all admin dashboard caches (5-minute TTL).");
+    private final AtomicLong lastAccessedTime = new AtomicLong(0L);
+
+    @Scheduled(fixedDelay = 60000)
+    public void refreshDashboardCaches() {
+        long current = System.currentTimeMillis();
+        long diff = current - lastAccessedTime.get();
+        if (diff < 600000) { // 10 minutes
+            log.info("Refreshing dashboard caches in background (Cache Warming)...");
+            try {
+                SystemStatisticsResponse stats = calculateSystemStatistics();
+                cacheManager.getCache("dashboard_statistics").put(org.springframework.cache.interceptor.SimpleKey.EMPTY, stats);
+
+                List<SubjectDistributionResponse> subjects = calculateSubjectDistribution();
+                cacheManager.getCache("dashboard_subject_dist").put(org.springframework.cache.interceptor.SimpleKey.EMPTY, subjects);
+
+                StorageStatsResponse storage = calculateStorageStats();
+                cacheManager.getCache("dashboard_storage").put(org.springframework.cache.interceptor.SimpleKey.EMPTY, storage);
+
+                log.info("Dashboard caches successfully warmed.");
+            } catch (Exception e) {
+                log.error("Failed to warm dashboard caches: {}", e.getMessage(), e);
+            }
+        } else {
+            log.info("Inactivity threshold reached (last accessed {}s ago). Skipping dashboard cache warming.", diff / 1000);
+        }
     }
 
     @Override
     @Cacheable("dashboard_statistics")
     public SystemStatisticsResponse getSystemStatistics() {
+        lastAccessedTime.set(System.currentTimeMillis());
+        return calculateSystemStatistics();
+    }
+
+    private SystemStatisticsResponse calculateSystemStatistics() {
         ZonedDateTime vnNow = ZonedDateTime.now(VN_ZONE);
         LocalDateTime now = vnNow.toLocalDateTime();
         LocalDateTime thirtyDaysAgo = vnNow.minusDays(30).toLocalDateTime();
@@ -107,6 +132,11 @@ public class DashboardService implements IDashboard {
     @Override
     @Cacheable("dashboard_subject_dist")
     public List<SubjectDistributionResponse> getSubjectDistribution() {
+        lastAccessedTime.set(System.currentTimeMillis());
+        return calculateSubjectDistribution();
+    }
+
+    private List<SubjectDistributionResponse> calculateSubjectDistribution() {
         long totalActiveDocs = documentRepo.countByUploadStatusAndModerationStatusAndDeletedAtIsNull(
                 UploadStatus.COMPLETED, ModerationStatus.NORMAL);
 
@@ -221,12 +251,14 @@ public class DashboardService implements IDashboard {
                 0, ModerationStatus.NORMAL);
         long pendingUploads = documentRepo.countByUploadStatusAndDeletedAtIsNull(UploadStatus.PENDING);
         long totalBannedUsers = userRepo.countByStatus(UserStatus.BANNED);
+        long totalPendingUsers = userRepo.countByStatus(UserStatus.PENDING);
 
         return ModerationSummaryResponse.builder()
                 .pendingReportCasesCount(pendingReportCases)
                 .reportedDocumentsCount(reportedDocs)
                 .pendingUploadDocumentsCount(pendingUploads)
                 .totalBannedUsersCount(totalBannedUsers)
+                .totalPendingUsersCount(totalPendingUsers)
                 .build();
     }
 
@@ -294,6 +326,11 @@ public class DashboardService implements IDashboard {
     @Override
     @Cacheable("dashboard_storage")
     public StorageStatsResponse getStorageStats() {
+        lastAccessedTime.set(System.currentTimeMillis());
+        return calculateStorageStats();
+    }
+
+    private StorageStatsResponse calculateStorageStats() {
         long totalStorageUsed = documentRepo.sumFileSizeOfActiveDocuments();
         long totalActiveDocuments = documentRepo.countByUploadStatusAndModerationStatusAndDeletedAtIsNull(
                 UploadStatus.COMPLETED, ModerationStatus.NORMAL);

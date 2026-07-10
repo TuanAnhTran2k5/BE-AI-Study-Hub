@@ -9,6 +9,7 @@ import AiStudyHub.BE.repository.*;
 import AiStudyHub.BE.service.impl.DashboardService;
 import AiStudyHub.BE.service.impl.UserService;
 import AiStudyHub.BE.service.INotification;
+import org.springframework.cache.CacheManager;
 import io.qdrant.client.QdrantClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,8 @@ public class DashboardAndUserAdminTest {
     private DataSource dataSource;
     @Mock
     private INotification notificationService;
+    @Mock
+    private CacheManager cacheManager;
 
     @InjectMocks
     private DashboardService dashboardService;
@@ -130,6 +133,7 @@ public class DashboardAndUserAdminTest {
         when(documentRepo.countByReportCountGreaterThanAndModerationStatusAndDeletedAtIsNull(anyInt(), any())).thenReturn(5L);
         when(documentRepo.countByUploadStatusAndDeletedAtIsNull(UploadStatus.PENDING)).thenReturn(2L);
         when(userRepo.countByStatus(UserStatus.BANNED)).thenReturn(1L);
+        when(userRepo.countByStatus(UserStatus.PENDING)).thenReturn(4L);
 
         ModerationSummaryResponse result = dashboardService.getModerationSummary();
 
@@ -138,6 +142,7 @@ public class DashboardAndUserAdminTest {
         assertEquals(5L, result.getReportedDocumentsCount());
         assertEquals(2L, result.getPendingUploadDocumentsCount());
         assertEquals(1L, result.getTotalBannedUsersCount());
+        assertEquals(4L, result.getTotalPendingUsersCount());
     }
 
     @Test
@@ -240,5 +245,30 @@ public class DashboardAndUserAdminTest {
         assertEquals(UserStatus.ACTIVE, response.getStatus());
         verify(notificationService, times(1)).sendAccountUnbannedNotification(eq(target));
         verify(userRepo, times(1)).save(target);
+    }
+
+    @Test
+    public void testRefreshDashboardCaches_IdleSkip() {
+        // Act
+        dashboardService.refreshDashboardCaches();
+        
+        // Assert
+        verifyNoInteractions(chatMessageRepository);
+    }
+
+    @Test
+    public void testRefreshDashboardCaches_Active_WarmsCache() {
+        // Arrange
+        when(userRepo.countByStatus(UserStatus.ACTIVE)).thenReturn(10L);
+        
+        org.springframework.cache.Cache mockCache = mock(org.springframework.cache.Cache.class);
+        when(cacheManager.getCache(anyString())).thenReturn(mockCache);
+
+        // Act
+        dashboardService.getSystemStatistics();
+        dashboardService.refreshDashboardCaches();
+
+        // Assert
+        verify(mockCache, times(3)).put(eq(org.springframework.cache.interceptor.SimpleKey.EMPTY), any());
     }
 }
