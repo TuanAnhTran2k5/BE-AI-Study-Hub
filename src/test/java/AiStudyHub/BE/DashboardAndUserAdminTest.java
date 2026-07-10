@@ -197,4 +197,48 @@ public class DashboardAndUserAdminTest {
             assertEquals("User is already banned", exception.getMessage());
         }
     }
+
+    @Test
+    public void testBanUser_Success_SendsNotification() {
+        // Arrange
+        User admin = User.builder().userId(1L).role(UserRole.AD).build();
+        User target = User.builder().userId(2L).role(UserRole.US).status(UserStatus.ACTIVE).email("target@studyhub.com").build();
+        
+        try (MockedStatic<AiStudyHub.BE.security.SecurityUtils> mockedSecurity = mockStatic(AiStudyHub.BE.security.SecurityUtils.class)) {
+            mockedSecurity.when(AiStudyHub.BE.security.SecurityUtils::getCurrentUser).thenReturn(admin);
+            
+            when(userRepo.findById(1L)).thenReturn(Optional.of(admin));
+            when(userRepo.findById(2L)).thenReturn(Optional.of(target));
+            when(documentRepo.countActiveDocumentsGroupByOwnerIds(any())).thenReturn(new ArrayList<>());
+            when(downloadRepo.countDownloadsReceivedGroupByOwnerIds(any())).thenReturn(new ArrayList<>());
+
+            // Act
+            AdminUserResponse response = userService.banUser(2L, "Violation of rules");
+
+            // Assert
+            assertNotNull(response);
+            assertEquals(UserStatus.BANNED, response.getStatus());
+            verify(notificationService, times(1)).sendAccountBannedNotification(eq(target), eq(null), anyString(), eq("Violation of rules"));
+            verify(userRepo, times(1)).save(target);
+        }
+    }
+
+    @Test
+    public void testUnbanUser_Success_SendsNotification() {
+        // Arrange
+        User target = User.builder().userId(2L).role(UserRole.US).status(UserStatus.BANNED).email("target@studyhub.com").build();
+        
+        when(userRepo.findById(2L)).thenReturn(Optional.of(target));
+        when(documentRepo.countActiveDocumentsGroupByOwnerIds(any())).thenReturn(new ArrayList<>());
+        when(downloadRepo.countDownloadsReceivedGroupByOwnerIds(any())).thenReturn(new ArrayList<>());
+
+        // Act
+        AdminUserResponse response = userService.unbanUser(2L);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(UserStatus.ACTIVE, response.getStatus());
+        verify(notificationService, times(1)).sendAccountUnbannedNotification(eq(target));
+        verify(userRepo, times(1)).save(target);
+    }
 }
