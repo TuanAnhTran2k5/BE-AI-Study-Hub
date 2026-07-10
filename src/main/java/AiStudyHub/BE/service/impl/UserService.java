@@ -12,13 +12,15 @@ import AiStudyHub.BE.mapper.UserMapper;
 import AiStudyHub.BE.repository.*;
 import AiStudyHub.BE.service.IUser;
 import AiStudyHub.BE.service.ISupabaseStorage;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Collections;
 import java.util.Locale;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -35,30 +37,21 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 public class UserService implements IUser {
 
-    @Autowired
     UserRepo userRepo;
-    @Autowired
     UserMapper userMapper;
-    @Autowired
     UserRankRepo userRankRepo;
-    @Autowired
     UserBadgeRepo userBadgeRepo;
-    @Autowired
     DocumentRepo documentRepo;
-    @Autowired
     DownloadRepo downloadRepo;
-    @Autowired
     BookmarkRepo bookmarkRepo;
-    @Autowired
     NotificationRepo notificationRepo;
-    @Autowired
     WeeklyScoreRepo weeklyScoreRepo;
-    @Autowired
     RankingRepo rankingRepo;
-    @Autowired
     ISupabaseStorage supabaseStorage;
 
     @Override
@@ -266,29 +259,24 @@ public class UserService implements IUser {
                 .weeklyRank(weeklyRank)
                 .build();
 
-        return UserResponse.builder()
-                .userId(user.getUserId())
-                .fullName(user.getFullName())
-                .email(user.getEmail())
-                .avatarUrl(user.getAvatarUrl())
-                .totalScore(user.getTotalScore() == null ? 0L : user.getTotalScore())
-                .role(user.getRole())
-                .status(user.getStatus())
-                .displayRole(displayRole)
-                .displayStatus(displayStatus)
-                .createdAt(user.getCreatedAt())
-                .storageUsed(used)
-                .storageLimit(limit)
-                .storageRemaining(remaining)
-                .storageUsagePercent(usagePercent)
-                .currentRank(currentRankResponse)
-                .rankProgress(progress)
-                .badges(badgeResponses)
-                .statistics(stats)
-                .leaderboard(leaderboard)
-                .unreadNotificationCount((int) unreadNotifCount)
-                .accessToken(accessToken)
-                .build();
+        UserResponse response = userMapper.toUserResponse(user);
+        if (response.getTotalScore() == null) {
+            response.setTotalScore(0L);
+        }
+        response.setDisplayRole(displayRole);
+        response.setDisplayStatus(displayStatus);
+        response.setStorageUsed(used);
+        response.setStorageLimit(limit);
+        response.setStorageRemaining(remaining);
+        response.setStorageUsagePercent(usagePercent);
+        response.setCurrentRank(currentRankResponse);
+        response.setRankProgress(progress);
+        response.setBadges(badgeResponses);
+        response.setStatistics(stats);
+        response.setLeaderboard(leaderboard);
+        response.setUnreadNotificationCount((int) unreadNotifCount);
+        response.setAccessToken(accessToken);
+        return response;
     }
 
     private RankingResponse mapToRankingResponse(Ranking rank) {

@@ -6,73 +6,76 @@ import AiStudyHub.BE.constraint.OtpPurpose;
 import AiStudyHub.BE.constraint.UserRole;
 import AiStudyHub.BE.constraint.UserStatus;
 import AiStudyHub.BE.dto.Request.ForgotPasswordRequest;
-import AiStudyHub.BE.dto.Request.ResetPasswordRequest;
-import AiStudyHub.BE.dto.Request.ResendOtpRequest;
-import AiStudyHub.BE.dto.Response.ForgotPasswordResponse;
-import AiStudyHub.BE.dto.Response.ResendOtpResponse;
 import AiStudyHub.BE.dto.Request.GoogleLoginRequest;
 import AiStudyHub.BE.dto.Request.LoginRequest;
 import AiStudyHub.BE.dto.Request.LogoutRequest;
 import AiStudyHub.BE.dto.Request.RegisterRequest;
+import AiStudyHub.BE.dto.Request.ResendOtpRequest;
+import AiStudyHub.BE.dto.Request.ResetPasswordRequest;
 import AiStudyHub.BE.dto.Request.VerifyOtpRequest;
 import AiStudyHub.BE.dto.Request.VerifyTokenRequest;
+import AiStudyHub.BE.dto.Response.ForgotPasswordResponse;
 import AiStudyHub.BE.dto.Response.GoogleUserInfo;
 import AiStudyHub.BE.dto.Response.RegisterResponse;
+import AiStudyHub.BE.dto.Response.ResendOtpResponse;
 import AiStudyHub.BE.dto.Response.UserResponse;
-import AiStudyHub.BE.service.IUser;
 import AiStudyHub.BE.entity.OtpVerification;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.exception.GlobalException;
-import AiStudyHub.BE.mapper.UserMapper;
 import AiStudyHub.BE.mapper.OtpMapper;
-import AiStudyHub.BE.repository.OtpVerificationRepo;
+import AiStudyHub.BE.mapper.UserMapper;
 import AiStudyHub.BE.repository.UserRepo;
 import AiStudyHub.BE.service.IAuthentication;
-import AiStudyHub.BE.service.IEmail;
+import AiStudyHub.BE.service.IOtpService;
+import AiStudyHub.BE.service.IToken;
+import AiStudyHub.BE.service.IUser;
+import AiStudyHub.BE.utils.OtpUtil;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.authentication.*;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
 @Slf4j
 public class AuthenticationService implements UserDetailsService, IAuthentication {
 
-    private SecureRandom secureRandom = new SecureRandom();
+    final UserRepo userRepo;
+    final UserMapper userMapper;
+    final OtpMapper otpMapper;
+    final PasswordEncoder passwordEncoder;
 
     @Autowired
-    private UserRepo userRepo;
-    @Autowired
-    private UserMapper userMapper;
-    @Autowired
-    private OtpMapper otpMapper;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    @Autowired
-    private AuthenticationManager authenticationManager;
-    @Autowired
-    private AiStudyHub.BE.service.IToken tokenService;
-    @Autowired
-    private OtpVerificationRepo otpVerificationRepo;
-    @Autowired
-    private IEmail emailService;
-    @Autowired
-    private IUser userService;
+    @Lazy
+    AuthenticationManager authenticationManager;
 
+    final IToken tokenService;
+    final IUser userService;
+    final IOtpService otpService;
+    final OtpUtil otpUtil;
+    final WebClient webClient = WebClient.create();
 
 
     @Override
+    @Transactional
     public RegisterResponse register(RegisterRequest registerRequest) {
         String email = registerRequest.getEmail();
         Optional<User> existingUserOpt = userRepo.findByEmail(email);
@@ -91,54 +94,23 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             user.setPasswordHash(passwordEncoder.encode(registerRequest.getPassword()));
             user = userRepo.save(user);
         } else {
-            // Use mapper to convert Request -> Entity
+            // Use mapper for Request → Entity, then set encoded password and authProvider manually
             user = userMapper.toUser(registerRequest);
             user.setPasswordHash(passwordEncoder.encode(registerRequest.getPassword()));
-            user.setStatus(UserStatus.PENDING);
             user.setAuthProvider(AuthProvider.LOCAL);
-            user.setRole(UserRole.US);
-            user.setCreatedAt(LocalDateTime.now());
-            user.setStorageLimit(2L * 1024 * 1024 * 1024);
-            user.setStorageUsed(0L);
-            user.setTotalScore(0L);
             user = userRepo.save(user);
         }
 
-        // Invalidate any previously issued, still-unused REGISTER OTPs for this user
-        // so only the newest code can be used.
-        List<OtpVerification> oldOtps =
-                otpVerificationRepo.findByUserAndPurposeAndIsUseFalse(user, OtpPurpose.REGISTER);
-        if (!oldOtps.isEmpty()) {
-            oldOtps.forEach(o -> o.setIsUse(true));
-            otpVerificationRepo.saveAll(oldOtps);
-        }
+        // Delegate OTP creation, invalidation, and email sending to OtpService
+        OtpVerification otpVerification = otpService.generateAndSendOtp(user, email, OtpPurpose.REGISTER);
 
-        // Generate a cryptographically strong 6-digit OTP code
-        String otpCode = String.valueOf(secureRandom.nextInt(900000) + 100000);
-
-        // Save OtpVerification to DB
-        OtpVerification otpVerification = OtpVerification.builder()
-                .user(user)
-                .email(email)
-                .otpCode(otpCode)
-                .purpose(OtpPurpose.REGISTER)
-                .expiredAt(LocalDateTime.now().plusMinutes(5))
-                .isUse(false)
-                .build();
-        otpVerificationRepo.save(otpVerification);
-
-        // Send OTP via email
-        emailService.sendOtpEmail(email, otpCode);
-
-        // Return info the FE needs (e.g. email to pre-fill the form, OTP expiry time for countdown)
-        return RegisterResponse.builder()
-                .email(email)
-                .otpExpiredAt(otpVerification.getExpiredAt())
-                .status(user.getStatus())
-                .build();
+        RegisterResponse response = userMapper.toRegisterResponse(user);
+        response.setOtpExpiredAt(otpVerification.getExpiredAt());
+        return response;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserResponse login(LoginRequest loginRequest) {
         try {
             Authentication authentication = authenticationManager.authenticate(
@@ -153,15 +125,8 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             if (user.getStatus() == UserStatus.PENDING) {
                 throw new GlobalException(ErrorCode.EMAIL_NOT_VERIFIED);
             }
-            if (user.getStatus() == UserStatus.BANNED) {
-                throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
-            }
 
             String accessToken = tokenService.generateAccessToken(user);
-
-            // Verify the freshly issued access token (signature, expiry, subject, user exists)
-            // so we never hand the client a token that wouldn't pass authentication.
-            tokenService.verifyAccessToken(accessToken);
 
             return userService.buildUserProfileResponse(user, accessToken);
 
@@ -176,6 +141,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     }
 
     @Override
+    @Transactional
     public UserResponse verifyEmail(VerifyOtpRequest request) {
         String email = request.getEmail();
         User user = userRepo.findByEmail(email)
@@ -189,21 +155,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
         }
 
-        OtpVerification otp = otpVerificationRepo
-                .findByUserAndOtpCodeAndPurposeAndIsUseFalse(
-                        user,
-                        request.getOtpCode(),
-                        OtpPurpose.REGISTER
-                )
-                .orElseThrow(() -> new GlobalException(ErrorCode.INVALID_OTP));
-
-        if (otp.getExpiredAt().isBefore(LocalDateTime.now())) {
-            throw new GlobalException(ErrorCode.OTP_EXPIRED);
-        }
-
-        otp.setIsUse(true);
-        otp.setVerifiedAt(LocalDateTime.now());
-        otpVerificationRepo.save(otp);
+        otpService.verifyAndConsumeOtp(user, request.getOtpCode(), OtpPurpose.REGISTER);
 
         user.setStatus(UserStatus.ACTIVE);
         user = userRepo.save(user);
@@ -213,12 +165,12 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     }
 
     @Override
+    @Transactional
     public UserResponse googleLogin(GoogleLoginRequest request) {
-        WebClient webClient = WebClient.create();
         GoogleUserInfo googleUserInfo = null;
         String token = request.getToken();
 
-        boolean isJwtIdToken = token != null && token.startsWith("ey") && token.split("\\.").length == 3;
+        boolean isJwtIdToken = otpUtil.isJwtToken(token);
 
         if (isJwtIdToken) {
             try {
@@ -245,9 +197,9 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                     try {
                         googleUserInfo = webClient.get()
                                 .uri("https://oauth2.googleapis.com/tokeninfo?id_token=" + token)
-                        .retrieve()
-                        .bodyToMono(GoogleUserInfo.class)
-                        .block();
+                                .retrieve()
+                                .bodyToMono(GoogleUserInfo.class)
+                                .block();
                     } catch (Exception ignored) {
                     }
                 }
@@ -267,39 +219,28 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         User user = userRepo.findByEmail(finalUserInfo.getEmail())
                 .map(existingUser -> {
                     existingUser.setGoogleId(finalUserInfo.getSub());
-                    
+
                     if (existingUser.getStatus() == UserStatus.PENDING) {
                         existingUser.setStatus(UserStatus.ACTIVE);
                     }
-                    
+
                     if (existingUser.getAvatarUrl() == null || existingUser.getAvatarUrl().isBlank() || existingUser.getAvatarUrl().contains("googleusercontent.com")) {
                         if (finalUserInfo.getPicture() != null && !finalUserInfo.getPicture().isBlank()) {
                             existingUser.setAvatarUrl(finalUserInfo.getPicture());
                         }
                     }
-                    
+
                     return userRepo.save(existingUser);
                 })
                 .orElseGet(() -> {
+                    // Use mapper for GoogleUserInfo → Entity, then set Service-specific fields
                     User newUser = userMapper.toUser(finalUserInfo);
-                    if (newUser.getAvatarUrl() == null || newUser.getAvatarUrl().isBlank()) {
-                        newUser.setAvatarUrl(finalUserInfo.getPicture());
-                    }
                     newUser.setAuthProvider(AuthProvider.GOOGLE);
-                    newUser.setRole(UserRole.US);
                     newUser.setStatus(UserStatus.ACTIVE);
-                    newUser.setCreatedAt(LocalDateTime.now());
-                    newUser.setStorageLimit(2L * 1024 * 1024 * 1024);
-                    newUser.setStorageUsed(0L);
-                    newUser.setTotalScore(0L);
                     return userRepo.save(newUser);
                 });
 
         String accessToken = tokenService.generateAccessToken(user);
-
-        // Verify the freshly issued access token (signature, expiry, subject, user exists)
-        // so we never hand the client a token that wouldn't pass authentication.
-        tokenService.verifyAccessToken(accessToken);
 
         return userService.buildUserProfileResponse(user, accessToken);
     }
@@ -329,6 +270,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     }
 
     @Override
+    @Transactional
     public ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request) {
         String email = request.getEmail();
         User user = userRepo.findByEmail(email)
@@ -338,32 +280,13 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
         }
 
-        // Invalidate old OTPs
-        List<OtpVerification> oldOtps =
-                otpVerificationRepo.findByUserAndPurposeAndIsUseFalse(user, OtpPurpose.FORGOT_PASSWORD);
-        if (!oldOtps.isEmpty()) {
-            oldOtps.forEach(o -> o.setIsUse(true));
-            otpVerificationRepo.saveAll(oldOtps);
-        }
-
-        String otpCode = String.valueOf(secureRandom.nextInt(900000) + 100000);
-
-        OtpVerification otpVerification = OtpVerification.builder()
-                .user(user)
-                .email(email)
-                .otpCode(otpCode)
-                .purpose(OtpPurpose.FORGOT_PASSWORD)
-                .expiredAt(LocalDateTime.now().plusMinutes(5))
-                .isUse(false)
-                .build();
-        otpVerificationRepo.save(otpVerification);
-
-        emailService.sendOtpEmail(email, otpCode);
+        OtpVerification otpVerification = otpService.generateAndSendOtp(user, email, OtpPurpose.FORGOT_PASSWORD);
 
         return otpMapper.toForgotPasswordResponse(otpVerification);
     }
 
     @Override
+    @Transactional
     public boolean verifyForgotPasswordOtp(VerifyOtpRequest request) {
         String email = request.getEmail();
         User user = userRepo.findByEmail(email)
@@ -373,25 +296,13 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
         }
 
-        OtpVerification otp = otpVerificationRepo
-                .findByUserAndOtpCodeAndPurposeAndIsUseFalse(
-                        user,
-                        request.getOtpCode(),
-                        OtpPurpose.FORGOT_PASSWORD
-                )
-                .orElseThrow(() -> new GlobalException(ErrorCode.INVALID_OTP));
-
-        if (otp.getExpiredAt().isBefore(LocalDateTime.now())) {
-            throw new GlobalException(ErrorCode.OTP_EXPIRED);
-        }
-
-        otp.setVerifiedAt(LocalDateTime.now());
-        otpVerificationRepo.save(otp);
+        otpService.verifyOtpWithoutConsume(user, request.getOtpCode(), OtpPurpose.FORGOT_PASSWORD);
 
         return true;
     }
 
     @Override
+    @Transactional
     public boolean resetPassword(ResetPasswordRequest request) {
         String email = request.getEmail();
         User user = userRepo.findByEmail(email)
@@ -401,29 +312,18 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
         }
 
-        OtpVerification otp = otpVerificationRepo
-                .findFirstByUserAndPurposeAndIsUseFalseAndVerifiedAtIsNotNullOrderByCreatedAtDesc(
-                        user,
-                        OtpPurpose.FORGOT_PASSWORD
-                )
-                .orElseThrow(() -> new GlobalException(ErrorCode.INVALID_OTP));
-
-        if (otp.getVerifiedAt().plusMinutes(15).isBefore(LocalDateTime.now())) {
-            throw new GlobalException(ErrorCode.OTP_EXPIRED);
-        }
+        // Verify and consume OTP
+        otpService.verifyAndConsumeOtp(user, request.getOtpCode(), OtpPurpose.FORGOT_PASSWORD);
 
         // Update password
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         userRepo.save(user);
 
-        // Mark OTP as used
-        otp.setIsUse(true);
-        otpVerificationRepo.save(otp);
-        
         return true;
     }
 
     @Override
+    @Transactional
     public ResendOtpResponse resendOtp(ResendOtpRequest request) {
         String email = request.getEmail();
         User user = userRepo.findByEmail(email)
@@ -439,27 +339,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             throw new GlobalException(ErrorCode.EMAIL_ALREADY_VERIFIED);
         }
 
-        // Invalidate old OTPs for the requested purpose
-        List<OtpVerification> oldOtps =
-                otpVerificationRepo.findByUserAndPurposeAndIsUseFalse(user, purpose);
-        if (!oldOtps.isEmpty()) {
-            oldOtps.forEach(o -> o.setIsUse(true));
-            otpVerificationRepo.saveAll(oldOtps);
-        }
-
-        String otpCode = String.valueOf(secureRandom.nextInt(900000) + 100000);
-
-        OtpVerification otpVerification = OtpVerification.builder()
-                .user(user)
-                .email(email)
-                .otpCode(otpCode)
-                .purpose(purpose)
-                .expiredAt(LocalDateTime.now().plusMinutes(5))
-                .isUse(false)
-                .build();
-        otpVerificationRepo.save(otpVerification);
-
-        emailService.sendOtpEmail(email, otpCode);
+        OtpVerification otpVerification = otpService.generateAndSendOtp(user, email, purpose);
 
         return otpMapper.toResendOtpResponse(otpVerification);
     }
