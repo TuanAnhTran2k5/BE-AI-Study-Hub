@@ -477,6 +477,8 @@ public class UserService implements IUser {
         target.setBannedBy(null);
         userRepo.save(target);
 
+        notificationService.sendAccountUnbannedNotification(target);
+
         List<Long> ids = Collections.singletonList(targetUserId);
         Map<Long, Long> docCounts = toCountMap(documentRepo.countActiveDocumentsGroupByOwnerIds(ids));
         Map<Long, Long> downloadCounts = toCountMap(downloadRepo.countDownloadsReceivedGroupByOwnerIds(ids));

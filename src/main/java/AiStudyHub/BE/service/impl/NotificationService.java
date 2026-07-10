@@ -191,6 +191,35 @@ public class NotificationService implements INotification {
     }
 
     @Override
+    public Notification sendAccountUnbannedNotification(User user) {
+        log.info("Sending account unbanned notification to owner {} (ID: {})",
+                user.getEmail(), user.getUserId());
+
+        String subject = "[AI Study Hub] Account Restored Notice";
+        String htmlContent = loadAndPopulateEmailTemplate(
+                "Account Restored Notice (ACTIVE)",
+                user.getFullName(),
+                "Personal account",
+                "Account has been unlocked (ACTIVE). Welcome back!",
+                "Account Restored",
+                "Review Completed",
+                "Your account has been unlocked by an administrator. You can now log back in and use the platform normally."
+        );
+
+        emailService.sendEmail(user.getEmail(), subject, htmlContent);
+
+        Notification notification = Notification.builder()
+                .user(user)
+                .title(subject)
+                .message("Your account has been unlocked (ACTIVE) by an administrator.")
+                .type("SYSTEM")
+                .notificationCase("ACCOUNT_UNBANNED")
+                .isRead(false)
+                .build();
+        return notificationRepo.save(notification);
+    }
+
+    @Override
     public Notification sendReportApprovedNotification(
             User reporter,
             Document document,
