@@ -25,5 +25,6 @@ public class ReportCaseAdminResponse {
     LocalDateTime openedAt;
     LocalDateTime resolvedAt;
     String resolvedByName;
+    String resolvedByEmail;
     String adminNote;
 }

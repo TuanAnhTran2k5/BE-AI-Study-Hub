@@ -141,6 +141,7 @@ public class ReportAdminController {
                 .openedAt(rc.getOpenedAt())
                 .resolvedAt(rc.getResolvedAt())
                 .resolvedByName(rc.getResolvedBy() != null ? rc.getResolvedBy().getFullName() : null)
+                .resolvedByEmail(rc.getResolvedBy() != null ? rc.getResolvedBy().getEmail() : null)
                 .adminNote(rc.getAdminNote())
                 .build();
     }
