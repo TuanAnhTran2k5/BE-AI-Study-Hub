@@ -496,4 +496,86 @@ public class ReportService implements IReport {
 
         reportReasonRepo.delete(reason);
     }
+
+    @Override
+    @Transactional
+    public ReportCase refundAppeal(Long caseId, Long adminId, String note) {
+        ReportCase rc = reportCaseRepo.findByCaseId(caseId)
+                .orElseThrow(() -> new GlobalException(404, "ReportCase not found"));
+        User admin = userRepo.findById(adminId)
+                .orElseThrow(() -> new GlobalException(404, "Admin not found"));
+
+        if (!admin.getRole().equals(UserRole.AD)) {
+            throw new GlobalException(403, "Only admins can approve appeals and refund points");
+        }
+
+        if (rc.getCaseStatus() != CaseStatus.RESOLVED) {
+            throw new GlobalException(400, "Only RESOLVED (completed) cases in history can be appealed/refunded");
+        }
+
+        rc.setCaseStatus(CaseStatus.REJECTED);
+        rc.setResolvedBy(admin);
+        rc.setResolvedAt(LocalDateTime.now());
+        rc.setAdminNote("[Appeal Approved]: " + note + " (Original Note: " + rc.getAdminNote() + ")");
+
+        Document document = rc.getDocument();
+        User owner = document.getOwner();
+
+        if (document.getModerationStatus() == ModerationStatus.REMOVED || document.getModerationStatus() == ModerationStatus.HIDDEN) {
+            document.setModerationStatus(ModerationStatus.NORMAL);
+            documentRepo.save(document);
+        }
+
+        if (owner.getStatus() == UserStatus.BANNED) {
+            owner.setStatus(UserStatus.ACTIVE);
+            owner.setBanReason(null);
+            owner.setBannedAt(null);
+            owner.setBannedBy(null);
+            userRepo.save(owner);
+            notificationService.sendAccountUnbannedNotification(owner);
+        }
+
+        // Sum all negative score logs associated with this case to calculate refund amount
+        List<ScoreLog> logs = scoreLogRepo.findAllByReportCase(rc);
+        int totalRefund = 0;
+        for (ScoreLog logItem : logs) {
+            if (logItem.getScoreChange() != null && logItem.getScoreChange() < 0) {
+                totalRefund += Math.abs(logItem.getScoreChange());
+            }
+        }
+
+        if (totalRefund > 0) {
+            owner.setTotalScore(owner.getTotalScore() + totalRefund);
+            userRepo.save(owner);
+
+            ScoreType penaltyType = scoreTypeRepo.findByTypeCode("REPORT_PENALTY")
+                    .orElseThrow(() -> new GlobalException(500, "REPORT_PENALTY ScoreType not found"));
+
+            ScoreLog refundLog = ScoreLog.builder()
+                    .user(owner)
+                    .documentId(document != null ? document.getDocumentId() : null)
+                    .documentTitle(document != null ? document.getTitle() : null)
+                    .scoreType(penaltyType)
+                    .reportCase(rc)
+                    .scoreChange(totalRefund)
+                    .description("Refund of warning penalty after report case was rejected by admin")
+                    .build();
+            scoreLogRepo.save(refundLog);
+
+            rankingBadgeService.updateUserRank(owner.getUserId());
+            rankingBadgeService.checkAndAwardBadges(owner.getUserId());
+        }
+
+        // Reset all reports to REJECTED status
+        List<Report> reports = reportRepo.findAllByReportCase(rc);
+        for (Report report : reports) {
+            report.setStatus(ReportStatus.REJECTED);
+            reportRepo.save(report);
+        }
+
+        // Send restoration notification
+        notificationService.sendDocumentRestoredNotification(owner, document, note);
+
+        return reportCaseRepo.save(rc);
+    }
 }

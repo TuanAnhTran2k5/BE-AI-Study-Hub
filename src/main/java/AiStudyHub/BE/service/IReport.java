@@ -17,4 +17,6 @@ public interface IReport {
     ReportReason createReason(ReportReasonRequest request);
     ReportReason updateReason(Long reasonId, ReportReasonRequest request);
     void deleteReason(Long reasonId);
+
+    ReportCase refundAppeal(Long caseId, Long adminId, String note);
 }

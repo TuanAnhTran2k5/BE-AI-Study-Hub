@@ -95,6 +95,16 @@ public class ReportAdminController {
         return ResponseEntity.ok(APIResponse.response(200, "Resolve report case successfully", toCaseAdminView(rc)));
     }
 
+    @PostMapping("/{caseId}/appeal-refund")
+    @Operation(summary = "Accept user email appeal: restore document/user status and refund warning penalty points (Admin)")
+    public ResponseEntity<APIResponse<ReportCaseAdminResponse>> refundAppeal(
+            @PathVariable Long caseId,
+            @Valid @RequestBody AppealRefundRequest request
+    ) {
+        ReportCase rc = reportService.refundAppeal(caseId, request.getAdminId(), request.getNote());
+        return ResponseEntity.ok(APIResponse.response(200, "Appeal accepted and refunded successfully", toCaseAdminView(rc)));
+    }
+
     @PostMapping("/reasons")
     @Operation(summary = "Create a new report reason (Admin)")
     public ResponseEntity<APIResponse<ReportReason>> createReason(@Valid @RequestBody ReportReasonRequest request) {
@@ -131,6 +141,7 @@ public class ReportAdminController {
                 .openedAt(rc.getOpenedAt())
                 .resolvedAt(rc.getResolvedAt())
                 .resolvedByName(rc.getResolvedBy() != null ? rc.getResolvedBy().getFullName() : null)
+                .resolvedByEmail(rc.getResolvedBy() != null ? rc.getResolvedBy().getEmail() : null)
                 .adminNote(rc.getAdminNote())
                 .build();
     }
@@ -151,6 +162,13 @@ public class ReportAdminController {
     public static class ResolveRequest {
         Long adminId;
         AdminDecision decision;
+        String note;
+    }
+
+    @Data
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    public static class AppealRefundRequest {
+        Long adminId;
         String note;
     }
 }
