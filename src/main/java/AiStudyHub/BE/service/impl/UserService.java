@@ -21,14 +21,14 @@ import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Collections;
-import java.util.Locale;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
+import org.springframework.transaction.annotation.Transactional;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -427,7 +427,7 @@ public class UserService implements IUser {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public AdminUserResponse banUser(Long targetUserId, String reason) {
         User currentLoggedIn = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
         User admin = userRepo.findById(currentLoggedIn.getUserId())
@@ -462,7 +462,7 @@ public class UserService implements IUser {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public AdminUserResponse unbanUser(Long targetUserId) {
         User target = userRepo.findById(targetUserId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));

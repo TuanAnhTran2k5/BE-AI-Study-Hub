@@ -224,6 +224,10 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                         existingUser.setStatus(UserStatus.ACTIVE);
                     }
 
+                    if(existingUser.getStatus() == UserStatus.BANNED){
+                        throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+                    }
+
                     if (existingUser.getAvatarUrl() == null || existingUser.getAvatarUrl().isBlank() || existingUser.getAvatarUrl().contains("googleusercontent.com")) {
                         if (finalUserInfo.getPicture() != null && !finalUserInfo.getPicture().isBlank()) {
                             existingUser.setAvatarUrl(finalUserInfo.getPicture());
