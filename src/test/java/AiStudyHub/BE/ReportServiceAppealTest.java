@@ -42,8 +42,6 @@ public class ReportServiceAppealTest {
     private INotification notificationService;
     @Mock
     private IGamification rankingBadgeService;
-    @Mock
-    private AppealRepo appealRepo;
 
     @InjectMocks
     private ReportService reportService;
@@ -52,7 +50,6 @@ public class ReportServiceAppealTest {
     private User adminUser;
     private Document document;
     private ReportCase reportCase;
-    private Appeal appeal;
 
     @BeforeEach
     public void setUp() {
@@ -87,74 +84,47 @@ public class ReportServiceAppealTest {
                 .reason(ReportReason.builder().reasonId(5L).reasonName("Copyright").build())
                 .firstWarningAt(LocalDateTime.now())
                 .build();
-
-        appeal = Appeal.builder()
-                .appealId(30L)
-                .reportCase(reportCase)
-                .user(regularUser)
-                .appealReason("Oan sai quá")
-                .status(AppealStatus.PENDING)
-                .build();
     }
 
     @Test
-    public void testSubmitAppeal_Success() {
+    public void testRefundAppeal_Success() {
         when(reportCaseRepo.findByCaseId(20L)).thenReturn(Optional.of(reportCase));
-        when(userRepo.findById(2L)).thenReturn(Optional.of(regularUser));
-        when(appealRepo.existsByReportCaseCaseIdAndStatus(20L, AppealStatus.PENDING)).thenReturn(false);
-        when(appealRepo.save(any(Appeal.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        Appeal result = reportService.submitAppeal(20L, 2L, "Oan sai quá", "http://evidence.url");
-
-        assertNotNull(result);
-        assertEquals("Oan sai quá", result.getAppealReason());
-        assertEquals(AppealStatus.PENDING, result.getStatus());
-        verify(appealRepo, times(1)).save(any(Appeal.class));
-    }
-
-    @Test
-    public void testSubmitAppeal_NotResolved_ThrowsException() {
-        reportCase.setCaseStatus(CaseStatus.OPEN);
-        when(reportCaseRepo.findByCaseId(20L)).thenReturn(Optional.of(reportCase));
-        when(userRepo.findById(2L)).thenReturn(Optional.of(regularUser));
-
-        assertThrows(GlobalException.class, () -> {
-            reportService.submitAppeal(20L, 2L, "Reason", null);
-        });
-    }
-
-    @Test
-    public void testResolveAppeal_Approve_Success() {
-        when(appealRepo.findById(30L)).thenReturn(Optional.of(appeal));
         when(userRepo.findById(1L)).thenReturn(Optional.of(adminUser));
-        when(appealRepo.save(any(Appeal.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reportCaseRepo.save(any(ReportCase.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Mock scorelogs for point refund
         ScoreLog log1 = ScoreLog.builder().scoreChange(-20).build();
         when(scoreLogRepo.findAllByReportCase(reportCase)).thenReturn(List.of(log1));
         when(scoreTypeRepo.findByTypeCode("REPORT_PENALTY")).thenReturn(Optional.of(new ScoreType()));
 
-        Appeal result = reportService.resolveAppeal(30L, 1L, true, "Appeal accepted, restoring document");
+        ReportCase result = reportService.refundAppeal(20L, 1L, "Appeal approved, restoring document and score");
 
         assertNotNull(result);
-        assertEquals(AppealStatus.APPROVED, result.getStatus());
-        assertEquals(CaseStatus.REJECTED, reportCase.getCaseStatus());
+        assertEquals(CaseStatus.REJECTED, result.getCaseStatus());
         assertEquals(ModerationStatus.NORMAL, document.getModerationStatus());
         assertEquals(120L, regularUser.getTotalScore()); // Refunded 20 points
         verify(notificationService, times(1)).sendDocumentRestoredNotification(eq(regularUser), eq(document), anyString());
     }
 
     @Test
-    public void testResolveAppeal_Reject_Success() {
-        when(appealRepo.findById(30L)).thenReturn(Optional.of(appeal));
+    public void testRefundAppeal_NotResolved_ThrowsException() {
+        reportCase.setCaseStatus(CaseStatus.OPEN);
+        when(reportCaseRepo.findByCaseId(20L)).thenReturn(Optional.of(reportCase));
         when(userRepo.findById(1L)).thenReturn(Optional.of(adminUser));
-        when(appealRepo.save(any(Appeal.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Appeal result = reportService.resolveAppeal(30L, 1L, false, "Appeal rejected");
+        assertThrows(GlobalException.class, () -> {
+            reportService.refundAppeal(20L, 1L, "Reason");
+        });
+    }
 
-        assertNotNull(result);
-        assertEquals(AppealStatus.REJECTED, result.getStatus());
-        assertEquals(CaseStatus.RESOLVED, reportCase.getCaseStatus()); // Remains resolved
-        verify(notificationService, never()).sendDocumentRestoredNotification(any(), any(), any());
+    @Test
+    public void testRefundAppeal_NotAdmin_ThrowsException() {
+        User regularUserAsAdmin = User.builder().userId(1L).role(UserRole.US).build();
+        when(reportCaseRepo.findByCaseId(20L)).thenReturn(Optional.of(reportCase));
+        when(userRepo.findById(1L)).thenReturn(Optional.of(regularUserAsAdmin));
+
+        assertThrows(GlobalException.class, () -> {
+            reportService.refundAppeal(20L, 1L, "Reason");
+        });
     }
 }

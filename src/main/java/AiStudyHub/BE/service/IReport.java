@@ -1,9 +1,7 @@
 package AiStudyHub.BE.service;
 
 import AiStudyHub.BE.constraint.AdminDecision;
-import AiStudyHub.BE.constraint.AppealStatus;
 import AiStudyHub.BE.dto.Request.ReportReasonRequest;
-import AiStudyHub.BE.entity.Appeal;
 import AiStudyHub.BE.entity.Report;
 import AiStudyHub.BE.entity.ReportCase;
 import AiStudyHub.BE.entity.ReportReason;
@@ -20,8 +18,5 @@ public interface IReport {
     ReportReason updateReason(Long reasonId, ReportReasonRequest request);
     void deleteReason(Long reasonId);
 
-    Appeal submitAppeal(Long caseId, Long userId, String appealReason, String evidenceUrl);
-    Appeal resolveAppeal(Long appealId, Long adminId, boolean approve, String adminNote);
-    List<Appeal> getAppealsByStatus(AppealStatus status);
-    List<Appeal> getAppealsByUser(Long userId);
+    ReportCase refundAppeal(Long caseId, Long adminId, String note);
 }

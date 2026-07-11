@@ -19,11 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
-import AiStudyHub.BE.constraint.AppealStatus;
 import AiStudyHub.BE.dto.Request.ReportReasonRequest;
-import AiStudyHub.BE.dto.Request.ResolveAppealRequest;
-import AiStudyHub.BE.dto.Response.AppealResponse;
-import AiStudyHub.BE.entity.Appeal;
 import AiStudyHub.BE.entity.ReportReason;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
@@ -99,6 +95,16 @@ public class ReportAdminController {
         return ResponseEntity.ok(APIResponse.response(200, "Resolve report case successfully", toCaseAdminView(rc)));
     }
 
+    @PostMapping("/{caseId}/appeal-refund")
+    @Operation(summary = "Accept user email appeal: restore document/user status and refund warning penalty points (Admin)")
+    public ResponseEntity<APIResponse<ReportCaseAdminResponse>> refundAppeal(
+            @PathVariable Long caseId,
+            @Valid @RequestBody AppealRefundRequest request
+    ) {
+        ReportCase rc = reportService.refundAppeal(caseId, request.getAdminId(), request.getNote());
+        return ResponseEntity.ok(APIResponse.response(200, "Appeal accepted and refunded successfully", toCaseAdminView(rc)));
+    }
+
     @PostMapping("/reasons")
     @Operation(summary = "Create a new report reason (Admin)")
     public ResponseEntity<APIResponse<ReportReason>> createReason(@Valid @RequestBody ReportReasonRequest request) {
@@ -150,48 +156,18 @@ public class ReportAdminController {
                 .build();
     }
 
-    @GetMapping("/appeals")
-    @Operation(summary = "Get list of user appeals filtered by status (Admin)")
-    public ResponseEntity<APIResponse<List<AppealResponse>>> getAppeals(
-            @RequestParam(required = false, defaultValue = "PENDING") AppealStatus status) {
-        List<AppealResponse> responses = reportService.getAppealsByStatus(status)
-                .stream()
-                .map(this::toAppealView)
-                .toList();
-        return ResponseEntity.ok(APIResponse.response(200, "Get appeals list successfully", responses));
-    }
-
-    @PostMapping("/appeals/{appealId}/resolve")
-    @Operation(summary = "Resolve a pending user appeal (Admin)")
-    public ResponseEntity<APIResponse<AppealResponse>> resolveAppeal(
-            @PathVariable Long appealId,
-            @RequestParam Long adminId,
-            @Valid @RequestBody ResolveAppealRequest request) {
-        Appeal appeal = reportService.resolveAppeal(appealId, adminId, request.getApprove(), request.getAdminNote());
-        return ResponseEntity.ok(APIResponse.response(200, "Resolve appeal successfully", toAppealView(appeal)));
-    }
-
-    private AppealResponse toAppealView(Appeal appeal) {
-        return AppealResponse.builder()
-                .appealId(appeal.getAppealId())
-                .caseId(appeal.getReportCase().getCaseId())
-                .userId(appeal.getUser().getUserId())
-                .documentTitle(appeal.getReportCase().getDocument().getTitle())
-                .appealReason(appeal.getAppealReason())
-                .evidenceUrl(appeal.getEvidenceUrl())
-                .status(appeal.getStatus())
-                .createdAt(appeal.getCreatedAt())
-                .resolvedAt(appeal.getResolvedAt())
-                .resolvedByAdminName(appeal.getResolvedBy() != null ? appeal.getResolvedBy().getFullName() : null)
-                .adminNote(appeal.getAdminNote())
-                .build();
-    }
-
     @Data
     @FieldDefaults(level = AccessLevel.PRIVATE)
     public static class ResolveRequest {
         Long adminId;
         AdminDecision decision;
+        String note;
+    }
+
+    @Data
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    public static class AppealRefundRequest {
+        Long adminId;
         String note;
     }
 }
