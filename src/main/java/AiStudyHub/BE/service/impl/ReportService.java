@@ -32,6 +32,7 @@ public class ReportService implements IReport {
     private final ScoreTypeRepo scoreTypeRepo;
     private final INotification notificationService;
     private final IGamification rankingBadgeService;
+    private final AppealRepo appealRepo;
 
     @Override
     @Transactional
@@ -495,5 +496,136 @@ public class ReportService implements IReport {
         }
 
         reportReasonRepo.delete(reason);
+    }
+
+    @Override
+    @Transactional
+    public Appeal submitAppeal(Long caseId, Long userId, String appealReason, String evidenceUrl) {
+        ReportCase rc = reportCaseRepo.findByCaseId(caseId)
+                .orElseThrow(() -> new GlobalException(404, "ReportCase not found"));
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new GlobalException(404, "User not found"));
+
+        if (rc.getCaseStatus() != CaseStatus.RESOLVED && rc.getCaseStatus() != CaseStatus.REJECTED) {
+            throw new GlobalException(400, "Only resolved or rejected cases can be appealed");
+        }
+
+        if (!rc.getDocument().getOwner().getUserId().equals(userId)) {
+            throw new GlobalException(403, "You can only appeal cases for your own documents");
+        }
+
+        if (appealRepo.existsByReportCaseCaseIdAndStatus(caseId, AppealStatus.PENDING)) {
+            throw new GlobalException(400, "There is already a pending appeal for this case");
+        }
+
+        Appeal appeal = Appeal.builder()
+                .reportCase(rc)
+                .user(user)
+                .appealReason(appealReason)
+                .evidenceUrl(evidenceUrl)
+                .status(AppealStatus.PENDING)
+                .build();
+        return appealRepo.save(appeal);
+    }
+
+    @Override
+    @Transactional
+    public Appeal resolveAppeal(Long appealId, Long adminId, boolean approve, String adminNote) {
+        Appeal appeal = appealRepo.findById(appealId)
+                .orElseThrow(() -> new GlobalException(404, "Appeal not found"));
+        User admin = userRepo.findById(adminId)
+                .orElseThrow(() -> new GlobalException(404, "Admin not found"));
+
+        if (!admin.getRole().equals(UserRole.AD)) {
+            throw new GlobalException(403, "Only admins can resolve appeals");
+        }
+
+        if (appeal.getStatus() != AppealStatus.PENDING) {
+            throw new GlobalException(400, "Appeal is already processed");
+        }
+
+        appeal.setResolvedBy(admin);
+        appeal.setResolvedAt(LocalDateTime.now());
+        appeal.setAdminNote(adminNote);
+
+        ReportCase rc = appeal.getReportCase();
+        Document document = rc.getDocument();
+        User owner = document.getOwner();
+
+        if (approve) {
+            appeal.setStatus(AppealStatus.APPROVED);
+            rc.setCaseStatus(CaseStatus.REJECTED);
+            reportCaseRepo.save(rc);
+
+            if (document.getModerationStatus() == ModerationStatus.REMOVED || document.getModerationStatus() == ModerationStatus.HIDDEN) {
+                document.setModerationStatus(ModerationStatus.NORMAL);
+                documentRepo.save(document);
+            }
+
+            if (owner.getStatus() == UserStatus.BANNED) {
+                owner.setStatus(UserStatus.ACTIVE);
+                owner.setBanReason(null);
+                owner.setBannedAt(null);
+                owner.setBannedBy(null);
+                userRepo.save(owner);
+            }
+
+            // Sum all points deducted for this report case in ScoreLog
+            List<ScoreLog> logs = scoreLogRepo.findAllByReportCase(rc);
+            int totalRefund = 0;
+            for (ScoreLog logItem : logs) {
+                if (logItem.getScoreChange() != null && logItem.getScoreChange() < 0) {
+                    totalRefund += Math.abs(logItem.getScoreChange());
+                }
+            }
+
+            if (totalRefund > 0) {
+                owner.setTotalScore(owner.getTotalScore() + totalRefund);
+                userRepo.save(owner);
+
+                ScoreType penaltyType = scoreTypeRepo.findByTypeCode("REPORT_PENALTY")
+                        .orElseThrow(() -> new GlobalException(500, "REPORT_PENALTY ScoreType not found"));
+
+                ScoreLog refundLog = ScoreLog.builder()
+                        .user(owner)
+                        .documentId(document != null ? document.getDocumentId() : null)
+                        .documentTitle(document != null ? document.getTitle() : null)
+                        .scoreType(penaltyType)
+                        .reportCase(rc)
+                        .scoreChange(totalRefund)
+                        .description("Refund of warning penalty after report case was rejected by admin: " + rc.getReason().getReasonName())
+                        .build();
+                scoreLogRepo.save(refundLog);
+
+                rankingBadgeService.updateUserRank(owner.getUserId());
+                rankingBadgeService.checkAndAwardBadges(owner.getUserId());
+            }
+
+            // Restore all reports associated with this case to REJECTED
+            List<Report> reports = reportRepo.findAllByReportCase(rc);
+            for (Report report : reports) {
+                report.setStatus(ReportStatus.REJECTED);
+                reportRepo.save(report);
+            }
+
+            // Send notification about successful appeal & points refund
+            notificationService.sendDocumentRestoredNotification(owner, document, adminNote);
+
+        } else {
+            appeal.setStatus(AppealStatus.REJECTED);
+            // Optionally notify owner that the appeal was rejected
+        }
+
+        return appealRepo.save(appeal);
+    }
+
+    @Override
+    public List<Appeal> getAppealsByStatus(AppealStatus status) {
+        return appealRepo.findAllByStatusOrderByCreatedAtDesc(status);
+    }
+
+    @Override
+    public List<Appeal> getAppealsByUser(Long userId) {
+        return appealRepo.findAllByUserUserIdOrderByCreatedAtDesc(userId);
     }
 }
