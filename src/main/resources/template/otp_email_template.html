@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify your AI Study Hub account</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f1f5f9;
+            color: #334155;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .email-wrapper {
+            width: 100%;
+            background-color: #f1f5f9;
+            padding: 40px 15px;
+        }
+        .email-container {
+            max-width: 580px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+        }
+        .email-header {
+            background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+            color: #ffffff;
+            padding: 32px 30px;
+            text-align: center;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        .email-header .subtitle {
+            margin-top: 6px;
+            font-size: 13px;
+            color: #bfdbfe;
+            font-weight: 500;
+        }
+        .email-body {
+            padding: 40px 32px;
+        }
+        .greeting {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 16px;
+        }
+        .message-text {
+            font-size: 15px;
+            color: #475569;
+            margin-bottom: 28px;
+        }
+        .otp-container {
+            background-color: #eff6ff;
+            border: 2px dashed #3b82f6;
+            border-radius: 10px;
+            padding: 24px;
+            text-align: center;
+            margin: 30px 0;
+        }
+        .otp-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #1e40af;
+            margin-bottom: 8px;
+        }
+        .otp-code {
+            font-size: 34px;
+            font-weight: 700;
+            color: #1d4ed8;
+            letter-spacing: 10px;
+            margin: 0;
+            display: inline-block;
+        }
+        .expiry-note {
+            font-size: 13px;
+            color: #64748b;
+            text-align: center;
+            margin-top: 8px;
+        }
+        .security-notice {
+            background-color: #f8fafc;
+            border-left: 4px solid #f59e0b;
+            border-radius: 6px;
+            padding: 16px;
+            margin-top: 32px;
+            font-size: 13px;
+            color: #64748b;
+        }
+        .security-notice strong {
+            color: #b45309;
+        }
+        .signature {
+            margin-top: 36px;
+            font-size: 15px;
+            color: #334155;
+        }
+        .email-footer {
+            background-color: #f8fafc;
+            padding: 24px 30px;
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <h1>AI STUDY HUB</h1>
+                <div class="subtitle">Account Verification & Identity Security</div>
+            </div>
+            <div class="email-body">
+                <div class="greeting">Hello,</div>
+                <div class="message-text">
+                    You recently requested a one-time verification code to verify your account or reset your password. Please use the following OTP code to complete your request:
+                </div>
+                
+                <div class="otp-container">
+                    <div class="otp-label">Your Verification Code</div>
+                    <div class="otp-code">{{otpCode}}</div>
+                </div>
+                
+                <div class="expiry-note">
+                    ⏳ This code is valid for <strong>5 minutes</strong> only.
+                </div>
+                
+                <div class="security-notice">
+                    <strong>Security Alert:</strong> Never share this OTP with anyone, including AI Study Hub staff. If you did not initiate this request, please ignore this email and verify your account security settings.
+                </div>
+                
+                <div class="signature">
+                    Best regards,<br>
+                    <strong>The AI Study Hub Team</strong>
+                </div>
+            </div>
+            <div class="email-footer">
+                &copy; 2026 AI Study Hub. All rights reserved.<br>
+                This is an automated security message. Please do not reply directly to this email.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
