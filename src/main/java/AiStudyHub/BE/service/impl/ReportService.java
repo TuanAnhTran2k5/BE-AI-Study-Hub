@@ -532,6 +532,7 @@ public class ReportService implements IReport {
             owner.setBannedAt(null);
             owner.setBannedBy(null);
             userRepo.save(owner);
+            notificationService.sendAccountUnbannedNotification(owner);
         }
 
         // Sum all negative score logs associated with this case to calculate refund amount
