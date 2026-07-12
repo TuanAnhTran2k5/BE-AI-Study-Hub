@@ -13,7 +13,6 @@ import java.util.Optional;
 public interface DocumentRepo extends JpaRepository<Document, Long> {
 
 
-    @org.springframework.data.jpa.repository.Query("SELECT d FROM Document d WHERE (d.owner.userId = :userId OR d.visibilityStatus = :visibilityStatus) AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL")
     List<Document> findByOwnerUserIdOrVisibilityStatus(
             @org.springframework.data.repository.query.Param("userId") Long userId, 
             @org.springframework.data.repository.query.Param("visibilityStatus") VisibilityStatus visibilityStatus
@@ -22,18 +21,15 @@ public interface DocumentRepo extends JpaRepository<Document, Long> {
 
     long deleteByDocumentId(Long documentId);
 
-    @org.springframework.data.jpa.repository.Query("SELECT d FROM Document d WHERE d.visibilityStatus = :visibilityStatus AND d.ratingCount >= :minCount AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL")
     List<Document> findByVisibilityStatusAndRatingCountGreaterThanEqual(
             @org.springframework.data.repository.query.Param("visibilityStatus") VisibilityStatus visibilityStatus,
             @org.springframework.data.repository.query.Param("minCount") Integer minCount
     );
 
-    @org.springframework.data.jpa.repository.Query("SELECT d FROM Document d WHERE d.visibilityStatus = :visibilityStatus AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL")
     List<Document> findByVisibilityStatus(
             @org.springframework.data.repository.query.Param("visibilityStatus") VisibilityStatus visibilityStatus
     );
 
-    @org.springframework.data.jpa.repository.Query("SELECT d FROM Document d WHERE d.visibilityStatus = :visibilityStatus AND d.simHashContent IS NOT NULL AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL")
     List<Document> findByVisibilityStatusAndSimHashContentIsNotNull(
             @org.springframework.data.repository.query.Param("visibilityStatus") VisibilityStatus visibilityStatus
     );
