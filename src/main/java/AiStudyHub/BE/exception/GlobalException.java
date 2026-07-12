@@ -12,6 +12,7 @@ import lombok.experimental.FieldDefaults;
 public class GlobalException extends RuntimeException {
 
     Integer code;
+    Object data;
 
     public GlobalException(String message) {
         super(message);
@@ -25,6 +26,12 @@ public class GlobalException extends RuntimeException {
     public GlobalException(ErrorCode errorCode) {
         super(errorCode.getMessage());
         this.code = errorCode.getCode();
+    }
+
+    public GlobalException(ErrorCode errorCode, Object data) {
+        super(errorCode.getMessage());
+        this.code = errorCode.getCode();
+        this.data = data;
     }
 
     public GlobalException(String message, Throwable cause) {

@@ -13,17 +13,30 @@ import java.util.Optional;
 public interface DocumentRepo extends JpaRepository<Document, Long> {
 
 
-    List<Document> findByOwnerUserIdOrVisibilityStatus(Long userId, VisibilityStatus visibilityStatus);
+    @org.springframework.data.jpa.repository.Query("SELECT d FROM Document d WHERE (d.owner.userId = :userId OR d.visibilityStatus = :visibilityStatus) AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL")
+    List<Document> findByOwnerUserIdOrVisibilityStatus(
+            @org.springframework.data.repository.query.Param("userId") Long userId, 
+            @org.springframework.data.repository.query.Param("visibilityStatus") VisibilityStatus visibilityStatus
+    );
 
 
     long deleteByDocumentId(Long documentId);
 
-    List<Document> findByVisibilityStatusAndRatingCountGreaterThanEqual(VisibilityStatus visibilityStatus,
-            Integer minCount);
+    @org.springframework.data.jpa.repository.Query("SELECT d FROM Document d WHERE d.visibilityStatus = :visibilityStatus AND d.ratingCount >= :minCount AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL")
+    List<Document> findByVisibilityStatusAndRatingCountGreaterThanEqual(
+            @org.springframework.data.repository.query.Param("visibilityStatus") VisibilityStatus visibilityStatus,
+            @org.springframework.data.repository.query.Param("minCount") Integer minCount
+    );
 
-    List<Document> findByVisibilityStatus(VisibilityStatus visibilityStatus);
+    @org.springframework.data.jpa.repository.Query("SELECT d FROM Document d WHERE d.visibilityStatus = :visibilityStatus AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL")
+    List<Document> findByVisibilityStatus(
+            @org.springframework.data.repository.query.Param("visibilityStatus") VisibilityStatus visibilityStatus
+    );
 
-    List<Document> findByVisibilityStatusAndSimHashContentIsNotNull(VisibilityStatus visibilityStatus);
+    @org.springframework.data.jpa.repository.Query("SELECT d FROM Document d WHERE d.visibilityStatus = :visibilityStatus AND d.simHashContent IS NOT NULL AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL")
+    List<Document> findByVisibilityStatusAndSimHashContentIsNotNull(
+            @org.springframework.data.repository.query.Param("visibilityStatus") VisibilityStatus visibilityStatus
+    );
 
     List<Document> findByOwner(AiStudyHub.BE.entity.User owner);
     List<Document> findByOwnerUserId(Long userId);

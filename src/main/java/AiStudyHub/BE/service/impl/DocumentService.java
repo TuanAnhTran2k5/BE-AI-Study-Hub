@@ -297,7 +297,10 @@ public class DocumentService implements IDocument {
     @Override
     public List<DocumentResponse> searchDocumentsByTitle(String keyword) {
         return documentRepo.findByTitleContainingIgnoreCase(keyword).stream()
-                .filter(doc -> doc.getVisibilityStatus() == VisibilityStatus.PUBLIC && doc.getUploadStatus() == UploadStatus.COMPLETED)
+                .filter(doc -> doc.getVisibilityStatus() == VisibilityStatus.PUBLIC 
+                        && doc.getUploadStatus() == UploadStatus.COMPLETED
+                        && doc.getModerationStatus() == ModerationStatus.NORMAL
+                        && doc.getDeletedAt() == null)
                 .map(documentMapper::toDocumentResponse)
                 .collect(Collectors.toList());
     }
@@ -325,11 +328,27 @@ public class DocumentService implements IDocument {
             // Tự upload hoặc tài liệu gốc đã bị xóa
             User owner = doc.getOwner();
             if (owner != null) {
+                resp.setOwnerName(owner.getFullName());
+                resp.setOwnerAvatar(owner.getAvatarUrl());
                 resp.setOriginalUploaderId(owner.getUserId());
                 resp.setOriginalUploaderName(owner.getFullName());
                 resp.setOriginalUploaderAvatar(owner.getAvatarUrl());
             }
         }
+
+        // Nếu tài liệu bị ẩn hoặc xóa do vi phạm, truy vấn email admin và lý do để owner kháng nghị
+        if (doc.getModerationStatus() != ModerationStatus.NORMAL) {
+            List<AiStudyHub.BE.entity.ReportCase> cases = reportCaseRepo.findByDocumentDocumentIdOrderByResolvedAtDesc(doc.getDocumentId());
+            AiStudyHub.BE.entity.ReportCase latestResolvedCase = cases.stream()
+                    .filter(c -> c.getCaseStatus() == AiStudyHub.BE.constraint.CaseStatus.RESOLVED && c.getResolvedBy() != null)
+                    .findFirst()
+                    .orElse(null);
+            if (latestResolvedCase != null) {
+                resp.setModeratedByEmail(latestResolvedCase.getResolvedBy().getEmail());
+                resp.setModerationNote(latestResolvedCase.getAdminNote());
+            }
+        }
+
         return resp;
     }
 
@@ -346,6 +365,24 @@ public class DocumentService implements IDocument {
     public DocumentResponse getDocumentDetail(Long documentId) {
         Document document = documentRepo.findById(documentId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (document.getDeletedAt() != null) {
+            throw new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND);
+        }
+
+        // Kiểm tra quyền truy cập tài liệu bị ẩn/gỡ bỏ TRƯỚC KHI enrich response để tránh lộ dữ liệu
+        if (document.getModerationStatus() != ModerationStatus.NORMAL) {
+            User currentUser = null;
+            try {
+                currentUser = SecurityUtils.getCurrentUser();
+            } catch (Exception ignored) {}
+
+            if (currentUser == null || 
+                (!currentUser.getRole().equals(AiStudyHub.BE.constraint.UserRole.AD) 
+                 && !document.getOwner().getUserId().equals(currentUser.getUserId()))) {
+                throw new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND);
+            }
+        }
 
         if (document.getVisibilityStatus() == VisibilityStatus.PRIVATE) {
             User currentUser = SecurityUtils.getCurrentUser();
