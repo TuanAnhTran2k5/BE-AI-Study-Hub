@@ -13,17 +13,26 @@ import java.util.Optional;
 public interface DocumentRepo extends JpaRepository<Document, Long> {
 
 
-    List<Document> findByOwnerUserIdOrVisibilityStatus(Long userId, VisibilityStatus visibilityStatus);
+    List<Document> findByOwnerUserIdOrVisibilityStatus(
+            @org.springframework.data.repository.query.Param("userId") Long userId, 
+            @org.springframework.data.repository.query.Param("visibilityStatus") VisibilityStatus visibilityStatus
+    );
 
 
     long deleteByDocumentId(Long documentId);
 
-    List<Document> findByVisibilityStatusAndRatingCountGreaterThanEqual(VisibilityStatus visibilityStatus,
-            Integer minCount);
+    List<Document> findByVisibilityStatusAndRatingCountGreaterThanEqual(
+            @org.springframework.data.repository.query.Param("visibilityStatus") VisibilityStatus visibilityStatus,
+            @org.springframework.data.repository.query.Param("minCount") Integer minCount
+    );
 
-    List<Document> findByVisibilityStatus(VisibilityStatus visibilityStatus);
+    List<Document> findByVisibilityStatus(
+            @org.springframework.data.repository.query.Param("visibilityStatus") VisibilityStatus visibilityStatus
+    );
 
-    List<Document> findByVisibilityStatusAndSimHashContentIsNotNull(VisibilityStatus visibilityStatus);
+    List<Document> findByVisibilityStatusAndSimHashContentIsNotNull(
+            @org.springframework.data.repository.query.Param("visibilityStatus") VisibilityStatus visibilityStatus
+    );
 
     List<Document> findByOwner(AiStudyHub.BE.entity.User owner);
     List<Document> findByOwnerUserId(Long userId);

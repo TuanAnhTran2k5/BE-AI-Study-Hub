@@ -51,6 +51,9 @@ public class DocumentResponse {
     Boolean isBookmarked;
     Integer myRating;
 
+    String moderatedByEmail;
+    String moderationNote;
+
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 }

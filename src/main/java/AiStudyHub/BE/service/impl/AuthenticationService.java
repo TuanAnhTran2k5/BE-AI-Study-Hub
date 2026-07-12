@@ -87,7 +87,11 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                 throw new GlobalException(ErrorCode.EMAIL_ALREADY_EXISTS);
             }
             if (user.getStatus() == UserStatus.BANNED) {
-                throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+                java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+                banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
+                banDetails.put("banReason", user.getBanReason());
+                banDetails.put("bannedAt", user.getBannedAt());
+                throw new GlobalException(ErrorCode.ACCOUNT_BANNED, banDetails);
             }
             // Update existing PENDING user
             user.setFullName(registerRequest.getFullName());
@@ -131,6 +135,14 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
             return userService.buildUserProfileResponse(user, accessToken);
 
         } catch (LockedException exception) {
+            User user = userRepo.findByEmail(loginRequest.getEmail()).orElse(null);
+            if (user != null && user.getStatus() == UserStatus.BANNED) {
+                java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+                banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
+                banDetails.put("banReason", user.getBanReason());
+                banDetails.put("bannedAt", user.getBannedAt());
+                throw new GlobalException(ErrorCode.ACCOUNT_BANNED, banDetails);
+            }
             throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
         } catch (BadCredentialsException exception) {
             throw new GlobalException(ErrorCode.INVALID_CREDENTIALS);
@@ -152,7 +164,11 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         }
 
         if (user.getStatus() == UserStatus.BANNED) {
-            throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+            java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+            banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
+            banDetails.put("banReason", user.getBanReason());
+            banDetails.put("bannedAt", user.getBannedAt());
+            throw new GlobalException(ErrorCode.ACCOUNT_BANNED, banDetails);
         }
 
         otpService.verifyAndConsumeOtp(user, request.getOtpCode(), OtpPurpose.REGISTER);
@@ -218,6 +234,13 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
 
         User user = userRepo.findByEmail(finalUserInfo.getEmail())
                 .map(existingUser -> {
+                    if (existingUser.getStatus() == UserStatus.BANNED) {
+                        java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+                        banDetails.put("bannedByEmail", existingUser.getBannedBy() != null ? existingUser.getBannedBy().getEmail() : null);
+                        banDetails.put("banReason", existingUser.getBanReason());
+                        banDetails.put("bannedAt", existingUser.getBannedAt());
+                        throw new GlobalException(ErrorCode.ACCOUNT_BANNED, banDetails);
+                    }
                     existingUser.setGoogleId(finalUserInfo.getSub());
 
                     if (existingUser.getStatus() == UserStatus.PENDING) {
@@ -254,7 +277,11 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         User user = tokenService.verifyAccessToken(request.getToken());
 
         if (user.getStatus() == UserStatus.BANNED) {
-            throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+            java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+            banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
+            banDetails.put("banReason", user.getBanReason());
+            banDetails.put("bannedAt", user.getBannedAt());
+            throw new GlobalException(ErrorCode.ACCOUNT_BANNED, banDetails);
         }
 
         return userService.buildUserProfileResponse(user, request.getToken());
@@ -281,7 +308,11 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
         if (user.getStatus() == UserStatus.BANNED) {
-            throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+            java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+            banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
+            banDetails.put("banReason", user.getBanReason());
+            banDetails.put("bannedAt", user.getBannedAt());
+            throw new GlobalException(ErrorCode.ACCOUNT_BANNED, banDetails);
         }
 
         OtpVerification otpVerification = otpService.generateAndSendOtp(user, email, OtpPurpose.FORGOT_PASSWORD);
@@ -297,7 +328,11 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
         if (user.getStatus() == UserStatus.BANNED) {
-            throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+            java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+            banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
+            banDetails.put("banReason", user.getBanReason());
+            banDetails.put("bannedAt", user.getBannedAt());
+            throw new GlobalException(ErrorCode.ACCOUNT_BANNED, banDetails);
         }
 
         otpService.verifyOtpWithoutConsume(user, request.getOtpCode(), OtpPurpose.FORGOT_PASSWORD);
@@ -313,7 +348,11 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
         if (user.getStatus() == UserStatus.BANNED) {
-            throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+            java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+            banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
+            banDetails.put("banReason", user.getBanReason());
+            banDetails.put("bannedAt", user.getBannedAt());
+            throw new GlobalException(ErrorCode.ACCOUNT_BANNED, banDetails);
         }
 
         // Verify and consume OTP
@@ -334,7 +373,11 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
         if (user.getStatus() == UserStatus.BANNED) {
-            throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
+            java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+            banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
+            banDetails.put("banReason", user.getBanReason());
+            banDetails.put("bannedAt", user.getBannedAt());
+            throw new GlobalException(ErrorCode.ACCOUNT_BANNED, banDetails);
         }
 
         OtpPurpose purpose = request.getPurpose();

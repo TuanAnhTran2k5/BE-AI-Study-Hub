@@ -21,7 +21,7 @@ public class GlobalExceptionHandler {
                 ? exception.getCode() // HTTP status code value
                 : HttpStatus.INTERNAL_SERVER_ERROR.value();
 
-        return ResponseEntity.status(status).body(APIResponse.response(status, exception.getMessage(), null));
+        return ResponseEntity.status(status).body(APIResponse.response(status, exception.getMessage(), exception.getData()));
     }
 
     // Catch-all: any unhandled exception returns a generic 500 instead of leaking

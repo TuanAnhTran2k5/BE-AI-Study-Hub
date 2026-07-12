@@ -27,6 +27,30 @@
         ]]></query>
     </named-query>
 
+    <named-query name="Document.findByOwnerUserIdOrVisibilityStatus">
+        <query><![CDATA[
+            SELECT d FROM Document d WHERE (d.owner.userId = :userId OR d.visibilityStatus = :visibilityStatus) AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL
+        ]]></query>
+    </named-query>
+
+    <named-query name="Document.findByVisibilityStatusAndRatingCountGreaterThanEqual">
+        <query><![CDATA[
+            SELECT d FROM Document d WHERE d.visibilityStatus = :visibilityStatus AND d.ratingCount >= :minCount AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL
+        ]]></query>
+    </named-query>
+
+    <named-query name="Document.findByVisibilityStatus">
+        <query><![CDATA[
+            SELECT d FROM Document d WHERE d.visibilityStatus = :visibilityStatus AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL
+        ]]></query>
+    </named-query>
+
+    <named-query name="Document.findByVisibilityStatusAndSimHashContentIsNotNull">
+        <query><![CDATA[
+            SELECT d FROM Document d WHERE d.visibilityStatus = :visibilityStatus AND d.simHashContent IS NOT NULL AND d.moderationStatus = 'NORMAL' AND d.deletedAt IS NULL
+        ]]></query>
+    </named-query>
+
     <named-query name="Document.countDocumentsGroupBySubject">
         <query><![CDATA[
             SELECT d.subject.subjectId, COUNT(d) FROM Document d 
