@@ -48,7 +48,7 @@ public class NotificationService implements INotification {
             String explanation
     ) {
         try {
-            ClassPathResource resource = new ClassPathResource("report_penalty_template.html");
+            ClassPathResource resource = new ClassPathResource("template/report_penalty_template.html");
             String template = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             return template.replace("{{title}}", title != null ? title : "")
                     .replace("{{userName}}", userName != null ? userName : "")
@@ -58,7 +58,7 @@ public class NotificationService implements INotification {
                     .replace("{{reason}}", reason != null ? reason : "Community guidelines violation")
                     .replace("{{explanation}}", explanation != null ? explanation : "No additional notes provided.");
         } catch (Exception e) {
-            log.warn("Could not load report_penalty_template.html, falling back to basic HTML format: {}", e.getMessage());
+            log.warn("Could not load template/report_penalty_template.html, falling back to basic HTML format: {}", e.getMessage());
             return String.format(
                     "<h3>%s</h3><p>Dear %s,</p><p>Reported Object: %s<br>Action Taken: %s<br>Reputation Impact: %s<br>Violation Reason: %s<br>Admin Note: %s</p>",
                     title, userName, documentInfo, actionType, penaltyScoreText, reason, explanation
@@ -161,12 +161,9 @@ public class NotificationService implements INotification {
                 owner.getEmail(), owner.getUserId());
 
         String subject = "[AI Study Hub] Account Ban Notice: Severe Policy Violation";
-        String htmlContent = loadAndPopulateEmailTemplate(
-                "Account Ban Notice (BANNED)",
+        String htmlContent = loadBannedEmailTemplate(
                 owner.getFullName(),
                 document != null ? document.getTitle() : "Personal account",
-                "Account locked (BANNED) & infringing content removed",
-                "Account Banned",
                 reasonName,
                 explanation
         );
@@ -196,13 +193,8 @@ public class NotificationService implements INotification {
                 user.getEmail(), user.getUserId());
 
         String subject = "[AI Study Hub] Account Restored Notice";
-        String htmlContent = loadAndPopulateEmailTemplate(
-                "Account Restored Notice (ACTIVE)",
+        String htmlContent = loadUnbannedEmailTemplate(
                 user.getFullName(),
-                "Personal account",
-                "Account has been unlocked (ACTIVE). Welcome back!",
-                "Account Restored",
-                "Review Completed",
                 "Your account has been unlocked by an administrator. You can now log back in and use the platform normally."
         );
 
@@ -544,5 +536,45 @@ public class NotificationService implements INotification {
         }
 
         return builder.build();
+    }
+    
+    private String loadBannedEmailTemplate(
+            String userName,
+            String documentTitle,
+            String reasonName,
+            String explanation
+    ) {
+        try {
+            ClassPathResource resource = new ClassPathResource("template/account_banned_template.html");
+            String template = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            return template.replace("{{userName}}", userName != null ? userName : "")
+                    .replace("{{documentTitle}}", documentTitle != null ? documentTitle : "Personal account")
+                    .replace("{{reasonName}}", reasonName != null ? reasonName : "Severe Community Guidelines Violation")
+                    .replace("{{explanation}}", explanation != null ? explanation : "No additional notes provided.");
+        } catch (Exception e) {
+            log.warn("Could not load template/account_banned_template.html, falling back to basic HTML format: {}", e.getMessage());
+            return String.format(
+                    "<h3>Account Banned Notice</h3><p>Dear %s,</p><p>Your account has been locked due to a policy violation.<br>Infringing Content: %s<br>Violation Category: %s<br>Admin Note: %s<br>To appeal, email support@aistudyhub.com.</p>",
+                    userName, documentTitle != null ? documentTitle : "Personal account", reasonName, explanation
+            );
+        }
+    }
+
+    private String loadUnbannedEmailTemplate(
+            String userName,
+            String explanation
+    ) {
+        try {
+            ClassPathResource resource = new ClassPathResource("template/account_unbanned_template.html");
+            String template = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            return template.replace("{{userName}}", userName != null ? userName : "")
+                    .replace("{{explanation}}", explanation != null ? explanation : "Your account restrictions have been lifted following moderation review.");
+        } catch (Exception e) {
+            log.warn("Could not load template/account_unbanned_template.html, falling back to basic HTML format: {}", e.getMessage());
+            return String.format(
+                    "<h3>Account Restored Notice</h3><p>Dear %s,</p><p>Your account has been unlocked (ACTIVE) by an administrator.<br>Note: %s<br>Welcome back to AI Study Hub!</p>",
+                    userName, explanation != null ? explanation : "Account unlocked."
+            );
+        }
     }
 }

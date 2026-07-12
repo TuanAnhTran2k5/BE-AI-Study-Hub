@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Study Hub - Account Restored Notice</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0fdf4;
+            color: #334155;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .email-wrapper {
+            width: 100%;
+            background-color: #f0fdf4;
+            padding: 40px 15px;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.08);
+            border: 1px solid #a7f3d0;
+        }
+        .email-header {
+            background: linear-gradient(135deg, #065f46 0%, #059669 50%, #10b981 100%);
+            color: #ffffff;
+            padding: 32px 30px;
+            text-align: center;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+        }
+        .email-header .subtitle {
+            margin-top: 6px;
+            font-size: 13px;
+            color: #d1fae5;
+            font-weight: 500;
+        }
+        .email-body {
+            padding: 36px 32px;
+        }
+        .status-badge {
+            display: inline-block;
+            background-color: #ecfdf5;
+            color: #047857;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 6px 16px;
+            border-radius: 20px;
+            margin-bottom: 24px;
+            border: 1px solid #6ee7b7;
+            letter-spacing: 0.5px;
+        }
+        .greeting {
+            font-size: 17px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 14px;
+        }
+        .message-intro {
+            font-size: 15px;
+            color: #475569;
+            margin-bottom: 24px;
+        }
+        .details-card {
+            background-color: #f0fdf4;
+            border-left: 4px solid #10b981;
+            border-radius: 8px;
+            padding: 22px;
+            margin-bottom: 24px;
+        }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .details-table td {
+            padding: 8px 0;
+            vertical-align: top;
+            font-size: 14px;
+        }
+        .details-table td.label {
+            width: 155px;
+            font-weight: 600;
+            color: #065f46;
+        }
+        .details-table td.value {
+            color: #1e293b;
+            font-weight: 600;
+        }
+        .value.status {
+            color: #059669;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .explanation-box {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 18px;
+            margin-bottom: 28px;
+        }
+        .explanation-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 6px;
+        }
+        .explanation-text {
+            font-size: 14px;
+            color: #334155;
+            margin: 0;
+            white-space: pre-line;
+        }
+        .welcome-back {
+            background: linear-gradient(to right, #eff6ff, #f0fdf4);
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-top: 15px;
+        }
+        .welcome-back p {
+            margin: 0 0 16px 0;
+            font-size: 14px;
+            color: #1e3a8a;
+            font-weight: 500;
+        }
+        .signature {
+            margin-top: 32px;
+            font-size: 15px;
+            color: #334155;
+        }
+        .email-footer {
+            background-color: #f8fafc;
+            padding: 24px 30px;
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="email-header">
+                <h1>AI STUDY HUB</h1>
+                <div class="subtitle">Trust & Safety Moderation Team</div>
+            </div>
+            <div class="email-body">
+                <div class="status-badge">🎉 ACCOUNT RESTORED / ACTIVE</div>
+                
+                <div class="greeting">Dear {{userName}},</div>
+                
+                <div class="message-intro">
+                    Good news! Your AI Study Hub account has been fully restored and unlocked by an administrator following a review of your appeal or account status.
+                </div>
+                
+                <div class="details-card">
+                    <table class="details-table">
+                        <tr>
+                            <td class="label">Account Status:</td>
+                            <td class="value status">Active (Restored)</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Resolution Type:</td>
+                            <td class="value">Moderation Review & Appeal Approval</td>
+                        </tr>
+                        <tr>
+                            <td class="label">Access Privileges:</td>
+                            <td class="value">Fully Restored (Upload, Download & Community)</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="explanation-box">
+                    <div class="explanation-title">Admin Resolution Note</div>
+                    <p class="explanation-text">{{explanation}}</p>
+                </div>
+                
+                <div class="welcome-back">
+                    <p>Welcome back! You can now log back into the platform and access all features normally. Thank you for your patience and for being a part of the AI Study Hub community!</p>
+                </div>
+                
+                <div class="signature">
+                    Best regards,<br>
+                    <strong>The AI Study Hub Team</strong>
+                </div>
+            </div>
+            <div class="email-footer">
+                &copy; 2026 AI Study Hub. All rights reserved.<br>
+                This is an automated notification from our Moderation team. Please do not reply directly to this email.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
