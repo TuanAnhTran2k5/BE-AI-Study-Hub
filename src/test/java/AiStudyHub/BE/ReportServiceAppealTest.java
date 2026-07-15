@@ -103,7 +103,8 @@ public class ReportServiceAppealTest {
         assertEquals(CaseStatus.REJECTED, result.getCaseStatus());
         assertEquals(ModerationStatus.NORMAL, document.getModerationStatus());
         assertEquals(120L, regularUser.getTotalScore()); // Refunded 20 points
-        verify(notificationService, times(1)).sendDocumentRestoredNotification(eq(regularUser), eq(document), anyString());
+        verify(notificationService, times(1)).sendDocumentRestoredNotification(eq(regularUser), eq(document),
+                anyString());
     }
 
     @Test
@@ -126,5 +127,86 @@ public class ReportServiceAppealTest {
         assertThrows(GlobalException.class, () -> {
             reportService.refundAppeal(20L, 1L, "Reason");
         });
+    }
+
+    @Test
+    public void testCheckAndEscalateWarningCases_UserHasUpdated_ResolvesCase() {
+        // Prepare warning_1 case where firstWarningAt is 4 days ago
+        reportCase.setCaseStatus(CaseStatus.WARNING_1);
+        reportCase.setFirstWarningAt(LocalDateTime.now().minusDays(4));
+        
+        // Document updated after warning (e.g. 10 hours ago)
+        document.setModerationStatus(ModerationStatus.NORMAL);
+        document.setUpdatedAt(LocalDateTime.now().minusHours(10));
+
+        when(reportCaseRepo.findAllByCaseStatus(CaseStatus.WARNING_1)).thenReturn(List.of(reportCase));
+        when(reportCaseRepo.findAllByCaseStatus(CaseStatus.WARNING_2)).thenReturn(Collections.emptyList());
+        
+        Report report = Report.builder().status(ReportStatus.PENDING).build();
+        when(reportRepo.findAllByReportCase(reportCase)).thenReturn(List.of(report));
+
+        reportService.checkAndEscalateWarningCases();
+
+        assertEquals(CaseStatus.REJECTED, reportCase.getCaseStatus());
+        assertEquals(ModerationStatus.NORMAL, document.getModerationStatus());
+        assertEquals(ReportStatus.REJECTED, report.getStatus());
+        verify(documentRepo, times(1)).save(document);
+        verify(reportCaseRepo, times(1)).save(reportCase);
+        verify(notificationService, times(1)).sendDocumentRestoredNotification(eq(regularUser), eq(document), anyString());
+    }
+
+    @Test
+    public void testCheckAndEscalateWarningCases_UserHasNotUpdated_EscalatesToWarning2() {
+        // Prepare warning_1 case where firstWarningAt is 4 days ago
+        reportCase.setCaseStatus(CaseStatus.WARNING_1);
+        reportCase.setFirstWarningAt(LocalDateTime.now().minusDays(4));
+        
+        // Document not updated (e.g. 5 days ago)
+        document.setModerationStatus(ModerationStatus.NORMAL);
+        document.setUpdatedAt(LocalDateTime.now().minusDays(5));
+
+        when(reportCaseRepo.findAllByCaseStatus(CaseStatus.WARNING_1)).thenReturn(List.of(reportCase));
+        when(reportCaseRepo.findAllByCaseStatus(CaseStatus.WARNING_2)).thenReturn(Collections.emptyList());
+        when(userRepo.save(any(User.class))).thenReturn(regularUser);
+        
+        ScoreType penaltyType = ScoreType.builder().defaultPoint(-10).build();
+        when(scoreTypeRepo.findByTypeCode("REPORT_PENALTY")).thenReturn(Optional.of(penaltyType));
+
+        reportService.checkAndEscalateWarningCases();
+
+        assertEquals(CaseStatus.WARNING_2, reportCase.getCaseStatus());
+        assertEquals(ModerationStatus.HIDDEN, document.getModerationStatus());
+        assertNotNull(reportCase.getSecondWarningAt());
+        assertEquals(90L, regularUser.getTotalScore()); // Deducted 10 points
+        verify(documentRepo, times(1)).save(document);
+        verify(reportCaseRepo, times(1)).save(reportCase);
+        verify(notificationService, times(1)).sendDocumentModerationNotification(
+                eq(regularUser), eq(document), any(), eq(10), eq("WARNING_2 (Warning Notice)"), anyString()
+        );
+    }
+
+    @Test
+    public void testCheckAndEscalateWarningCases_Warning2Expired_AutoRemovesDocument() {
+        // Prepare warning_2 case where secondWarningAt is 8 days ago
+        reportCase.setCaseStatus(CaseStatus.WARNING_2);
+        reportCase.setSecondWarningAt(LocalDateTime.now().minusDays(8));
+        document.setModerationStatus(ModerationStatus.HIDDEN);
+
+        when(reportCaseRepo.findAllByCaseStatus(CaseStatus.WARNING_1)).thenReturn(Collections.emptyList());
+        when(reportCaseRepo.findAllByCaseStatus(CaseStatus.WARNING_2)).thenReturn(List.of(reportCase));
+        
+        Report report = Report.builder().status(ReportStatus.PENDING).build();
+        when(reportRepo.findAllByReportCase(reportCase)).thenReturn(List.of(report));
+
+        reportService.checkAndEscalateWarningCases();
+
+        assertEquals(CaseStatus.RESOLVED, reportCase.getCaseStatus());
+        assertEquals(ModerationStatus.REMOVED, document.getModerationStatus());
+        assertEquals(ReportStatus.RESOLVED, report.getStatus());
+        verify(documentRepo, times(1)).save(document);
+        verify(reportCaseRepo, times(1)).save(reportCase);
+        verify(notificationService, times(1)).sendDocumentModerationNotification(
+                eq(regularUser), eq(document), any(), eq(0), eq("REMOVED (Permanently Removed)"), anyString()
+        );
     }
 }

@@ -41,10 +41,6 @@ public class ScoreLog {
     String uniqueActionKey;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "reportId")
-    Report report;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reportCaseId")
     ReportCase reportCase;
 
