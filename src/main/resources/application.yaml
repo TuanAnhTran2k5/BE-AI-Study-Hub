@@ -81,6 +81,11 @@ app:
       - "/api/files/**"
       - "/api/user/document/search"
       - "/api/user/academic/**"
+  system-admin:
+    email: ${SYSTEM_ADMIN_EMAIL}
+    password: ${SYSTEM_ADMIN_PASSWORD}
+    fullName: ${SYSTEM_ADMIN_FULL_NAME}
+
 
 jwt:
   signerKey: ${JWT_SIGNER_KEY}

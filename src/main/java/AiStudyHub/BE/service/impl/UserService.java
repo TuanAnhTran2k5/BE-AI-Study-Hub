@@ -1,5 +1,6 @@
 package AiStudyHub.BE.service.impl;
 
+import AiStudyHub.BE.config.SystemAdminProperties;
 import AiStudyHub.BE.constraint.*;
 import AiStudyHub.BE.dto.Request.UpdateProfileRequest;
 import AiStudyHub.BE.dto.Response.*;
@@ -55,6 +56,8 @@ public class UserService implements IUser {
     RankingRepo rankingRepo;
     ISupabaseStorage supabaseStorage;
     INotification notificationService;
+    SystemAdminProperties systemAdminProperties;
+
 
     @Override
     public UserResponse updateProfile(Long userId, UpdateProfileRequest request) {
@@ -436,12 +439,18 @@ public class UserService implements IUser {
         User target = userRepo.findById(targetUserId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
+        if (target.getEmail().equalsIgnoreCase(systemAdminProperties.getEmail())) {
+            throw new GlobalException(403, "Cannot ban the system administrator");
+        }
+
         if (target.getUserId().equals(admin.getUserId())) {
             throw new GlobalException(400, "Cannot ban yourself");
         }
-        if (target.getRole() == UserRole.AD) {
-            throw new GlobalException(403, "Cannot ban another admin");
+
+        if (target.getRole() == UserRole.AD && !admin.getEmail().equalsIgnoreCase(systemAdminProperties.getEmail())) {
+            throw new GlobalException(403, "Cannot ban another admin account");
         }
+
         if (target.getStatus() == UserStatus.BANNED) {
             throw new GlobalException(409, "User is already banned");
         }
@@ -464,11 +473,19 @@ public class UserService implements IUser {
     @Override
     @Transactional
     public AdminUserResponse unbanUser(Long targetUserId) {
+        User currentLoggedIn = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+        User admin = userRepo.findById(currentLoggedIn.getUserId())
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
         User target = userRepo.findById(targetUserId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
         if (target.getStatus() != UserStatus.BANNED) {
             throw new GlobalException(409, "User is not currently banned");
+        }
+
+        if (target.getRole() == UserRole.AD && !admin.getEmail().equalsIgnoreCase(systemAdminProperties.getEmail())) {
+            throw new GlobalException(403, "Cannot unban another admin");
         }
 
         target.setStatus(UserStatus.ACTIVE);
@@ -485,6 +502,35 @@ public class UserService implements IUser {
 
         return mapToAdminUserResponse(target, docCounts.getOrDefault(targetUserId, 0L), downloadCounts.getOrDefault(targetUserId, 0L));
     }
+
+    @Override
+    @Transactional
+    public AdminUserResponse updateUserRole(Long targetUserId, UserRole newRole) {
+        User currentLoggedIn = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+        User admin = userRepo.findById(currentLoggedIn.getUserId())
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
+        if (!admin.getEmail().equalsIgnoreCase(systemAdminProperties.getEmail())) {
+            throw new GlobalException(403, "Only the system administrator can manage user roles");
+        }
+
+        User target = userRepo.findById(targetUserId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
+
+        if (target.getUserId().equals(admin.getUserId())) {
+            throw new GlobalException(400, "Cannot change your own role");
+        }
+
+        target.setRole(newRole);
+        userRepo.save(target);
+
+        List<Long> ids = Collections.singletonList(targetUserId);
+        Map<Long, Long> docCounts = toCountMap(documentRepo.countActiveDocumentsGroupByOwnerIds(ids));
+        Map<Long, Long> downloadCounts = toCountMap(downloadRepo.countDownloadsReceivedGroupByOwnerIds(ids));
+
+        return mapToAdminUserResponse(target, docCounts.getOrDefault(targetUserId, 0L), downloadCounts.getOrDefault(targetUserId, 0L));
+    }
+
 
     private AdminUserResponse mapToAdminUserResponse(User u, long activeDocs, long downloadsReceived) {
         return AdminUserResponse.builder()

@@ -56,4 +56,14 @@ public class AdminUserController {
     ) {
         return ResponseEntity.ok(APIResponse.response(200, "Unban user successfully", userService.unbanUser(userId)));
     }
+
+    @PostMapping("/{userId}/role")
+    @Operation(summary = "Update a user's role (promote US to AD, demote AD to US)")
+    public ResponseEntity<APIResponse<AdminUserResponse>> updateUserRole(
+            @PathVariable Long userId,
+            @Valid @RequestBody AiStudyHub.BE.dto.Request.UpdateRoleRequest request
+    ) {
+        return ResponseEntity.ok(APIResponse.response(200, "Update user role successfully", userService.updateUserRole(userId, request.getRole())));
+    }
 }
+

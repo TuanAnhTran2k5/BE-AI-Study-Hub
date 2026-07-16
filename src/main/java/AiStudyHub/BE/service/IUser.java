@@ -1,5 +1,6 @@
 package AiStudyHub.BE.service;
 
+import AiStudyHub.BE.constraint.UserRole;
 import AiStudyHub.BE.dto.Request.UpdateProfileRequest;
 import AiStudyHub.BE.dto.Response.AdminUserResponse;
 import AiStudyHub.BE.dto.Response.UserResponse;
@@ -18,4 +19,6 @@ public interface IUser {
     AdminUserResponse getUserDetailForAdmin(Long userId);
     AdminUserResponse banUser(Long targetUserId, String reason);
     AdminUserResponse unbanUser(Long targetUserId);
+    AdminUserResponse updateUserRole(Long targetUserId, UserRole newRole);
 }
+
