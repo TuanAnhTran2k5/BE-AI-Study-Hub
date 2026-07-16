@@ -50,6 +50,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -235,7 +237,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         User user = userRepo.findByEmail(finalUserInfo.getEmail())
                 .map(existingUser -> {
                     if (existingUser.getStatus() == UserStatus.BANNED) {
-                        java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+                        Map<String, Object> banDetails = new HashMap<>();
                         banDetails.put("bannedByEmail", existingUser.getBannedBy() != null ? existingUser.getBannedBy().getEmail() : null);
                         banDetails.put("banReason", existingUser.getBanReason());
                         banDetails.put("bannedAt", existingUser.getBannedAt());
@@ -277,7 +279,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         User user = tokenService.verifyAccessToken(request.getToken());
 
         if (user.getStatus() == UserStatus.BANNED) {
-            java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+            Map<String, Object> banDetails = new HashMap<>();
             banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
             banDetails.put("banReason", user.getBanReason());
             banDetails.put("bannedAt", user.getBannedAt());
@@ -308,7 +310,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
         if (user.getStatus() == UserStatus.BANNED) {
-            java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+            Map<String, Object> banDetails = new HashMap<>();
             banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
             banDetails.put("banReason", user.getBanReason());
             banDetails.put("bannedAt", user.getBannedAt());
@@ -328,7 +330,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
         if (user.getStatus() == UserStatus.BANNED) {
-            java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+            Map<String, Object> banDetails = new HashMap<>();
             banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
             banDetails.put("banReason", user.getBanReason());
             banDetails.put("bannedAt", user.getBannedAt());
@@ -348,7 +350,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
         if (user.getStatus() == UserStatus.BANNED) {
-            java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+            Map<String, Object> banDetails = new HashMap<>();
             banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
             banDetails.put("banReason", user.getBanReason());
             banDetails.put("bannedAt", user.getBannedAt());
@@ -373,7 +375,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
         if (user.getStatus() == UserStatus.BANNED) {
-            java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+            Map<String, Object> banDetails = new HashMap<>();
             banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
             banDetails.put("banReason", user.getBanReason());
             banDetails.put("bannedAt", user.getBannedAt());
