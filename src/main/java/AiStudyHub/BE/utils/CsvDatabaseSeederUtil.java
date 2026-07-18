@@ -10,8 +10,9 @@ import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.FileReader;
+import java.io.InputStreamReader;
 import java.io.Reader;
+import org.springframework.core.io.ClassPathResource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,7 @@ public class CsvDatabaseSeederUtil {
     public void seedSemesters() {
         if (semesterRepo.count() > 0) return;
         log.info("Seeding Semesters from CSV...");
-        try (Reader reader = new FileReader("semesters.csv")) {
+        try (Reader reader = new InputStreamReader(new ClassPathResource("csv/semesters.csv").getInputStream())) {
             Iterable<CSVRecord> records = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build().parse(reader);
             for (CSVRecord record : records) {
                 semesterRepo.save(Semester.builder()
@@ -51,7 +52,7 @@ public class CsvDatabaseSeederUtil {
     public void seedComboSubjects() {
         if (comboSubjectRepo.count() > 0) return;
         log.info("Seeding ComboSubjects from CSV...");
-        try (Reader reader = new FileReader("combo_subjects.csv")) {
+        try (Reader reader = new InputStreamReader(new ClassPathResource("csv/combo_subjects.csv").getInputStream())) {
             Iterable<CSVRecord> records = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build().parse(reader);
             for (CSVRecord record : records) {
                 comboSubjectRepo.save(ComboSubject.builder()
@@ -68,7 +69,7 @@ public class CsvDatabaseSeederUtil {
     public void seedSubjectsAndCombos() {
         if (subjectRepo.count() > 0) return;
         log.info("Seeding Subjects from CSV...");
-        try (Reader reader = new FileReader("subjects.csv")) {
+        try (Reader reader = new InputStreamReader(new ClassPathResource("csv/subjects.csv").getInputStream())) {
             Iterable<CSVRecord> records = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build().parse(reader);
             Map<String, Semester> semesterMap = semesterRepo.findAll().stream().collect(Collectors.toMap(Semester::getSemesterNo, s -> s));
             Map<String, ComboSubject> comboMap = comboSubjectRepo.findAll().stream().collect(Collectors.toMap(ComboSubject::getComboCode, c -> c));
@@ -112,7 +113,7 @@ public class CsvDatabaseSeederUtil {
     public void seedScoreTypes() {
         if (scoreTypeRepo.count() > 0) return;
         log.info("Seeding ScoreTypes from CSV...");
-        try (Reader reader = new FileReader("score_types.csv")) {
+        try (Reader reader = new InputStreamReader(new ClassPathResource("csv/score_types.csv").getInputStream())) {
             Iterable<CSVRecord> records = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build().parse(reader);
             List<ScoreType> scoreTypes = new ArrayList<>();
             for (CSVRecord record : records) {
@@ -132,7 +133,7 @@ public class CsvDatabaseSeederUtil {
     public void seedRankings() {
         if (rankingRepo.count() > 0) return;
         log.info("Seeding Rankings from CSV...");
-        try (Reader reader = new FileReader("rankings.csv")) {
+        try (Reader reader = new InputStreamReader(new ClassPathResource("csv/rankings.csv").getInputStream())) {
             Iterable<CSVRecord> records = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build().parse(reader);
             List<Ranking> rankings = new ArrayList<>();
             for (CSVRecord record : records) {
@@ -155,7 +156,7 @@ public class CsvDatabaseSeederUtil {
     public void seedBadges() {
         if (badgeRepo.count() > 0) return;
         log.info("Seeding Badges from CSV...");
-        try (Reader reader = new FileReader("badges.csv")) {
+        try (Reader reader = new InputStreamReader(new ClassPathResource("csv/badges.csv").getInputStream())) {
             Iterable<CSVRecord> records = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build().parse(reader);
             List<Badge> badges = new ArrayList<>();
             for (CSVRecord record : records) {
