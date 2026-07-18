@@ -1,19 +1,10 @@
 package AiStudyHub.BE.service.impl;
 
-import AiStudyHub.BE.constraint.ErrorCode;
-import AiStudyHub.BE.constraint.ModerationStatus;
-import AiStudyHub.BE.constraint.VisibilityStatus;
-import AiStudyHub.BE.constraint.UploadStatus;
-import AiStudyHub.BE.constraint.ScoreTypeCode;
+import AiStudyHub.BE.constraint.*;
 import AiStudyHub.BE.dto.Request.DocumentUpdateRequest;
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
 import AiStudyHub.BE.dto.Response.*;
-import AiStudyHub.BE.entity.Document;
-import AiStudyHub.BE.entity.Download;
-import AiStudyHub.BE.entity.RagDocument;
-import AiStudyHub.BE.entity.Subject;
-import AiStudyHub.BE.entity.User;
-import AiStudyHub.BE.entity.ScoreLog;
+import AiStudyHub.BE.entity.*;
 import AiStudyHub.BE.exception.GlobalException;
 import AiStudyHub.BE.mapper.DocumentMapper;
 import AiStudyHub.BE.repository.*;
@@ -301,56 +292,10 @@ public class DocumentService implements IDocument {
                         && doc.getUploadStatus() == UploadStatus.COMPLETED
                         && doc.getModerationStatus() == ModerationStatus.NORMAL
                         && doc.getDeletedAt() == null)
-                .map(documentMapper::toDocumentResponse)
+                .map(this::enrichDocumentResponse)
                 .collect(Collectors.toList());
     }
 
-    private DocumentResponse enrichDocumentResponse(Document doc) {
-        DocumentResponse resp = documentMapper.toDocumentResponse(doc);
-        Document source = doc.getSourceDocument();
-        if (source != null) {
-            // Đồng bộ stats từ tài liệu gốc
-            resp.setDownloadCount(source.getDownloadCount());
-            resp.setBookmarkCount(source.getBookmarkCount());
-            resp.setAverageRating(source.getAverageRating());
-            resp.setRatingCount(source.getRatingCount());
-            
-            // Gán thông tin uploader gốc
-            User originalOwner = source.getOwner();
-            if (originalOwner != null) {
-                resp.setOriginalUploaderId(originalOwner.getUserId());
-                resp.setOriginalUploaderName(originalOwner.getFullName());
-                resp.setOriginalUploaderAvatar(originalOwner.getAvatarUrl());
-                resp.setOwnerName(originalOwner.getFullName());
-                resp.setOwnerAvatar(originalOwner.getAvatarUrl());
-            }
-        } else {
-            // Tự upload hoặc tài liệu gốc đã bị xóa
-            User owner = doc.getOwner();
-            if (owner != null) {
-                resp.setOwnerName(owner.getFullName());
-                resp.setOwnerAvatar(owner.getAvatarUrl());
-                resp.setOriginalUploaderId(owner.getUserId());
-                resp.setOriginalUploaderName(owner.getFullName());
-                resp.setOriginalUploaderAvatar(owner.getAvatarUrl());
-            }
-        }
-
-        // Nếu tài liệu bị ẩn hoặc xóa do vi phạm, truy vấn email admin và lý do để owner kháng nghị
-        if (doc.getModerationStatus() != ModerationStatus.NORMAL) {
-            List<AiStudyHub.BE.entity.ReportCase> cases = reportCaseRepo.findByDocumentDocumentIdOrderByResolvedAtDesc(doc.getDocumentId());
-            AiStudyHub.BE.entity.ReportCase latestResolvedCase = cases.stream()
-                    .filter(c -> c.getCaseStatus() == AiStudyHub.BE.constraint.CaseStatus.RESOLVED && c.getResolvedBy() != null)
-                    .findFirst()
-                    .orElse(null);
-            if (latestResolvedCase != null) {
-                resp.setModeratedByEmail(latestResolvedCase.getResolvedBy().getEmail());
-                resp.setModerationNote(latestResolvedCase.getAdminNote());
-            }
-        }
-
-        return resp;
-    }
 
     @Override
     @Transactional(readOnly = true)
@@ -662,6 +607,71 @@ public class DocumentService implements IDocument {
     }
 
     // --- UTILS ---
+
+
+    private DocumentResponse enrichDocumentResponse(Document doc) {
+        DocumentResponse resp = documentMapper.toDocumentResponse(doc);
+        Document source = doc.getSourceDocument();
+        User targetOwner = null;
+        if (source != null) {
+            // Đồng bộ stats từ tài liệu gốc
+            resp.setDownloadCount(source.getDownloadCount());
+            resp.setBookmarkCount(source.getBookmarkCount());
+            resp.setAverageRating(source.getAverageRating());
+            resp.setRatingCount(source.getRatingCount());
+            
+            // Gán thông tin uploader gốc
+            targetOwner = source.getOwner();
+            if (targetOwner != null) {
+                resp.setOriginalUploaderId(targetOwner.getUserId());
+                resp.setOriginalUploaderName(targetOwner.getFullName());
+                resp.setOriginalUploaderAvatar(targetOwner.getAvatarUrl());
+                resp.setOwnerName(targetOwner.getFullName());
+                resp.setOwnerAvatar(targetOwner.getAvatarUrl());
+            }
+        } else {
+            // Tự upload hoặc tài liệu gốc đã bị xóa
+            targetOwner = doc.getOwner();
+            if (targetOwner != null) {
+                resp.setOwnerName(targetOwner.getFullName());
+                resp.setOwnerAvatar(targetOwner.getAvatarUrl());
+                resp.setOriginalUploaderId(targetOwner.getUserId());
+                resp.setOriginalUploaderName(targetOwner.getFullName());
+                resp.setOriginalUploaderAvatar(targetOwner.getAvatarUrl());
+            }
+        }
+
+        if (targetOwner != null) {
+            resp.setOwnerTotalScore(targetOwner.getTotalScore() != null ? targetOwner.getTotalScore() : 0L);
+            try {
+                UserRankResponse rankResp = gamificationService.getUserRank(targetOwner.getUserId());
+                resp.setOwnerCurrentRank(rankResp);
+                
+                long docCount = documentRepo.countByOwnerUserId(targetOwner.getUserId());
+                long downCount = documentRepo.sumDownloadCountByOwnerUserId(targetOwner.getUserId());
+                resp.setOwnerDocumentCount((int) docCount);
+                resp.setOwnerDownloadCount((int) downCount);
+            } catch (Exception e) {
+                log.warn("Failed to fetch gamification stats for owner: {}", e.getMessage());
+            }
+        }
+
+        // Nếu tài liệu bị ẩn hoặc xóa do vi phạm, truy vấn email admin và lý do để owner kháng nghị
+        if (doc.getModerationStatus() != ModerationStatus.NORMAL) {
+            List<ReportCase> cases = reportCaseRepo.findByDocumentDocumentIdOrderByResolvedAtDesc(doc.getDocumentId());
+            ReportCase latestResolvedCase = cases.stream()
+                    .filter(c -> c.getCaseStatus() == CaseStatus.RESOLVED && c.getResolvedBy() != null)
+                    .findFirst()
+                    .orElse(null);
+            if (latestResolvedCase != null) {
+                resp.setModeratedByEmail(latestResolvedCase.getResolvedBy().getEmail());
+                resp.setModerationNote(latestResolvedCase.getAdminNote());
+            }
+        }
+
+        return resp;
+    }
+
 
     private void applyPartialUpdate(Document document, DocumentUpdateRequest request) {
         // title: null, blank, or Swagger default placeholder "string" → skip

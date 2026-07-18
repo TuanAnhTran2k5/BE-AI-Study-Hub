@@ -26,6 +26,11 @@ public class DocumentResponse {
     String originalUploaderName;
     String originalUploaderAvatar;
 
+    Long ownerTotalScore;
+    AiStudyHub.BE.dto.Response.UserRankResponse ownerCurrentRank;
+    Integer ownerDocumentCount;
+    Integer ownerDownloadCount;
+
     Long subjectId;
     String subjectCode;
     String subjectName;
