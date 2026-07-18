@@ -13,4 +13,5 @@ public interface IComboSubjectService {
     ComboSubjectResponse updateComboSubject(Long comboId, ComboSubjectRequest request);
     DeleteResponse deleteComboSubject(Long comboId);
     List<ComboSubjectResponse> searchComboSubjects(String keyword);
+    ComboSubjectResponse restoreComboSubject(Long comboId);
 }

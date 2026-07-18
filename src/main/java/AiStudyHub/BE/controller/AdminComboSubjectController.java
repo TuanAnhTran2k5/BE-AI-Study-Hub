@@ -48,4 +48,9 @@ public class AdminComboSubjectController {
     public ResponseEntity<APIResponse<DeleteResponse>> deleteComboSubject(@PathVariable Long id) {
         return ResponseEntity.ok(APIResponse.response(200, "Delete combo subject and its subjects successfully", comboSubjectService.deleteComboSubject(id)));
     }
+
+    @PutMapping("/restore/{id}")
+    public ResponseEntity<APIResponse<ComboSubjectResponse>> restoreComboSubject(@PathVariable Long id) {
+        return ResponseEntity.ok(APIResponse.response(200, "Restore combo subject successfully", comboSubjectService.restoreComboSubject(id)));
+    }
 }

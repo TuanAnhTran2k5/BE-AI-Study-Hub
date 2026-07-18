@@ -15,4 +15,5 @@ public interface ISubjectService {
     List<SubjectResponse> getSubjectsBySemester(Long semesterId);
     List<SubjectResponse> getSubjectsBySemesterAndCombo(Long semesterId, Long comboId);
     List<SubjectResponse> searchSubjects(String keyword);
+    SubjectResponse restoreSubject(Long subjectId);
 }

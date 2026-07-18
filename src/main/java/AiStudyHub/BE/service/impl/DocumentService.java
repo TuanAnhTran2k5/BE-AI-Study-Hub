@@ -80,6 +80,9 @@ public class DocumentService implements IDocument {
 
         Subject subject = subjectRepo.findById(request.getSubjectId())
                 .orElseThrow(() -> new GlobalException(ErrorCode.SUBJECT_NOT_FOUND));
+        if (Boolean.TRUE.equals(subject.getIsDeleted())) {
+            throw new GlobalException(ErrorCode.SUBJECT_NOT_FOUND);
+        }
 
         long fileSize = request.getFile().getSize();
 
@@ -683,6 +686,9 @@ public class DocumentService implements IDocument {
         if (request.getSubjectId() != null && request.getSubjectId() > 0) {
             Subject subject = subjectRepo.findById(request.getSubjectId())
                     .orElseThrow(() -> new GlobalException(ErrorCode.SUBJECT_NOT_FOUND));
+            if (Boolean.TRUE.equals(subject.getIsDeleted())) {
+                throw new GlobalException(ErrorCode.SUBJECT_NOT_FOUND);
+            }
             document.setSubject(subject);
         }
 

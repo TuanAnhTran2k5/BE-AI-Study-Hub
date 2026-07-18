@@ -48,4 +48,9 @@ public class AdminSubjectController {
     public ResponseEntity<APIResponse<DeleteResponse>> deleteSubject(@PathVariable Long id) {
         return ResponseEntity.ok(APIResponse.response(200, "Delete subject successfully", subjectService.deleteSubject(id)));
     }
+
+    @PutMapping("/restore/{id}")
+    public ResponseEntity<APIResponse<SubjectResponse>> restoreSubject(@PathVariable Long id) {
+        return ResponseEntity.ok(APIResponse.response(200, "Restore subject successfully", subjectService.restoreSubject(id)));
+    }
 }
