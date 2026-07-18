@@ -15,7 +15,4 @@ public class LeaderboardResponse {
     String avatarUrl;
     Long totalScore;
     String rankName;
-    String rankIcon;
-    String rankColor;
-    String rankTextColor;
 }
