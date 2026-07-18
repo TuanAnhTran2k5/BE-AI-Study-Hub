@@ -38,7 +38,7 @@ public class ComboSubjectService implements IComboSubjectService {
 
     private ComboSubjectResponse mapToComboSubjectResponse(ComboSubject combo) {
         ComboSubjectResponse response = comboSubjectMapper.toComboSubjectResponse(combo);
-        List<SubjectResponse> subjects = subjectRepo.findByComboSubjectComboId(combo.getComboId())
+        List<SubjectResponse> subjects = subjectRepo.findByComboSubjectComboIdAndIsDeletedFalse(combo.getComboId())
                 .stream().map(subjectMapper::toSubjectResponse).collect(Collectors.toList());
         response.setSubjects(subjects);
         return response;
@@ -74,6 +74,16 @@ public class ComboSubjectService implements IComboSubjectService {
         for (SubjectRequest subReq : request.getSubjects()) {
             Semester semester = semesterRepo.findById(subReq.getSemesterId())
                     .orElseThrow(() -> new GlobalException(404, "Semester not found: " + subReq.getSemesterId()));
+            
+            java.util.Optional<Subject> existingOpt = subjectRepo.findBySubjectCode(subReq.getSubjectCode());
+            if (existingOpt.isPresent()) {
+                Subject existing = existingOpt.get();
+                if (!Boolean.TRUE.equals(existing.getIsDeleted())) {
+                    throw new GlobalException(400, "Subject code " + subReq.getSubjectCode() + " already exists and is active");
+                } else {
+                    throw new GlobalException(400, "Subject code " + subReq.getSubjectCode() + " already exists in a deleted subject. Please restore it.");
+                }
+            }
             Subject subject = Subject.builder()
                     .subjectCode(subReq.getSubjectCode())
                     .subjectName(subReq.getSubjectName())
@@ -99,7 +109,7 @@ public class ComboSubjectService implements IComboSubjectService {
         combo = comboSubjectRepo.save(combo);
 
         if (request.getSubjects() != null) {
-            List<Subject> existingSubjects = subjectRepo.findByComboSubjectComboId(combo.getComboId());
+            List<Subject> existingSubjects = subjectRepo.findByComboSubjectComboIdAndIsDeletedFalse(combo.getComboId());
             for (Subject s : existingSubjects) {
                 s.setIsDeleted(true);
             }
@@ -108,14 +118,35 @@ public class ComboSubjectService implements IComboSubjectService {
             for (SubjectRequest subReq : request.getSubjects()) {
                 Semester semester = semesterRepo.findById(subReq.getSemesterId())
                         .orElseThrow(() -> new GlobalException(404, "Semester not found: " + subReq.getSemesterId()));
-                Subject subject = Subject.builder()
-                        .subjectCode(subReq.getSubjectCode())
-                        .subjectName(subReq.getSubjectName())
-                        .description(subReq.getDescription())
-                        .subjectType(subReq.getSubjectType())
-                        .semester(semester)
-                        .comboSubject(combo)
-                        .build();
+                
+                java.util.Optional<Subject> existingOpt = subjectRepo.findBySubjectCode(subReq.getSubjectCode());
+                Subject subject;
+                if (existingOpt.isPresent()) {
+                    Subject existing = existingOpt.get();
+                    if (existing.getComboSubject() == null || !existing.getComboSubject().getComboId().equals(combo.getComboId())) {
+                        if (!Boolean.TRUE.equals(existing.getIsDeleted())) {
+                            throw new GlobalException(400, "Subject code " + subReq.getSubjectCode() + " already exists and is active");
+                        } else {
+                            throw new GlobalException(400, "Subject code " + subReq.getSubjectCode() + " already exists in a deleted subject. Please restore it.");
+                        }
+                    }
+                    existing.setSubjectName(subReq.getSubjectName());
+                    existing.setDescription(subReq.getDescription());
+                    existing.setSubjectType(subReq.getSubjectType());
+                    existing.setSemester(semester);
+                    existing.setComboSubject(combo);
+                    existing.setIsDeleted(false);
+                    subject = existing;
+                } else {
+                    subject = Subject.builder()
+                            .subjectCode(subReq.getSubjectCode())
+                            .subjectName(subReq.getSubjectName())
+                            .description(subReq.getDescription())
+                            .subjectType(subReq.getSubjectType())
+                            .semester(semester)
+                            .comboSubject(combo)
+                            .build();
+                }
                 subjectRepo.save(subject);
             }
         }
@@ -128,7 +159,7 @@ public class ComboSubjectService implements IComboSubjectService {
         ComboSubject combo = comboSubjectRepo.findById(comboId)
                 .orElseThrow(() -> new GlobalException(404, "ComboSubject not found"));
 
-        List<Subject> subjects = subjectRepo.findByComboSubjectComboId(combo.getComboId());
+        List<Subject> subjects = subjectRepo.findByComboSubjectComboIdAndIsDeletedFalse(combo.getComboId());
         for (Subject subject : subjects) {
             subject.setIsDeleted(true);
         }
@@ -147,5 +178,36 @@ public class ComboSubjectService implements IComboSubjectService {
                 .filter(combo -> !combo.getIsDeleted())
                 .map(this::mapToComboSubjectResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public ComboSubjectResponse restoreComboSubject(Long comboId) {
+        ComboSubject combo = comboSubjectRepo.findById(comboId)
+                .orElseThrow(() -> new GlobalException(404, "ComboSubject not found"));
+        if (!Boolean.TRUE.equals(combo.getIsDeleted())) {
+            throw new GlobalException(400, "ComboSubject is already active");
+        }
+
+        List<Subject> subjects = subjectRepo.findByComboSubjectComboId(combo.getComboId());
+
+        for (Subject subject : subjects) {
+            java.util.Optional<Subject> activeOpt = subjectRepo.findBySubjectCode(subject.getSubjectCode());
+            if (activeOpt.isPresent() && !Boolean.TRUE.equals(activeOpt.get().getIsDeleted()) && !activeOpt.get().getSubjectId().equals(subject.getSubjectId())) {
+                throw new GlobalException(400, "Cannot restore combo because subject code '" + subject.getSubjectCode() + "' is already in use by another active subject");
+            }
+        }
+
+        combo.setIsDeleted(false);
+        comboSubjectRepo.save(combo);
+
+        for (Subject subject : subjects) {
+            subject.setIsDeleted(false);
+        }
+        if (!subjects.isEmpty()) {
+            subjectRepo.saveAll(subjects);
+        }
+
+        return mapToComboSubjectResponse(combo);
     }
 }

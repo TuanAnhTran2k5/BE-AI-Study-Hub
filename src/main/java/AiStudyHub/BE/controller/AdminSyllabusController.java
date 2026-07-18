@@ -86,7 +86,7 @@ public class AdminSyllabusController {
     @GetMapping("/{subjectId}")
     public ResponseEntity<APIResponse<SyllabusResponse>> getSyllabus(@PathVariable Long subjectId) {
         SubjectSyllabus syllabus = subjectSyllabusRepo.findBySubjectSubjectId(subjectId).orElse(null);
-        if (syllabus == null) {
+        if (syllabus == null || Boolean.TRUE.equals(syllabus.getSubject().getIsDeleted())) {
             return ResponseEntity.status(404).body(
                     APIResponse.response(404, "No syllabus found for this subject", null)
             );

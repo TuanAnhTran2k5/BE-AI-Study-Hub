@@ -56,6 +56,9 @@ public class SyllabusService implements ISyllabusService {
         log.info("Initializing syllabus upload for subject ID: {} by admin: {}", subjectId, adminUsername);
         Subject subject = subjectRepo.findById(subjectId)
                 .orElseThrow(() -> new GlobalException(404, "Subject not found with ID: " + subjectId));
+        if (Boolean.TRUE.equals(subject.getIsDeleted())) {
+            throw new GlobalException(404, "Subject not found with ID: " + subjectId);
+        }
 
         // 1. Extract plain text from PDF using Tika
         String plainText = "";
@@ -332,6 +335,9 @@ public class SyllabusService implements ISyllabusService {
         // 2. Fetch current syllabus
         SubjectSyllabus syllabus = subjectSyllabusRepo.findBySubjectSubjectId(subjectId)
                 .orElseThrow(() -> new GlobalException(404, "Syllabus not found for subject ID: " + subjectId));
+        if (Boolean.TRUE.equals(syllabus.getSubject().getIsDeleted())) {
+            throw new GlobalException(404, "Syllabus not found for subject ID: " + subjectId);
+        }
 
         // 3. Save snapshot to history
         int latestVersion = subjectSyllabusHistoryRepo.findBySubjectSyllabusIdOrderByVersionDesc(syllabus.getId())
@@ -374,6 +380,9 @@ public class SyllabusService implements ISyllabusService {
     public List<SubjectSyllabusHistory> getHistory(Long subjectId) {
         SubjectSyllabus syllabus = subjectSyllabusRepo.findBySubjectSubjectId(subjectId)
                 .orElseThrow(() -> new GlobalException(404, "Syllabus not found for subject ID: " + subjectId));
+        if (Boolean.TRUE.equals(syllabus.getSubject().getIsDeleted())) {
+            throw new GlobalException(404, "Syllabus not found for subject ID: " + subjectId);
+        }
         return subjectSyllabusHistoryRepo.findBySubjectSyllabusIdOrderByVersionDesc(syllabus.getId());
     }
 
@@ -384,6 +393,9 @@ public class SyllabusService implements ISyllabusService {
 
         SubjectSyllabus syllabus = subjectSyllabusRepo.findBySubjectSubjectId(subjectId)
                 .orElseThrow(() -> new GlobalException(404, "Syllabus not found for subject ID: " + subjectId));
+        if (Boolean.TRUE.equals(syllabus.getSubject().getIsDeleted())) {
+            throw new GlobalException(404, "Syllabus not found for subject ID: " + subjectId);
+        }
 
         SubjectSyllabusHistory history = subjectSyllabusHistoryRepo.findById(historyId)
                 .orElseThrow(() -> new GlobalException(404, "Syllabus history not found with ID: " + historyId));
@@ -430,6 +442,9 @@ public class SyllabusService implements ISyllabusService {
         log.info("Deleting syllabus for subject ID: {}", subjectId);
         SubjectSyllabus syllabus = subjectSyllabusRepo.findBySubjectSubjectId(subjectId)
                 .orElseThrow(() -> new GlobalException(404, "Syllabus not found for subject ID: " + subjectId));
+        if (Boolean.TRUE.equals(syllabus.getSubject().getIsDeleted())) {
+            throw new GlobalException(404, "Syllabus not found for subject ID: " + subjectId);
+        }
 
         String subjectCode = syllabus.getSubject().getSubjectCode();
 

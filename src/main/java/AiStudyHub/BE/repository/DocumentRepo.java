@@ -71,4 +71,6 @@ public interface DocumentRepo extends JpaRepository<Document, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Document> findByDocumentId(Long documentId);
+
+    boolean existsBySubjectSubjectId(Long subjectId);
 }
