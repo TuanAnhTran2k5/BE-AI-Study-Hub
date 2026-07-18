@@ -26,6 +26,7 @@ public interface IRagSystem {
     Page<ChatMessageResponse> getSessionMessages(Long sessionId, int page, int size);
     ChatResponse deleteSession(Long sessionId);
     ChatSessionResponse updateSessionDocuments(Long sessionId, CreateSessionRequest request);
+    ChatSessionResponse updateSessionTitle(Long sessionId, String title);
     ChatResponse askQuestionInSession(Long sessionId, ChatRequest request);
 
     // --- DOCUMENT ---
