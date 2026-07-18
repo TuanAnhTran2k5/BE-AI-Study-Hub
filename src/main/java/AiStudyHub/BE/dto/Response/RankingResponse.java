@@ -15,8 +15,4 @@ public class RankingResponse {
     Integer maxScore;
     Long storageBonus;
     String displayPriority;
-    String iconUrl;
-    String color;
-    String badgeColor;
-    String textColor;
 }

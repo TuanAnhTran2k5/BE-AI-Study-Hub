@@ -152,9 +152,6 @@ public class UserService implements IUser {
                     .avatarUrl(u.getAvatarUrl())
                     .totalScore(u.getTotalScore() == null ? 0L : u.getTotalScore())
                     .rankName(mappedRank != null ? mappedRank.getRankName() : "")
-                    .rankIcon(mappedRank != null ? mappedRank.getIconUrl() : "")
-                    .rankColor(mappedRank != null ? mappedRank.getColor() : "")
-                    .rankTextColor(mappedRank != null ? mappedRank.getTextColor() : "")
                     .build());
         }
         
@@ -287,33 +284,6 @@ public class UserService implements IUser {
     private RankingResponse mapToRankingResponse(Ranking rank) {
         if (rank == null) return null;
         
-        String iconUrl = "";
-        String color = "";
-        String badgeColor = "";
-        String textColor = "";
-        
-        if ("Bronze".equalsIgnoreCase(rank.getRankName())) {
-            iconUrl = "bronze_rank_icon";
-            color = "#CD7F32";
-            badgeColor = "#E6D7C3";
-            textColor = "#8B4513";
-        } else if ("Silver".equalsIgnoreCase(rank.getRankName())) {
-            iconUrl = "silver_rank_icon";
-            color = "#C0C0C0";
-            badgeColor = "#ECECEC";
-            textColor = "#708090";
-        } else if ("Gold".equalsIgnoreCase(rank.getRankName())) {
-            iconUrl = "gold_rank_icon";
-            color = "#FFD700";
-            badgeColor = "#FFF8DC";
-            textColor = "#B8860B";
-        } else if ("Elite Scholar".equalsIgnoreCase(rank.getRankName()) || "EliteScholar".equalsIgnoreCase(rank.getRankName())) {
-            iconUrl = "elite_scholar_rank_icon";
-            color = "#8A2BE2";
-            badgeColor = "#E6E6FA";
-            textColor = "#4B0082";
-        }
-        
         return RankingResponse.builder()
                 .rankId(rank.getRankId())
                 .rankName(rank.getRankName())
@@ -321,10 +291,6 @@ public class UserService implements IUser {
                 .maxScore(rank.getMaxScore())
                 .storageBonus(rank.getStorageBonus())
                 .displayPriority(rank.getDisplayPriority())
-                .iconUrl(iconUrl)
-                .color(color)
-                .badgeColor(badgeColor)
-                .textColor(textColor)
                 .build();
     }
 
