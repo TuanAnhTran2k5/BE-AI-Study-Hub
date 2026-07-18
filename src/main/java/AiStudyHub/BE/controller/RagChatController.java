@@ -3,6 +3,7 @@ package AiStudyHub.BE.controller;
 import AiStudyHub.BE.dto.Request.ChatRequest;
 import AiStudyHub.BE.dto.Request.CreateSessionRequest;
 import AiStudyHub.BE.dto.Request.SuggestPromptsRequest;
+import AiStudyHub.BE.dto.Request.UpdateSessionTitleRequest;
 import AiStudyHub.BE.dto.Response.APIResponse;
 import AiStudyHub.BE.dto.Response.ChatResponse;
 import AiStudyHub.BE.dto.Response.ChatSessionResponse;
@@ -13,6 +14,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -47,12 +49,12 @@ public class RagChatController {
     }
 
     @GetMapping("/sessions/{sessionId}/messages")
-    public ResponseEntity<APIResponse<org.springframework.data.domain.Page<ChatMessageResponse>>> getSessionMessages(
+    public ResponseEntity<APIResponse<Page<ChatMessageResponse>>> getSessionMessages(
             @PathVariable Long sessionId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         log.info("API Request: Get messages for session {}", sessionId);
-        org.springframework.data.domain.Page<ChatMessageResponse> response = ragChatService.getSessionMessages(sessionId, page, size);
+        Page<ChatMessageResponse> response = ragChatService.getSessionMessages(sessionId, page, size);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Messages retrieved successfully", response)
         );
@@ -86,6 +88,17 @@ public class RagChatController {
         ChatSessionResponse response = ragChatService.updateSessionDocuments(sessionId, request);
         return ResponseEntity.ok(
                 APIResponse.response(200, "Session documents updated successfully", response)
+        );
+    }
+
+    @PutMapping("/sessions/{sessionId}/title")
+    public ResponseEntity<APIResponse<ChatSessionResponse>> updateSessionTitle(
+            @PathVariable Long sessionId,
+            @RequestBody @Valid UpdateSessionTitleRequest request) {
+        log.info("API Request: Update title for session {}", sessionId);
+        ChatSessionResponse response = ragChatService.updateSessionTitle(sessionId, request.getSessionTitle());
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Session title updated successfully", response)
         );
     }
 

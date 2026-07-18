@@ -480,6 +480,31 @@ public class RagSystemService implements IRagSystem {
 
     @Override
     @Transactional
+    public ChatSessionResponse updateSessionTitle(Long sessionId, String title) {
+        User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
+        ChatSession session = chatSessionRepository.findBySessionIdAndUserUserId(sessionId, currentUser.getUserId())
+                .orElseThrow(() -> new GlobalException(404, "Chat session not found or you don't have access"));
+
+        session.setSessionTitle(title);
+        session.setUpdatedAt(LocalDateTime.now());
+        chatSessionRepository.save(session);
+
+        List<Long> documentIds = chatSessionDocumentRepository.findBySessionSessionId(sessionId)
+                .stream()
+                .map(sd -> sd.getDocument().getDocumentId())
+                .collect(Collectors.toList());
+
+        return ChatSessionResponse.builder()
+                .sessionId(session.getSessionId())
+                .sessionTitle(session.getSessionTitle())
+                .createdAt(session.getCreatedAt())
+                .updatedAt(session.getUpdatedAt())
+                .documentIds(documentIds)
+                .build();
+    }
+
+    @Override
+    @Transactional
     public ChatResponse askQuestionInSession(Long sessionId, ChatRequest request) {
         User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
         ChatSession session = chatSessionRepository.findBySessionIdAndUserUserId(sessionId, currentUser.getUserId())
