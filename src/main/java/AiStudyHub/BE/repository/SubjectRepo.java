@@ -8,15 +8,11 @@ import java.util.Optional;
 
 public interface SubjectRepo extends JpaRepository<Subject, Long> {
 
-    List<Subject> findBySemesterSemesterId(Long semesterId);
-
     List<Subject> findBySemesterSemesterIdAndIsDeletedFalse(Long semesterId);
 
     List<Subject> findBySemesterSemesterIdAndComboSubjectIsNullAndIsDeletedFalse(Long semesterId);
 
     List<Subject> findBySemesterSemesterIdAndComboSubjectComboIdAndIsDeletedFalse(Long semesterId, Long comboId);
-
-    List<Subject> findByIsDeletedFalse();
 
     List<Subject> findBySubjectNameContainingIgnoreCaseAndIsDeletedFalse(String subjectName);
 
@@ -26,5 +22,4 @@ public interface SubjectRepo extends JpaRepository<Subject, Long> {
 
     Optional<Subject> findBySubjectCode(String subjectCode);
 
-    boolean existsBySubjectCode(String subjectCode);
 }

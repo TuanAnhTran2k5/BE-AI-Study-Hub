@@ -36,7 +36,7 @@ public class SubjectService implements ISubjectService {
 
     @Override
     public List<SubjectResponse> getAllSubjects() {
-        return subjectRepo.findByIsDeletedFalse().stream()
+        return subjectRepo.findAll().stream()
                 .map(subjectMapper::toSubjectResponse)
                 .collect(Collectors.toList());
     }

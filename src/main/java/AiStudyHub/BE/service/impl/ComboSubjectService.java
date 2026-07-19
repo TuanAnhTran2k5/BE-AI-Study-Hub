@@ -38,7 +38,7 @@ public class ComboSubjectService implements IComboSubjectService {
 
     private ComboSubjectResponse mapToComboSubjectResponse(ComboSubject combo) {
         ComboSubjectResponse response = comboSubjectMapper.toComboSubjectResponse(combo);
-        List<SubjectResponse> subjects = subjectRepo.findByComboSubjectComboIdAndIsDeletedFalse(combo.getComboId())
+        List<SubjectResponse> subjects = subjectRepo.findByComboSubjectComboId(combo.getComboId())
                 .stream().map(subjectMapper::toSubjectResponse).collect(Collectors.toList());
         response.setSubjects(subjects);
         return response;
@@ -46,7 +46,7 @@ public class ComboSubjectService implements IComboSubjectService {
 
     @Override
     public List<ComboSubjectResponse> getAllComboSubjects() {
-        return comboSubjectRepo.findByIsDeletedFalse().stream()
+        return comboSubjectRepo.findAll().stream()
                 .map(this::mapToComboSubjectResponse)
                 .collect(Collectors.toList());
     }

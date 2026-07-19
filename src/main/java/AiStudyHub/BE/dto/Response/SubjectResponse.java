@@ -23,4 +23,6 @@ public class SubjectResponse {
     Long comboId;
     String comboCode;
     String comboName;
+
+    Boolean isDeleted;
 }
