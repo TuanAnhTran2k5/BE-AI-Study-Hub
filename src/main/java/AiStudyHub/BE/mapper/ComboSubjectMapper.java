@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public interface ComboSubjectMapper {
 
     @Mapping(target = "subjects", ignore = true)
+    @Mapping(target = "isDeleted", source = "comboSubject.isDeleted")
     ComboSubjectResponse toComboSubjectResponse(ComboSubject comboSubject);
 
     @Mapping(target = "success", constant = "true")

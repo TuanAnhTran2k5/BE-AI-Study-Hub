@@ -14,4 +14,5 @@ public class ComboSubjectResponse {
     String comboCode;
     String comboName;
     List<SubjectResponse> subjects;
+    Boolean isDeleted;
 }

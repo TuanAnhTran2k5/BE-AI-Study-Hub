@@ -16,6 +16,7 @@ public interface SubjectMapper {
     @Mapping(target = "comboId", source = "comboSubject.comboId")
     @Mapping(target = "comboCode", source = "comboSubject.comboCode")
     @Mapping(target = "comboName", source = "comboSubject.comboName")
+    @Mapping(target = "isDeleted", source = "subject.isDeleted")
     SubjectResponse toSubjectResponse(Subject subject);
 
     @Mapping(target = "success", constant = "true")

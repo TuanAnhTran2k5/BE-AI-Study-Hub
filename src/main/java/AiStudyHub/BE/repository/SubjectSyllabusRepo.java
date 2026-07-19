@@ -6,5 +6,4 @@ import java.util.Optional;
 
 public interface SubjectSyllabusRepo extends JpaRepository<SubjectSyllabus, Long> {
     Optional<SubjectSyllabus> findBySubjectSubjectId(Long subjectId);
-    Optional<SubjectSyllabus> findBySubjectSubjectCode(String subjectCode);
 }

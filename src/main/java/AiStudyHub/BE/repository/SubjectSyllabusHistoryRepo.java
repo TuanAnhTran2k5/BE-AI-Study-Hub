@@ -7,7 +7,6 @@ import java.util.Optional;
 
 public interface SubjectSyllabusHistoryRepo extends JpaRepository<SubjectSyllabusHistory, Long> {
     List<SubjectSyllabusHistory> findBySubjectSyllabusIdOrderByVersionDesc(Long subjectSyllabusId);
-    Optional<SubjectSyllabusHistory> findFirstBySubjectSyllabusIdOrderByVersionDesc(Long subjectSyllabusId);
 
     long deleteBySubjectSyllabusId(Long subjectSyllabusId);
 }
