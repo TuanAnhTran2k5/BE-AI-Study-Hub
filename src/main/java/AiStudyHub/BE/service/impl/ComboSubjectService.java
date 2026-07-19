@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -75,7 +76,7 @@ public class ComboSubjectService implements IComboSubjectService {
             Semester semester = semesterRepo.findById(subReq.getSemesterId())
                     .orElseThrow(() -> new GlobalException(404, "Semester not found: " + subReq.getSemesterId()));
             
-            java.util.Optional<Subject> existingOpt = subjectRepo.findBySubjectCode(subReq.getSubjectCode());
+            Optional<Subject> existingOpt = subjectRepo.findBySubjectCode(subReq.getSubjectCode());
             if (existingOpt.isPresent()) {
                 Subject existing = existingOpt.get();
                 if (!Boolean.TRUE.equals(existing.getIsDeleted())) {
@@ -119,7 +120,7 @@ public class ComboSubjectService implements IComboSubjectService {
                 Semester semester = semesterRepo.findById(subReq.getSemesterId())
                         .orElseThrow(() -> new GlobalException(404, "Semester not found: " + subReq.getSemesterId()));
                 
-                java.util.Optional<Subject> existingOpt = subjectRepo.findBySubjectCode(subReq.getSubjectCode());
+                Optional<Subject> existingOpt = subjectRepo.findBySubjectCode(subReq.getSubjectCode());
                 Subject subject;
                 if (existingOpt.isPresent()) {
                     Subject existing = existingOpt.get();
@@ -192,7 +193,7 @@ public class ComboSubjectService implements IComboSubjectService {
         List<Subject> subjects = subjectRepo.findByComboSubjectComboId(combo.getComboId());
 
         for (Subject subject : subjects) {
-            java.util.Optional<Subject> activeOpt = subjectRepo.findBySubjectCode(subject.getSubjectCode());
+            Optional<Subject> activeOpt = subjectRepo.findBySubjectCode(subject.getSubjectCode());
             if (activeOpt.isPresent() && !Boolean.TRUE.equals(activeOpt.get().getIsDeleted()) && !activeOpt.get().getSubjectId().equals(subject.getSubjectId())) {
                 throw new GlobalException(400, "Cannot restore combo because subject code '" + subject.getSubjectCode() + "' is already in use by another active subject");
             }

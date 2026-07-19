@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.core.io.ClassPathResource;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -500,7 +501,7 @@ public class NotificationService implements INotification {
                 .deletedId(notificationId)
                 .entityName("Notification")
                 .entityIdentifier(notification.getTitle())
-                .deletedAt(java.time.LocalDateTime.now())
+                .deletedAt(LocalDateTime.now())
                 .build();
     }
 

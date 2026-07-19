@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -139,7 +140,7 @@ public class SupabaseStoreService implements ISupabaseStorage {
             logger.info("Downloading Supabase file: path={}, url={}", storagePath, downloadUrl);
 
             return webClient.get()
-                    .uri(java.net.URI.create(downloadUrl))
+                    .uri(URI.create(downloadUrl))
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + supabaseKey)
                     .header("apikey", supabaseKey)
                     .retrieve()

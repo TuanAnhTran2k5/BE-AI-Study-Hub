@@ -35,9 +35,12 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 
+import java.io.ByteArrayInputStream;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 @Service
 @RequiredArgsConstructor
@@ -291,12 +294,13 @@ public class DocumentService implements IDocument {
     @Override
     public List<DocumentResponse> searchDocumentsByTitle(String keyword) {
         return documentRepo.findByTitleContainingIgnoreCase(keyword).stream()
-                .filter(doc -> doc.getVisibilityStatus() == VisibilityStatus.PUBLIC 
+                .filter(doc -> doc.getTitle().toLowerCase().contains(keyword.toLowerCase())
+                        && doc.getVisibilityStatus() == VisibilityStatus.PUBLIC
                         && doc.getUploadStatus() == UploadStatus.COMPLETED
                         && doc.getModerationStatus() == ModerationStatus.NORMAL
                         && doc.getDeletedAt() == null)
                 .map(this::enrichDocumentResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
 
@@ -305,7 +309,7 @@ public class DocumentService implements IDocument {
     public List<DocumentResponse> getMyDocuments(Long userId) {
         return documentRepo.findByOwnerUserId(userId).stream()
                 .map(this::enrichDocumentResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
@@ -418,7 +422,7 @@ public class DocumentService implements IDocument {
             if (resolvedSimHash == null) {
                 try {
                     String text = textExtractionUtil.extractText(
-                            new java.io.ByteArrayInputStream(fileBytes));
+                            new ByteArrayInputStream(fileBytes));
                     if (text != null && !text.trim().isEmpty()) {
                         resolvedSimHash = simHashUtil.calculateSimHash(text);
                     }

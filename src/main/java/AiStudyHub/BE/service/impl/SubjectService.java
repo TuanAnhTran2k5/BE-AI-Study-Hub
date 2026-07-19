@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -54,7 +55,7 @@ public class SubjectService implements ISubjectService {
     @Override
     @Transactional
     public SubjectResponse createSubject(SubjectRequest request) {
-        java.util.Optional<Subject> existingOpt = subjectRepo.findBySubjectCode(request.getSubjectCode());
+        Optional<Subject> existingOpt = subjectRepo.findBySubjectCode(request.getSubjectCode());
         if (existingOpt.isPresent()) {
             Subject existing = existingOpt.get();
             if (!Boolean.TRUE.equals(existing.getIsDeleted())) {
@@ -91,7 +92,7 @@ public class SubjectService implements ISubjectService {
         }
 
         if (!subject.getSubjectCode().equalsIgnoreCase(request.getSubjectCode())) {
-            java.util.Optional<Subject> existingOpt = subjectRepo.findBySubjectCode(request.getSubjectCode());
+            Optional<Subject> existingOpt = subjectRepo.findBySubjectCode(request.getSubjectCode());
             if (existingOpt.isPresent()) {
                 Subject existing = existingOpt.get();
                 if (!Boolean.TRUE.equals(existing.getIsDeleted())) {
@@ -162,7 +163,7 @@ public class SubjectService implements ISubjectService {
             throw new GlobalException(400, "Subject is already active");
         }
 
-        java.util.Optional<Subject> activeOpt = subjectRepo.findBySubjectCode(subject.getSubjectCode());
+        Optional<Subject> activeOpt = subjectRepo.findBySubjectCode(subject.getSubjectCode());
         if (activeOpt.isPresent() && !Boolean.TRUE.equals(activeOpt.get().getIsDeleted()) && !activeOpt.get().getSubjectId().equals(subjectId)) {
             throw new GlobalException(400, "Cannot restore because subject code '" + subject.getSubjectCode() + "' is already in use by another active subject");
         }

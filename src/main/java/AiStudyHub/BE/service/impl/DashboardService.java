@@ -19,6 +19,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
+import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -219,7 +220,7 @@ public class DashboardService implements IDashboard {
         List<Object[]> rawDownloads = downloadRepo.countDownloadsByDate(since);
         List<Object[]> rawAiQueries = chatMessageRepository.countAiQueriesByDate(since);
 
-        // Convert query results to maps: Date (java.sql.Date or java.time.LocalDate) -> Count
+        // Convert query results to maps: Date (Date or LocalDate) -> Count
         Map<LocalDate, Long> signupMap = toDateMap(rawSignups);
         Map<LocalDate, Long> docMap = toDateMap(rawDocs);
         Map<LocalDate, Long> downloadMap = toDateMap(rawDownloads);
@@ -370,9 +371,9 @@ public class DashboardService implements IDashboard {
         for (Object[] row : queryResults) {
             if (row[0] != null) {
                 LocalDate date;
-                if (row[0] instanceof java.sql.Date sqlDate) {
+                if (row[0] instanceof Date sqlDate) {
                     date = sqlDate.toLocalDate();
-                } else if (row[0] instanceof java.time.LocalDate localDate) {
+                } else if (row[0] instanceof LocalDate localDate) {
                     date = localDate;
                 } else {
                     date = LocalDate.parse(row[0].toString());

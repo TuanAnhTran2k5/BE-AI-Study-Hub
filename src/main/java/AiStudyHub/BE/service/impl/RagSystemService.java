@@ -388,7 +388,7 @@ public class RagSystemService implements IRagSystem {
                     .documentIds(documentIds)
                     .build();
         })
-        .sorted(Comparator.comparing(ChatSessionResponse::getUpdatedAt, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+        .sorted(Comparator.comparing(ChatSessionResponse::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
         .collect(Collectors.toList());
     }
 
