@@ -1,6 +1,7 @@
 package AiStudyHub.BE.dto.Response;
 
 import AiStudyHub.BE.constraint.ModerationStatus;
+import AiStudyHub.BE.constraint.UploadStatus;
 import AiStudyHub.BE.constraint.VisibilityStatus;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
@@ -27,7 +28,7 @@ public class DocumentResponse {
     String originalUploaderAvatar;
 
     Long ownerTotalScore;
-    AiStudyHub.BE.dto.Response.UserRankResponse ownerCurrentRank;
+    UserRankResponse ownerCurrentRank;
     Integer ownerDocumentCount;
     Integer ownerDownloadCount;
 
@@ -44,7 +45,7 @@ public class DocumentResponse {
 
     VisibilityStatus visibilityStatus;
     ModerationStatus moderationStatus;
-    AiStudyHub.BE.constraint.UploadStatus uploadStatus;
+    UploadStatus uploadStatus;
 
     Double averageRating;
     Integer ratingCount;

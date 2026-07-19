@@ -89,7 +89,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                 throw new GlobalException(ErrorCode.EMAIL_ALREADY_EXISTS);
             }
             if (user.getStatus() == UserStatus.BANNED) {
-                java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+                Map<String, Object> banDetails = new HashMap<>();
                 banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
                 banDetails.put("banReason", user.getBanReason());
                 banDetails.put("bannedAt", user.getBannedAt());
@@ -139,7 +139,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         } catch (LockedException exception) {
             User user = userRepo.findByEmail(loginRequest.getEmail()).orElse(null);
             if (user != null && user.getStatus() == UserStatus.BANNED) {
-                java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+                Map<String, Object> banDetails = new HashMap<>();
                 banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
                 banDetails.put("banReason", user.getBanReason());
                 banDetails.put("bannedAt", user.getBannedAt());
@@ -166,7 +166,7 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
         }
 
         if (user.getStatus() == UserStatus.BANNED) {
-            java.util.Map<String, Object> banDetails = new java.util.HashMap<>();
+            Map<String, Object> banDetails = new HashMap<>();
             banDetails.put("bannedByEmail", user.getBannedBy() != null ? user.getBannedBy().getEmail() : null);
             banDetails.put("banReason", user.getBanReason());
             banDetails.put("bannedAt", user.getBannedAt());

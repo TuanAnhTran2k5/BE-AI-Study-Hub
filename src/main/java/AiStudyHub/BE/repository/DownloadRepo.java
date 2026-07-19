@@ -6,6 +6,9 @@ import AiStudyHub.BE.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
+import java.time.LocalDateTime;
+import java.util.List;
+import org.springframework.data.repository.query.Param;
 
 public interface DownloadRepo extends JpaRepository<Download, Long> {
 
@@ -19,9 +22,9 @@ public interface DownloadRepo extends JpaRepository<Download, Long> {
 
     long deleteByUserUserIdAndDocumentDocumentId(Long userId, Long documentId);
 
-    long countByDownloadedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
+    long countByDownloadedAtBetween(LocalDateTime start, LocalDateTime end);
 
-    java.util.List<Object[]> countDownloadsByDate(@org.springframework.data.repository.query.Param("since") java.time.LocalDateTime since);
+    List<Object[]> countDownloadsByDate(@Param("since") LocalDateTime since);
 
-    java.util.List<Object[]> countDownloadsReceivedGroupByOwnerIds(@org.springframework.data.repository.query.Param("ids") java.util.List<Long> ids);
+    List<Object[]> countDownloadsReceivedGroupByOwnerIds(@Param("ids") List<Long> ids);
 }

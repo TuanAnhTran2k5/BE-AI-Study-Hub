@@ -16,6 +16,8 @@ import AiStudyHub.BE.service.INotification;
 import AiStudyHub.BE.service.impl.ReputationPolicy;
 import lombok.extern.slf4j.Slf4j;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -701,15 +703,15 @@ public class GamificationService implements IGamification {
 
     private LocalDate calculateWeekStart(LocalDate date) {
         LocalDate current = date;
-        while (current.getDayOfWeek() != java.time.DayOfWeek.SUNDAY) {
+        while (current.getDayOfWeek() != DayOfWeek.SUNDAY) {
             current = current.minusDays(1);
         }
         return current;
     }
 
     private static double round2(double value) {
-        return java.math.BigDecimal.valueOf(value)
-                .setScale(2, java.math.RoundingMode.HALF_UP)
+        return BigDecimal.valueOf(value)
+                .setScale(2, RoundingMode.HALF_UP)
                 .doubleValue();
     }
 

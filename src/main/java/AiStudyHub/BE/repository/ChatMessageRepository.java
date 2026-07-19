@@ -6,6 +6,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import AiStudyHub.BE.constraint.SenderType;
+import java.time.LocalDateTime;
+import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 @Repository
@@ -14,9 +17,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     List<ChatMessage> findTop10BySession_SessionIdOrderByCreatedAtDesc(Long sessionId);
     long countBySession_SessionId(Long sessionId);
 
-    long countBySenderType(AiStudyHub.BE.constraint.SenderType senderType);
+    long countBySenderType(SenderType senderType);
     long countBySenderTypeAndCreatedAtBetween(
-            AiStudyHub.BE.constraint.SenderType senderType, java.time.LocalDateTime start, java.time.LocalDateTime end);
+            SenderType senderType, LocalDateTime start, LocalDateTime end);
 
-    java.util.List<Object[]> countAiQueriesByDate(@org.springframework.data.repository.query.Param("since") java.time.LocalDateTime since);
+    List<Object[]> countAiQueriesByDate(@Param("since") LocalDateTime since);
 }
