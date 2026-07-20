@@ -30,6 +30,7 @@ import AiStudyHub.BE.repository.ChatSessionDocumentRepository;
 import AiStudyHub.BE.entity.Subject;
 import AiStudyHub.BE.service.IRagSystem;
 import AiStudyHub.BE.service.ISupabaseStorage;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -91,12 +92,12 @@ public class RagSystemService implements IRagSystem {
             1. Help users understand, summarize, explain, and analyze information from uploaded documents as well as general academic and study topics.
             2. Prioritize Provided Context: Treat the provided Context as the primary and authoritative reference when answering questions related to the user's documents.
             3. Context-Only Answering: You must rely STRICTLY on the provided Context to answer the user's question. Do not answer questions that require external academic or general knowledge unless that knowledge directly explains or clarifies the provided Context.
-            4. Strict Refusal if Context is Missing: If the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED" or does not contain enough information to answer the question, you MUST politely refuse to answer. Explain to the user in their dominant language that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer or make up (hallucinate) details using your general knowledge.
+            4. Strict Refusal if Context is Missing: If the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED" or does not contain enough information to answer the question, you MUST politely refuse to answer. Explain to the user in their dominant language (e.g. if the question is in English, respond in English; if the question is in Vietnamese, respond in Vietnamese) that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer or make up (hallucinate) details using your general knowledge.
             5. Refusal for Missing Documents: If the user specifically asks about details of an un-retrieved document or syllabus, politely inform them that the document content is missing while refusing to answer.
             6. Temporal Accuracy: The current system date and time is {currentDate}. Always use this exact current date when answering any time-related questions (such as "today", "current year", "now", or comparing dates). Never claim your knowledge or date is restricted to an old pre-training cutoff date.
 
             Language Rules (CRITICAL & HIGHEST PRIORITY):
-            1. Conversational Language: Analyze the User Question to determine its dominant language (e.g., Vietnamese, English, Japanese, Korean, Spanish, etc.). You MUST write all explanations, analysis, commentary, and conversational phrases strictly in that DOMINANT LANGUAGE.
+            1. Conversational Language: Analyze the User Question to determine its dominant language (e.g., Vietnamese, English, Japanese, Korean, Spanish, etc.). You MUST write your ENTIRE response (including headings, summaries, explanations, bullet points, and commentary) strictly in that DOMINANT LANGUAGE of the User Question (e.g., if the User Question is in English, the entire response must be in English; if the User Question is in Vietnamese, the entire response must be in Vietnamese).
             2. Target Language Exception (Multilingual Study & Examples): When the user uploads or discusses a document written in or containing foreign language vocabulary, grammar, texts, or code (such as Japanese vocabulary, English grammar, Chinese idioms, programming code, etc.) and asks to create example sentences, explain usage, quote text, or generate exercises:
                - You MUST generate or preserve those vocabulary terms, example sentences, quotes, or technical snippets directly in their ORIGINAL / TARGET LANGUAGE (e.g., Japanese sentences in Japanese with Kanji/Hiragana, English quotes in English).
                - Accompany the target language examples with clear translations and detailed explanations in the dominant conversational language of the User Question.
@@ -111,7 +112,7 @@ public class RagSystemService implements IRagSystem {
             2. For all regular questions, conversational messages, explanations, or Q&A that are NOT explicit summary requests, DO NOT structure your answer with those 4 headings. Respond naturally using paragraphs, clear bullet points, or conversational style suitable for the prompt.
 
             Conversation Rules:
-            1. If the user's message is a general conversation (e.g., greetings, introductions, small talk), answer naturally and warmly. If the user's message is a question about a course, syllabus, subject, or academic topic, and the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED", you MUST refuse to answer. Explain to the user in their dominant language that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer using general knowledge.
+            1. If the user's message is a general greeting or casual conversation (e.g., "Hello", "How are you?", "What is your name?"), respond naturally and warmly. If the user's message is a question about a course, syllabus, subject, or academic topic, and the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED", you MUST refuse to answer. Explain to the user in their dominant language (e.g. if the question is in English, respond in English; if the question is in Vietnamese, respond in Vietnamese) that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer using general knowledge.
             
             Context:
             {context}
@@ -121,7 +122,7 @@ public class RagSystemService implements IRagSystem {
             
             IMPORTANT FINAL LANGUAGE OVERRIDE:
             Look strictly at the "User Question" above ("{question}"). Determine its dominant language.
-            Write your conversational explanations and commentary strictly in that exact dominant language of "{question}". However, whenever the question asks for example sentences, vocabulary usage, quotes, or exercises related to a foreign language document (e.g. Japanese, English, Chinese, etc.), ALWAYS output the example sentences/quotes in that target foreign language accompanied by explanations/translations in the dominant language of "{question}".
+            Write your ENTIRE response (including headings, summaries, explanations, bullet points, and commentary) strictly in that exact dominant language of "{question}" (e.g., if "{question}" is in English, the entire response must be in English; if "{question}" is in Vietnamese, the entire response must be in Vietnamese). However, whenever the question asks for example sentences, vocabulary usage, quotes, or exercises related to a foreign language document (e.g. Japanese, English, Chinese, etc.), ALWAYS output the example sentences/quotes in that target foreign language accompanied by explanations/translations in the dominant language of "{question}".
             """;
 
     private static final String RAG_WITH_HISTORY_PROMPT_TEMPLATE = """
@@ -129,7 +130,7 @@ public class RagSystemService implements IRagSystem {
             Current System Date & Time: {currentDate}
             
             Language Rules (CRITICAL & HIGHEST PRIORITY):          
-            1. Conversational Language: Analyze the Current User Question to determine its dominant language (e.g., Vietnamese, English, Japanese, Korean, Spanish, etc.). You MUST write all explanations, analysis, commentary, and conversational phrases strictly in that DOMINANT LANGUAGE.
+            1. Conversational Language: Analyze the Current User Question to determine its dominant language (e.g., Vietnamese, English, Japanese, Korean, Spanish, etc.). You MUST write your ENTIRE response (including headings, summaries, explanations, bullet points, and commentary) strictly in that DOMINANT LANGUAGE of the Current User Question (e.g., if the Current User Question is in English, the entire response must be in English; if the Current User Question is in Vietnamese, the entire response must be in Vietnamese).
             2. Target Language Exception (Multilingual Study & Examples): When the user uploads or discusses a document written in or containing foreign language vocabulary, grammar, texts, or code (such as Japanese vocabulary, English grammar, Chinese idioms, programming code, etc.) and asks to create example sentences, explain usage, quote text, or generate exercises:
                - You MUST generate or preserve those vocabulary terms, example sentences, quotes, or technical snippets directly in their ORIGINAL / TARGET LANGUAGE (e.g., Japanese sentences in Japanese with Kanji/Hiragana, English quotes in English).
                - Accompany the target language examples with clear translations and detailed explanations in the dominant conversational language of the Current User Question.
@@ -138,13 +139,13 @@ public class RagSystemService implements IRagSystem {
             Knowledge & Flexibility Rules:            
             1. Prioritize Provided Context: Treat the provided Context as the primary reference when answering questions related to user documents.
             2. Context-Only Answering: You must rely STRICTLY on the provided Context to answer the user's question. Do not answer questions that require external academic or general knowledge unless that knowledge directly explains or clarifies the provided Context.
-            3. Strict Refusal if Context is Missing: If the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED" or does not contain enough information to answer the question, you MUST politely refuse to answer. Explain to the user in their dominant language that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer or make up (hallucinate) details using your general knowledge.
+            3. Strict Refusal if Context is Missing: If the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED" or does not contain enough information to answer the question, you MUST politely refuse to answer. Explain to the user in their dominant language (e.g. if the question is in English, respond in English; if the question is in Vietnamese, respond in Vietnamese) that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer or make up (hallucinate) details using your general knowledge.
             4. Refusal for Missing Documents: If the user specifically asks about details of an un-retrieved document or syllabus, politely inform them that the document content is missing while refusing to answer.
             5. Conversation History: Use Previous Conversation History to maintain conversation flow, understand references ("this", "that", "the previous topic"), and support a natural multi-turn chat experience.
             6. Temporal Accuracy: The current system date and time is {currentDate}. Always use this exact current date when answering any time-related questions (such as "today", "current year", "now"). Never claim your knowledge or date is restricted to an old pre-training cutoff date when discussing dates.
             
             Formatting & Conversation Rules:            
-            1. If the user's message is a general greeting or casual conversation (e.g., "Hello", "How are you?", "What is your name?"), respond naturally and warmly. If the user's message is a question about a course, syllabus, subject, or academic topic, and the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED", you MUST refuse to answer. Explain to the user in their dominant language that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer using general knowledge.
+            1. If the user's message is a general greeting or casual conversation (e.g., "Hello", "How are you?", "What is your name?"), respond naturally and warmly. If the user's message is a question about a course, syllabus, subject, or academic topic, and the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED", you MUST refuse to answer. Explain to the user in their dominant language (e.g. if the question is in English, respond in English; if the question is in Vietnamese, respond in Vietnamese) that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer using general knowledge.
             2. ONLY when the user explicitly asks to summarize a document or topic (using words like "summarize", "tóm tắt"), provide 4 sections dynamically translated into the dominant language of the Current User Question:
                 2.1 [Translate heading meaning: Main Topic]
                 2.2 [Translate heading meaning: Purpose]
@@ -163,7 +164,7 @@ public class RagSystemService implements IRagSystem {
             
             IMPORTANT FINAL LANGUAGE OVERRIDE:
             Look strictly at the "Current User Question" above ("{question}"). Determine its dominant language.
-            Write your conversational explanations and commentary strictly in that exact dominant language of "{question}". However, whenever the question asks for example sentences, vocabulary usage, quotes, or exercises related to a foreign language document (e.g. Japanese, English, Chinese, etc.), ALWAYS output the example sentences/quotes in that target foreign language accompanied by explanations/translations in the dominant language of "{question}".
+            Write your ENTIRE response (including headings, summaries, explanations, bullet points, and commentary) strictly in that exact dominant language of "{question}" (e.g., if "{question}" is in English, the entire response must be in English; if "{question}" is in Vietnamese, the entire response must be in Vietnamese). However, whenever the question asks for example sentences, vocabulary usage, quotes, or exercises related to a foreign language document (e.g. Japanese, English, Chinese, etc.), ALWAYS output the example sentences/quotes in that target foreign language accompanied by explanations/translations in the dominant language of "{question}".
             
             Answer:
             """;
@@ -231,48 +232,79 @@ public class RagSystemService implements IRagSystem {
             List<Document> userDocChunks = new ArrayList<>();
             if (sessionDocIds == null || !sessionDocIds.isEmpty()) {
                 Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-                List<Long> accessibleIds;
-                if (auth != null && auth.getPrincipal() instanceof User currentUser) {
-                    accessibleIds = documentRepo.findByOwnerUserIdOrVisibilityStatus(currentUser.getUserId(), VisibilityStatus.PUBLIC)
-                            .stream()
-                            .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
-                            .map(AiStudyHub.BE.entity.Document::getDocumentId)
-                            .toList();
+                List<Long> targetIds = new ArrayList<>();
+
+                if (sessionDocIds != null) {
+                    for (Long docId : sessionDocIds) {
+                        Optional<AiStudyHub.BE.entity.Document> docOpt = documentRepo.findById(docId);
+                        if (docOpt.isPresent()) {
+                            AiStudyHub.BE.entity.Document doc = docOpt.get();
+                            boolean isAuthorized = false;
+                            if (doc.getVisibilityStatus() == VisibilityStatus.PUBLIC) {
+                                isAuthorized = true;
+                            } else if (auth != null && auth.getPrincipal() instanceof User currentUser) {
+                                if (doc.getOwner().getUserId().equals(currentUser.getUserId())) {
+                                    isAuthorized = true;
+                                }
+                            }
+
+                            if (isAuthorized) {
+                                if (doc.getUploadStatus() == UploadStatus.COMPLETED) {
+                                    targetIds.add(doc.getDocumentId());
+                                }
+                                if (doc.getSourceDocument() != null) {
+                                    AiStudyHub.BE.entity.Document sourceDoc = doc.getSourceDocument();
+                                    if (sourceDoc.getUploadStatus() == UploadStatus.COMPLETED) {
+                                        if (!targetIds.contains(sourceDoc.getDocumentId())) {
+                                            targetIds.add(sourceDoc.getDocumentId());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 } else {
-                    accessibleIds = documentRepo.findByVisibilityStatus(VisibilityStatus.PUBLIC)
-                            .stream()
-                            .filter(d -> d.getUploadStatus() == UploadStatus.COMPLETED)
-                            .map(AiStudyHub.BE.entity.Document::getDocumentId)
-                            .toList();
+                    List<AiStudyHub.BE.entity.Document> accessibleDocs;
+                    if (auth != null && auth.getPrincipal() instanceof User currentUser) {
+                        accessibleDocs = documentRepo.findByOwnerUserIdOrVisibilityStatus(currentUser.getUserId(), VisibilityStatus.PUBLIC);
+                    } else {
+                        accessibleDocs = documentRepo.findByVisibilityStatus(VisibilityStatus.PUBLIC);
+                    }
+
+                    for (AiStudyHub.BE.entity.Document doc : accessibleDocs) {
+                        if (doc.getUploadStatus() == UploadStatus.COMPLETED) {
+                            if (!targetIds.contains(doc.getDocumentId())) {
+                                targetIds.add(doc.getDocumentId());
+                            }
+                        }
+                        if (doc.getSourceDocument() != null) {
+                            AiStudyHub.BE.entity.Document sourceDoc = doc.getSourceDocument();
+                            if (sourceDoc.getUploadStatus() == UploadStatus.COMPLETED) {
+                                if (!targetIds.contains(sourceDoc.getDocumentId())) {
+                                    targetIds.add(sourceDoc.getDocumentId());
+                                }
+                            }
+                        }
+                    }
                 }
 
-                if (!accessibleIds.isEmpty()) {
-                    List<Long> targetIds;
-                    if (sessionDocIds != null) {
-                        targetIds = sessionDocIds.stream()
-                                .filter(accessibleIds::contains)
-                                .toList();
-                    } else {
-                        targetIds = accessibleIds;
-                    }
+                if (!targetIds.isEmpty()) {
+                    List<String> targetIdStrings = targetIds.stream()
+                            .map(Object::toString)
+                            .toList();
+                    log.info("Querying Qdrant with targetIds: {}", targetIdStrings);
 
-                    if (!targetIds.isEmpty()) {
-                        List<String> targetIdStrings = targetIds.stream()
-                                .map(Object::toString)
-                                .toList();
+                    FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
+                    Filter.Expression filterExpression = filterBuilder.in("documentId", (Object[]) targetIdStrings.toArray(new String[0])).build();
 
-                        FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
-                        Filter.Expression filterExpression = filterBuilder.in("documentId", targetIdStrings.toArray(new String[0])).build();
-
-                        SearchRequest searchRequest = SearchRequest.builder()
-                                .query(question)
-                                .filterExpression(filterExpression)
-                                .similarityThreshold(0.0)
-                                .topK(10)
-                                .build();
-                        userDocChunks = vectorStore.similaritySearch(searchRequest);
-                        log.info("Retrieved {} chunks from user documents", userDocChunks.size());
-                    }
+                    SearchRequest searchRequest = SearchRequest.builder()
+                            .query(question)
+                            .filterExpression(filterExpression)
+                            .similarityThreshold(0.0)
+                            .topK(10)
+                            .build();
+                    userDocChunks = vectorStore.similaritySearch(searchRequest);
+                    log.info("Retrieved {} chunks from user documents for targetIds: {}", userDocChunks.size(), targetIds);
                 }
             }
 
@@ -283,7 +315,7 @@ public class RagSystemService implements IRagSystem {
                     FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
                     Filter.Expression filterExpression = filterBuilder.and(
                             filterBuilder.eq("documentType", "SYSTEM_SYLLABUS"),
-                            filterBuilder.in("subjectCode", detectedSubjectCodes.toArray(new String[0]))
+                            filterBuilder.in("subjectCode", (Object[]) detectedSubjectCodes.toArray(new String[0]))
                     ).build();
 
                     SearchRequest searchRequest = SearchRequest.builder()
@@ -439,7 +471,7 @@ public class RagSystemService implements IRagSystem {
         User currentUser = SecurityUtils.getCurrentUser();
         log.info("Updating documents for session {}: {}", sessionId, request.getDocumentIds());
 
-        ChatSession session = chatSessionRepository.findBySessionIdAndUserUserId(sessionId, currentUser.getUserId())
+        ChatSession session = chatSessionRepository.findWithLockBySessionIdAndUserUserId(sessionId, currentUser.getUserId())
                 .orElseThrow(() -> new GlobalException(404, "Chat session not found or you don't have access"));
 
         chatSessionDocumentRepository.deleteBySessionSessionId(sessionId);
@@ -482,7 +514,7 @@ public class RagSystemService implements IRagSystem {
     @Transactional
     public ChatSessionResponse updateSessionTitle(Long sessionId, String title) {
         User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
-        ChatSession session = chatSessionRepository.findBySessionIdAndUserUserId(sessionId, currentUser.getUserId())
+        ChatSession session = chatSessionRepository.findWithLockBySessionIdAndUserUserId(sessionId, currentUser.getUserId())
                 .orElseThrow(() -> new GlobalException(404, "Chat session not found or you don't have access"));
 
         session.setSessionTitle(title);
@@ -507,7 +539,7 @@ public class RagSystemService implements IRagSystem {
     @Transactional
     public ChatResponse askQuestionInSession(Long sessionId, ChatRequest request) {
         User currentUser = AiStudyHub.BE.security.SecurityUtils.getCurrentUser();
-        ChatSession session = chatSessionRepository.findBySessionIdAndUserUserId(sessionId, currentUser.getUserId())
+        ChatSession session = chatSessionRepository.findWithLockBySessionIdAndUserUserId(sessionId, currentUser.getUserId())
                 .orElseThrow(() -> new GlobalException(404, "Chat session not found or you don't have access"));
 
         String question = request.getQuestion();
@@ -538,34 +570,35 @@ public class RagSystemService implements IRagSystem {
                 .build();
         chatMessageRepository.save(userMsg);
 
-        // 4. Sync session documents if documentIds is provided in the request
+        // 4. Determine which document IDs to use for RAG context.
+        //    Priority: documentIds from the request body (sent by frontend with every message).
+        //    Fallback: read from DB session (for clients that don't send documentIds).
+        //    NOTE: We intentionally do NOT write/sync chat_session_document here anymore.
+        //    That is handled exclusively by updateSessionDocuments to avoid deadlocks.
+        List<Long> sessionDocIds;
         if (request.getDocumentIds() != null) {
-            chatSessionDocumentRepository.deleteBySessionSessionId(sessionId);
-            chatSessionDocumentRepository.flush();
-
+            // Validate authorization on each docId before using it for search
+            sessionDocIds = new ArrayList<>();
             for (Long docId : request.getDocumentIds()) {
                 AiStudyHub.BE.entity.Document document = documentRepo.findById(docId).orElse(null);
                 if (document != null) {
                     boolean isPublic = document.getVisibilityStatus() == VisibilityStatus.PUBLIC;
                     boolean isOwner = document.getOwner().getUserId().equals(currentUser.getUserId());
                     if (isPublic || isOwner) {
-                        ChatSessionDocument sessionDoc = ChatSessionDocument.builder()
-                                .session(session)
-                                .document(document)
-                                .build();
-                        chatSessionDocumentRepository.saveAndFlush(sessionDoc);
+                        sessionDocIds.add(docId);
                     }
                 }
             }
+        } else {
+            // Fallback: read from DB
+            sessionDocIds = chatSessionDocumentRepository.findBySessionSessionId(sessionId)
+                    .stream()
+                    .map(sd -> sd.getDocument().getDocumentId())
+                    .collect(Collectors.toList());
         }
 
-        // 5. Retrieve session document ids
-        List<Long> sessionDocIds = chatSessionDocumentRepository.findBySessionSessionId(sessionId)
-                .stream()
-                .map(sd -> sd.getDocument().getDocumentId())
-                .collect(Collectors.toList());
-
         // 5. Similarity search filtering by session documents
+        log.info("Searching for context with documentIds: {}", sessionDocIds);
         List<Document> relevantChunks = retrieveRelevantChunksWithFilters(question, sessionDocIds);
         log.info("Retrieved {} relevant chunks for session {}", relevantChunks.size(), sessionId);
 
@@ -673,13 +706,46 @@ public class RagSystemService implements IRagSystem {
         try {
             log.info("Downloading document content via Supabase Storage service from URL: {}", mainDoc.getFileUrl());
             byte[] fileBytes = supabaseStorageService.downloadFile(mainDoc.getFileUrl());
-            
+
             cleanExistingRagResources(ragDoc);
             indexDocumentContent(ragDoc, fileBytes);
             ragDoc.setStatus("INDEXED");
             ragDoc = ragDocumentRepository.save(ragDoc);
         } catch (Exception e) {
-            log.error("Failed to manually index document: {}", mainDoc.getFileName(), e);
+            log.warn("Supabase download failed for document {}: {}. Attempting fallback from existing DB chunks...",
+                    mainDoc.getFileName(), e.getMessage());
+
+            // Fallback: if there are existing rag_chunks in the DB with content,
+            // re-push them to Qdrant instead of failing entirely.
+            List<RagChunk> existingChunks = ragChunkRepository.findByDocumentId(ragDoc.getId());
+            if (!existingChunks.isEmpty() && existingChunks.stream().anyMatch(c -> c.getContent() != null && !c.getContent().isBlank())) {
+                try {
+                    log.info("Found {} existing DB chunks for ragDocId {}. Re-pushing to Qdrant...", existingChunks.size(), ragDoc.getId());
+                    List<org.springframework.ai.document.Document> docsToVectorStore = new ArrayList<>();
+                    for (RagChunk chunk : existingChunks) {
+                        if (chunk.getContent() == null || chunk.getContent().isBlank()) continue;
+                        Map<String, Object> metadata = new HashMap<>();
+                        Long linkedDocumentId = ragDoc.getDocument() != null ? ragDoc.getDocument().getDocumentId() : null;
+                        metadata.put("documentId", linkedDocumentId != null ? linkedDocumentId.toString() : ragDoc.getId().toString());
+                        metadata.put("originalFileName", ragDoc.getOriginalFileName());
+                        metadata.put("uploadedBy", ragDoc.getUploadedBy());
+                        metadata.put("chunkIndex", chunk.getChunkIndex());
+                        String vectorId = UUID.nameUUIDFromBytes((ragDoc.getId().toString() + "_" + chunk.getChunkIndex()).getBytes()).toString();
+                        docsToVectorStore.add(new org.springframework.ai.document.Document(vectorId, chunk.getContent(), metadata));
+                    }
+                    if (!docsToVectorStore.isEmpty()) {
+                        vectorStore.add(docsToVectorStore);
+                        ragDoc.setStatus("INDEXED");
+                        ragDoc = ragDocumentRepository.save(ragDoc);
+                        log.info("Fallback re-index from DB chunks succeeded for document ID: {}", documentId);
+                        return ragDocumentMapper.toRagDocumentResponse(ragDoc);
+                    }
+                } catch (Exception fallbackEx) {
+                    log.error("Fallback DB chunk re-push also failed for document ID: {}", documentId, fallbackEx);
+                }
+            }
+
+            log.error("Failed to index document (no DB chunks available as fallback): {}", mainDoc.getFileName(), e);
             ragDoc.setStatus("FAILED");
             ragDocumentRepository.save(ragDoc);
             throw new GlobalException(500, "Failed to index document contents", e);
@@ -806,8 +872,7 @@ public class RagSystemService implements IRagSystem {
                 vectorStore.delete(vectorIds);
                 log.info("Successfully deleted existing vectors from Qdrant");
             } catch (Exception e) {
-                log.error("Failed to delete vectors from Qdrant for document ID: {}", document.getId(), e);
-                throw new GlobalException(500, "Failed to delete vectors from Qdrant", e);
+                log.warn("Failed to delete vectors from Qdrant for document ID: {} (might not exist yet): {}", document.getId(), e.getMessage());
             }
 
             ragChunkRepository.deleteByDocumentId(document.getId());
@@ -895,7 +960,7 @@ public class RagSystemService implements IRagSystem {
                 responseContent = responseContent.trim();
 
                 ObjectMapper mapper = new ObjectMapper();
-                return mapper.readValue(responseContent, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+                return mapper.readValue(responseContent, new TypeReference<List<String>>() {});
             }
             
             throw new GlobalException(500, "AI returned empty response");

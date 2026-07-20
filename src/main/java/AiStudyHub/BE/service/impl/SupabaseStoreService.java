@@ -126,8 +126,28 @@ public class SupabaseStoreService implements ISupabaseStorage {
 
     @Override
     public byte[] downloadFile(String fileUrlPath) {
-        String storagePath = extractStoragePath(fileUrlPath);
+        // If the stored URL is already a public URL, download directly from it.
+        // This avoids rebuilding an authenticated URL which may fail DNS in some environments.
+        boolean isPublicUrl = fileUrlPath != null && fileUrlPath.contains("/storage/v1/object/public/");
 
+        if (isPublicUrl) {
+            try {
+                logger.info("Downloading Supabase file via public URL: {}", fileUrlPath);
+                return webClient.get()
+                        .uri(URI.create(fileUrlPath))
+                        .retrieve()
+                        .bodyToMono(byte[].class)
+                        .block();
+            } catch (WebClientResponseException e) {
+                logger.warn("Public URL download failed (status={}, body={}), retrying with authenticated URL...",
+                        e.getStatusCode(), e.getResponseBodyAsString());
+            } catch (Exception e) {
+                logger.warn("Public URL download failed ({}), retrying with authenticated URL...", e.getMessage());
+            }
+        }
+
+        // Fallback: build authenticated URL
+        String storagePath = extractStoragePath(fileUrlPath);
         String downloadUrl = String.format(
                 "%s/storage/v1/object/authenticated/%s/%s",
                 supabaseUrl,
@@ -137,7 +157,7 @@ public class SupabaseStoreService implements ISupabaseStorage {
                         .replace("%2F", "/"));
 
         try {
-            logger.info("Downloading Supabase file: path={}, url={}", storagePath, downloadUrl);
+            logger.info("Downloading Supabase file via authenticated URL: path={}, url={}", storagePath, downloadUrl);
 
             return webClient.get()
                     .uri(URI.create(downloadUrl))
