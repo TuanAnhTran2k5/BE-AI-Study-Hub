@@ -283,3 +283,4 @@ public class DashboardAndUserAdminTest {
         verify(mockCache, times(3)).put(eq(org.springframework.cache.interceptor.SimpleKey.EMPTY), any());
     }
 }
+
