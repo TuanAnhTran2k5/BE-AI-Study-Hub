@@ -1,5 +1,6 @@
 package AiStudyHub.BE.service;
 
+import AiStudyHub.BE.constraint.UserRole;
 import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.NotificationResponse;
 import AiStudyHub.BE.entity.Badge;
@@ -79,6 +80,11 @@ public interface INotification {
     Notification sendBadgeAwardedNotification(
             User user,
             Badge badge
+    );
+
+    Notification sendRolePromotionNotification(
+            User user,
+            UserRole newRole
     );
 
     Page<NotificationResponse> getMyNotifications(int page, Boolean isRead, String type);

@@ -1,5 +1,6 @@
 package AiStudyHub.BE.service.impl;
 
+import AiStudyHub.BE.constraint.UserRole;
 import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.NotificationResponse;
 import AiStudyHub.BE.entity.Badge;
@@ -412,6 +413,42 @@ public class NotificationService implements INotification {
                 .message(content)
                 .type("REWARD")
                 .notificationCase("BADGE_AWARDED")
+                .isRead(false)
+                .build();
+        return notificationRepo.save(notification);
+    }
+
+    @Override
+    public Notification sendRolePromotionNotification(
+            User user,
+            UserRole newRole
+    ) {
+        if (user == null || newRole == null) return null;
+
+        log.info("Sending role promotion notification to user {} (ID: {}) for new role {}",
+                user.getEmail(), user.getUserId(), newRole.name());
+
+        String roleName = newRole.name().equals("AD") ? "System Administrator" : "Standard User";
+        String subject = "[AI Study Hub] Account Role Updated: " + roleName;
+        String content = String.format(
+                "Dear %s, your account role has been updated to \"%s\" by the system administrator.",
+                user.getFullName(), roleName
+        );
+
+        // Fallback email content if template is not used
+        String htmlContent = String.format(
+                "<h3>Account Role Updated</h3><p>Dear %s,</p><p>Your account role has been officially updated to <strong>%s</strong>.</p><p>Please re-login to ensure your new permissions are applied correctly.</p>",
+                user.getFullName(), roleName
+        );
+        
+        emailService.sendEmail(user.getEmail(), subject, htmlContent);
+
+        Notification notification = Notification.builder()
+                .user(user)
+                .title(subject)
+                .message(content)
+                .type("SYSTEM")
+                .notificationCase("ROLE_PROMOTION")
                 .isRead(false)
                 .build();
         return notificationRepo.save(notification);

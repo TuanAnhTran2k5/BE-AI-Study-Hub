@@ -490,6 +490,9 @@ public class UserService implements IUser {
         target.setRole(newRole);
         userRepo.save(target);
 
+        // Send notification about the role update
+        notificationService.sendRolePromotionNotification(target, newRole);
+
         List<Long> ids = Collections.singletonList(targetUserId);
         Map<Long, Long> docCounts = toCountMap(documentRepo.countActiveDocumentsGroupByOwnerIds(ids));
         Map<Long, Long> downloadCounts = toCountMap(downloadRepo.countDownloadsReceivedGroupByOwnerIds(ids));
