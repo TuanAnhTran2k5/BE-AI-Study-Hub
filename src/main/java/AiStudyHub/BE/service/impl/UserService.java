@@ -17,6 +17,7 @@ import AiStudyHub.BE.service.INotification;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -33,7 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Base64;
+import AiStudyHub.BE.dto.Response.FileUploadResponse;
+import org.springframework.beans.factory.annotation.Value;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -43,6 +45,10 @@ import java.util.stream.Collectors;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 public class UserService implements IUser {
+
+    @NonFinal
+    @Value("${supabase.storage.avatar-bucket:Avatars}")
+    String avatarBucket;
 
     UserRepo userRepo;
     UserMapper userMapper;
@@ -66,31 +72,33 @@ public class UserService implements IUser {
 
         userMapper.updateUserFromRequest(request, user);
 
-        // Save avatar as Base64 Data URI if a new one is provided in form-data
+        // Upload avatar lên Supabase Avatars bucket nếu có file mới
         if (request.getAvatar() != null && !request.getAvatar().isEmpty()) {
             MultipartFile avatarFile = request.getAvatar();
-            
+
             try {
-                String contentType = avatarFile.getContentType();
-                if (contentType == null || contentType.isBlank() || contentType.equals("application/octet-stream")) {
-                    contentType = "image/png";
-                }
-                byte[] bytes = avatarFile.getBytes();
-                String base64Image = "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(bytes);
-                
-                // Delete old custom avatar from Supabase if it was previously stored there
+                // 1. Xóa avatar cũ trên Supabase nếu là URL Supabase (không xóa Google/Base64)
                 String oldAvatarUrl = user.getAvatarUrl();
-                if (oldAvatarUrl != null && !oldAvatarUrl.isBlank() && !oldAvatarUrl.contains("googleusercontent.com") && !oldAvatarUrl.startsWith("data:")) {
+                if (oldAvatarUrl != null && !oldAvatarUrl.isBlank()
+                        && !oldAvatarUrl.contains("googleusercontent.com")
+                        && !oldAvatarUrl.startsWith("data:")) {
                     try {
                         supabaseStorage.deleteFile(oldAvatarUrl);
+                        log.info("Deleted old Supabase avatar: {}", oldAvatarUrl);
                     } catch (Exception e) {
-                        log.warn("Failed to delete old avatar file from storage: {}", e.getMessage());
+                        log.warn("Failed to delete old avatar from Supabase (non-critical): {}", e.getMessage());
                     }
                 }
-                
-                user.setAvatarUrl(base64Image);
+
+                // 2. Upload avatar mới lên Supabase Avatars bucket
+                FileUploadResponse uploaded = supabaseStorage.uploadFileToBucket(avatarFile, null, avatarBucket);
+                user.setAvatarUrl(uploaded.getPublicUrl());
+                log.info("Avatar uploaded to Supabase: {}", uploaded.getPublicUrl());
+
+            } catch (GlobalException e) {
+                throw e;
             } catch (Exception e) {
-                log.error("Failed to process new avatar: {}", e.getMessage());
+                log.error("Failed to upload avatar to Supabase: {}", e.getMessage());
                 throw new GlobalException(ErrorCode.FILE_UPLOAD_FAILED);
             }
         }
