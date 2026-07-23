@@ -14,6 +14,7 @@ import AiStudyHub.BE.dto.Request.ResendOtpRequest;
 import AiStudyHub.BE.dto.Request.ResetPasswordRequest;
 import AiStudyHub.BE.dto.Request.VerifyOtpRequest;
 import AiStudyHub.BE.dto.Request.VerifyTokenRequest;
+import AiStudyHub.BE.dto.Response.FileUploadResponse;
 import AiStudyHub.BE.dto.Response.ForgotPasswordResponse;
 import AiStudyHub.BE.dto.Response.GoogleUserInfo;
 import AiStudyHub.BE.dto.Response.RegisterResponse;
@@ -27,14 +28,17 @@ import AiStudyHub.BE.mapper.UserMapper;
 import AiStudyHub.BE.repository.UserRepo;
 import AiStudyHub.BE.service.IAuthentication;
 import AiStudyHub.BE.service.IOtpService;
+import AiStudyHub.BE.service.ISupabaseStorage;
 import AiStudyHub.BE.service.IToken;
 import AiStudyHub.BE.service.IUser;
 import AiStudyHub.BE.utils.OtpUtil;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -64,6 +68,11 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
     final UserMapper userMapper;
     final OtpMapper otpMapper;
     final PasswordEncoder passwordEncoder;
+    final ISupabaseStorage supabaseStorage;
+
+    @NonFinal
+    @Value("${supabase.storage.avatar-bucket:Avatars}")
+    String avatarBucket;
 
     @Autowired
     @Lazy
@@ -253,20 +262,47 @@ public class AuthenticationService implements UserDetailsService, IAuthenticatio
                         throw new GlobalException(ErrorCode.ACCOUNT_BANNED);
                     }
 
-                    if (existingUser.getAvatarUrl() == null || existingUser.getAvatarUrl().isBlank() || existingUser.getAvatarUrl().contains("googleusercontent.com")) {
+                    // Cập nhật avatar: ưu tiên giữ avatar custom của user.
+                    // Chỉ xử lý avatar Google nếu user chưa có avatar hoặc đang dùng avatar Google.
+                    if (existingUser.getAvatarUrl() == null || existingUser.getAvatarUrl().isBlank()
+                            || existingUser.getAvatarUrl().contains("googleusercontent.com")) {
                         if (finalUserInfo.getPicture() != null && !finalUserInfo.getPicture().isBlank()) {
-                            existingUser.setAvatarUrl(finalUserInfo.getPicture());
+                            // Download avatar Google → upload lên Supabase Avatars bucket
+                            try {
+                                FileUploadResponse avatarUpload = supabaseStorage.downloadAndUploadToBucket(
+                                        finalUserInfo.getPicture(), null, avatarBucket);
+                                existingUser.setAvatarUrl(avatarUpload.getPublicUrl());
+                                log.info("Google avatar migrated to Supabase: {}", avatarUpload.getPublicUrl());
+                            } catch (Exception e) {
+                                // Non-critical: nếu upload fail thì giữ URL Google gốc
+                                log.warn("Failed to migrate Google avatar to Supabase, using original URL: {}", e.getMessage());
+                                existingUser.setAvatarUrl(finalUserInfo.getPicture());
+                            }
                         }
                     }
 
                     return userRepo.save(existingUser);
                 })
                 .orElseGet(() -> {
-                    // Use mapper for GoogleUserInfo → Entity, then set Service-specific fields
-                    User newUser = userMapper.toUser(finalUserInfo);
-                    newUser.setAuthProvider(AuthProvider.GOOGLE);
-                    newUser.setStatus(UserStatus.ACTIVE);
-                    return userRepo.save(newUser);
+                // Tạo user mới từ Google login
+                User newUser = userMapper.toUser(finalUserInfo);
+                newUser.setAuthProvider(AuthProvider.GOOGLE);
+                newUser.setStatus(UserStatus.ACTIVE);
+
+                // Download avatar Google → upload lên Supabase Avatars bucket cho user mới
+                if (finalUserInfo.getPicture() != null && !finalUserInfo.getPicture().isBlank()) {
+                    try {
+                        FileUploadResponse avatarUpload = supabaseStorage.downloadAndUploadToBucket(
+                                finalUserInfo.getPicture(), null, avatarBucket);
+                        newUser.setAvatarUrl(avatarUpload.getPublicUrl());
+                        log.info("New Google user avatar saved to Supabase: {}", avatarUpload.getPublicUrl());
+                    } catch (Exception e) {
+                        log.warn("Failed to upload new Google user avatar to Supabase, using original URL: {}", e.getMessage());
+                        newUser.setAvatarUrl(finalUserInfo.getPicture());
+                    }
+                }
+
+                return userRepo.save(newUser);
                 });
 
         String accessToken = tokenService.generateAccessToken(user);

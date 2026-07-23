@@ -37,8 +37,7 @@ public class User implements UserDetails {
 
     String fullName;
 
-    @Lob
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(columnDefinition = "TEXT")
     String avatarUrl;
 
     @Builder.Default

@@ -18,6 +18,7 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -33,8 +34,13 @@ public class SupabaseStoreService implements ISupabaseStorage {
     @Value("${supabase.service-key}")
     private String supabaseKey;
 
+    /** Bucket mặc định dùng cho Document uploads */
     @Value("${supabase.storage.bucket}")
     private String supabaseBucket;
+
+    /** Bucket dành riêng cho Avatar uploads */
+    @Value("${supabase.storage.avatar-bucket}")
+    private String avatarBucket;
 
     public SupabaseStoreService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder
@@ -43,52 +49,28 @@ public class SupabaseStoreService implements ISupabaseStorage {
     }
 
     // ─────────────────────────────────────────────────────────────────
-    // PUBLIC API
+    // PUBLIC API — Document Bucket (giữ nguyên không thay đổi)
     // ─────────────────────────────────────────────────────────────────
 
     @Override
     public FileUploadResponse uploadFile(MultipartFile file, String folder) throws Exception {
-        String originalFileName = file.getOriginalFilename();
-        String sanitizedFileName = sanitizeFileName(originalFileName);
-        String storedFileName = UUID.randomUUID() + "_" + sanitizedFileName;
-
-        // Build the storage path inside the bucket
-        String storagePath = (folder != null && !folder.isBlank())
-                ? folder.strip() + "/" + storedFileName
-                : storedFileName;
-
-        String contentType = file.getContentType() != null
-                ? file.getContentType()
-                : "application/octet-stream";
-
-        doUpload(storagePath, file.getBytes(), contentType);
-
-        String publicUrl = buildPublicUrl(storagePath);
-
-        logger.info("Upload Successfully: path={}, url={}", storagePath, publicUrl);
-
-        return FileUploadResponse.builder()
-                .originalFileName(originalFileName)
-                .storedFileName(storedFileName)
-                .storagePath(storagePath)
-                .publicUrl(publicUrl)
-                .contentType(contentType)
-                .fileSize(file.getSize())
-                .build();
+        return uploadFileToBucket(file, folder, supabaseBucket);
     }
 
     @Override
     public String deleteFile(String fileUrlPath) {
         String storagePath = extractStoragePath(fileUrlPath);
+        // Xác định bucket từ URL
+        String bucket = detectBucketFromUrl(fileUrlPath);
 
         String deleteUrl = String.format(
                 "%s/storage/v1/object/%s/%s",
                 supabaseUrl,
-                supabaseBucket,
+                bucket,
                 storagePath);
 
         try {
-            logger.info("Deleting Supabase file: path={}, url={}", storagePath, deleteUrl);
+            logger.info("Deleting Supabase file: path={}, bucket={}, url={}", storagePath, bucket, deleteUrl);
 
             webClient.delete()
                     .uri(deleteUrl)
@@ -147,11 +129,12 @@ public class SupabaseStoreService implements ISupabaseStorage {
         }
 
         // Fallback: build authenticated URL
+        String bucket = detectBucketFromUrl(fileUrlPath);
         String storagePath = extractStoragePath(fileUrlPath);
         String downloadUrl = String.format(
                 "%s/storage/v1/object/authenticated/%s/%s",
                 supabaseUrl,
-                supabaseBucket,
+                bucket,
                 URLEncoder.encode(storagePath, StandardCharsets.UTF_8)
                         .replace("+", "%20")
                         .replace("%2F", "/"));
@@ -218,7 +201,7 @@ public class SupabaseStoreService implements ISupabaseStorage {
                     .bodyToMono(String.class)
                     .block();
 
-            String publicUrl = buildPublicUrl(storagePath);
+            String publicUrl = buildPublicUrl(storagePath, supabaseBucket);
 
             logger.info("Upload bytes successfully: path={}, url={}", storagePath, publicUrl);
 
@@ -241,15 +224,109 @@ public class SupabaseStoreService implements ISupabaseStorage {
         }
     }
 
-    // -----------------------------------------------------------------------------
-    private boolean doUpload(String storagePath, byte[] fileBytes, String contentType) {
+    // ─────────────────────────────────────────────────────────────────
+    // PUBLIC API — Multi-bucket support (dùng cho Avatar bucket)
+    // ─────────────────────────────────────────────────────────────────
+    @Override
+    public FileUploadResponse uploadFileToBucket(MultipartFile file, String folder, String bucket) throws Exception {
+        String originalFileName = file.getOriginalFilename();
+        String sanitizedFileName = sanitizeFileName(originalFileName);
+        String storedFileName = UUID.randomUUID() + "_" + sanitizedFileName;
+
+        String storagePath = (folder != null && !folder.isBlank())
+                ? folder.strip() + "/" + storedFileName
+                : storedFileName;
+
+        String contentType = file.getContentType() != null
+                ? file.getContentType()
+                : "application/octet-stream";
+
+        doUpload(storagePath, file.getBytes(), contentType, bucket);
+
+        String publicUrl = buildPublicUrl(storagePath, bucket);
+
+        logger.info("Upload to bucket '{}' Successfully: path={}, url={}", bucket, storagePath, publicUrl);
+
+        return FileUploadResponse.builder()
+                .originalFileName(originalFileName)
+                .storedFileName(storedFileName)
+                .storagePath(storagePath)
+                .publicUrl(publicUrl)
+                .contentType(contentType)
+                .fileSize(file.getSize())
+                .build();
+    }
+
+    @Override
+    public FileUploadResponse downloadAndUploadToBucket(String imageUrl, String folder, String bucket) throws Exception {
+        logger.info("Downloading external image from URL: {}", imageUrl);
+
+        byte[] imageBytes;
+        String contentType;
+
+        try {
+            // Tải ảnh từ URL bên ngoài (không cần auth)
+            var response = webClient.get()
+                    .uri(URI.create(imageUrl))
+                    .retrieve()
+                    .toEntity(byte[].class)
+                    .block();
+
+            if (response == null || response.getBody() == null || response.getBody().length == 0) {
+                throw new GlobalException(ErrorCode.FILE_UPLOAD_FAILED);
+            }
+
+            imageBytes = response.getBody();
+
+            // Lấy content-type từ response header, fallback về image/jpeg
+            contentType = response.getHeaders().getContentType() != null
+                    ? response.getHeaders().getContentType().toString()
+                    : "image/jpeg";
+
+        } catch (WebClientResponseException e) {
+            logger.error("Failed to download external image: url={}, status={}", imageUrl, e.getStatusCode());
+            throw new GlobalException(ErrorCode.FILE_UPLOAD_FAILED);
+        } catch (Exception e) {
+            logger.error("Failed to download external image: url={}, error={}", imageUrl, e.getMessage());
+            throw new GlobalException(ErrorCode.FILE_UPLOAD_FAILED);
+        }
+
+        // Tạo tên file từ extension phù hợp content-type
+        String extension = resolveExtension(contentType);
+        String storedFileName = UUID.randomUUID() + "_avatar" + extension;
+
+        String storagePath = (folder != null && !folder.isBlank())
+                ? folder.strip() + "/" + storedFileName
+                : storedFileName;
+
+        doUpload(storagePath, imageBytes, contentType, bucket);
+
+        String publicUrl = buildPublicUrl(storagePath, bucket);
+
+        logger.info("Re-uploaded external image to bucket '{}': path={}, url={}", bucket, storagePath, publicUrl);
+
+        return FileUploadResponse.builder()
+                .originalFileName(storedFileName)
+                .storedFileName(storedFileName)
+                .storagePath(storagePath)
+                .publicUrl(publicUrl)
+                .contentType(contentType)
+                .fileSize((long) imageBytes.length)
+                .build();
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // PRIVATE HELPERS
+    // ─────────────────────────────────────────────────────────────────
+
+    private boolean doUpload(String storagePath, byte[] fileBytes, String contentType, String bucket) {
         String uploadUrl = String.format(
                 "%s/storage/v1/object/%s/%s",
                 supabaseUrl,
-                supabaseBucket,
+                bucket,
                 storagePath);
 
-        logger.info("Uploading on Supabase: {}", uploadUrl);
+        logger.info("Uploading on Supabase bucket '{}': {}", bucket, uploadUrl);
 
         try {
             webClient.post()
@@ -264,23 +341,34 @@ public class SupabaseStoreService implements ISupabaseStorage {
                     .block();
 
         } catch (WebClientResponseException e) {
-            logger.error("Upload Fail: path={}, status={}, body={}",
-                    storagePath, e.getStatusCode(), e.getResponseBodyAsString());
+            logger.error("Upload Fail: path={}, bucket={}, status={}, body={}",
+                    storagePath, bucket, e.getStatusCode(), e.getResponseBodyAsString());
             throw new GlobalException(ErrorCode.FILE_UPLOAD_FAILED);
         }
         return true;
     }
 
-    private String buildPublicUrl(String storagePath) {
+    private String buildPublicUrl(String storagePath, String bucket) {
         String encodedPath = URLEncoder.encode(storagePath, StandardCharsets.UTF_8)
                 .replace("+", "%20")
-                .replace("%2F", "/"); // keep the slash character as-is
+                .replace("%2F", "/"); // giữ nguyên dấu slash
 
         return String.format(
                 "%s/storage/v1/object/public/%s/%s",
                 supabaseUrl,
-                supabaseBucket,
+                bucket,
                 encodedPath);
+    }
+
+    private String detectBucketFromUrl(String fileUrlPath) {
+        if (fileUrlPath == null) return supabaseBucket;
+        // Danh sách các bucket đã biết — avatar bucket được kiểm tra trước
+        for (String bucket : List.of(avatarBucket, supabaseBucket)) {
+            if (fileUrlPath.contains("/" + bucket + "/")) {
+                return bucket;
+            }
+        }
+        return supabaseBucket; // fallback về Documents
     }
 
     private String sanitizeFileName(String fileName) {
@@ -300,39 +388,45 @@ public class SupabaseStoreService implements ISupabaseStorage {
 
         String value = fileUrlOrPath.trim();
 
-        String publicMarker = "/storage/v1/object/public/" + supabaseBucket + "/";
-        String privateMarker = "/storage/v1/object/" + supabaseBucket + "/";
-        String signedMarker = "/storage/v1/object/sign/" + supabaseBucket + "/";
+        // Kiểm tra tất cả các bucket đã biết
+        for (String bucket : List.of(avatarBucket, supabaseBucket)) {
+            String publicMarker = "/storage/v1/object/public/" + bucket + "/";
+            String privateMarker = "/storage/v1/object/" + bucket + "/";
+            String signedMarker = "/storage/v1/object/sign/" + bucket + "/";
 
-        String path;
-
-        if (value.contains(publicMarker)) {
-            path = value.substring(value.indexOf(publicMarker) + publicMarker.length());
-        } else if (value.contains(privateMarker)) {
-            path = value.substring(value.indexOf(privateMarker) + privateMarker.length());
-        } else if (value.contains(signedMarker)) {
-            path = value.substring(value.indexOf(signedMarker) + signedMarker.length());
-        } else {
-            path = value;
+            if (value.contains(publicMarker)) {
+                return decode(removeQueryString(value.substring(value.indexOf(publicMarker) + publicMarker.length())));
+            } else if (value.contains(privateMarker)) {
+                return decode(removeQueryString(value.substring(value.indexOf(privateMarker) + privateMarker.length())));
+            } else if (value.contains(signedMarker)) {
+                return decode(removeQueryString(value.substring(value.indexOf(signedMarker) + signedMarker.length())));
+            }
         }
 
-        path = removeQueryString(path);
-
+        // Nếu không match pattern nào, dùng nguyên giá trị (có thể đã là path)
+        String path = removeQueryString(value);
         while (path.startsWith("/")) {
             path = path.substring(1);
         }
+        return decode(path);
+    }
 
+    private String decode(String path) {
         return URLDecoder.decode(path, StandardCharsets.UTF_8);
     }
 
     private String removeQueryString(String path) {
         int queryIndex = path.indexOf("?");
+        return queryIndex != -1 ? path.substring(0, queryIndex) : path;
+    }
 
-        if (queryIndex != -1) {
-            return path.substring(0, queryIndex);
-        }
-
-        return path;
+    private String resolveExtension(String contentType) {
+        if (contentType == null) return ".jpg";
+        if (contentType.contains("png")) return ".png";
+        if (contentType.contains("gif")) return ".gif";
+        if (contentType.contains("webp")) return ".webp";
+        if (contentType.contains("avif")) return ".avif";
+        return ".jpg"; // default jpeg
     }
 
 }

@@ -96,6 +96,7 @@ supabase:
   service-key: ${SUPABASE_SERVICE_KEY}
   storage:
     bucket: Documents
+    avatar-bucket: Avatars
     signed-url-expiration: 3600
 
 springdoc:
