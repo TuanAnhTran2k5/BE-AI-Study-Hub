@@ -1,9 +1,6 @@
 package AiStudyHub.BE.dto.Request;
 
-import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -20,6 +17,7 @@ public class RegisterRequest {
     String email;
 
     @NotBlank(message = "FIELD_REQUIRED")
+    @Size(min = 5,max = 50, message = "INVALID_SIZE")
     String fullName;
 
     @NotBlank(message = "FIELD_REQUIRED")
