@@ -16,7 +16,7 @@ RUN mvn dependency:go-offline -B --no-transfer-progress
 COPY src ./src
 
 # Build file .jar, bo qua tests
-RUN mvn package -DskipTests --batch-mode --no-transfer-progress
+RUN mvn package -Dmaven.test.skip=true --batch-mode --no-transfer-progress
 
 
 # ============================================================
