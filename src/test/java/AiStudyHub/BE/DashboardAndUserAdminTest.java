@@ -40,7 +40,7 @@ public class DashboardAndUserAdminTest {
     @Mock
     private DownloadRepo downloadRepo;
     @Mock
-    private ChatMessageRepository chatMessageRepository;
+    private ChatMessageRepo chatMessageRepo;
     @Mock
     private ReportCaseRepo reportCaseRepo;
     @Mock
@@ -96,19 +96,13 @@ public class DashboardAndUserAdminTest {
         when(userRepo.countByStatusAndCreatedAtBetween(any(), any(), any())).thenReturn(5L).thenReturn(10L);
 
         when(documentRepo.countByUploadStatusAndModerationStatusAndDeletedAtIsNull(any(), any())).thenReturn(20L);
-        when(documentRepo.countByUploadStatusAndModerationStatusAndDeletedAtIsNullAndCreatedAtBetween(any(), any(),
-                
-                
-                any(), any())).thenReturn(10L).thenReturn(20L);
+        when(documentRepo.countByUploadStatusAndModerationStatusAndDeletedAtIsNullAndCreatedAtBetween(any(), any(), any(), any())).thenReturn(10L).thenReturn(20L);
 
         when(downloadRepo.count()).thenReturn(100L);
         when(downloadRepo.countByDownloadedAtBetween(any(), any())).thenReturn(50L).thenReturn(100L);
 
-                
-        when(chatMessageRepository.countBySenderType(SenderType.USER)).thenReturn(200L);
-                
-        when(chatMessageRepository.countBySenderTypeAndCreatedAtBetween(any(), any(), any())).thenReturn(100L)
-                .thenReturn(200L);
+        when(chatMessageRepo.countBySenderType(SenderType.USER)).thenReturn(200L);
+        when(chatMessageRepo.countBySenderTypeAndCreatedAtBetween(any(), any(), any())).thenReturn(100L).thenReturn(200L);
 
         // Act
         SystemStatisticsResponse stats = dashboardService.getSystemStatistics();
@@ -138,13 +132,10 @@ public class DashboardAndUserAdminTest {
         assertTrue(result.isEmpty());
     }
 
-                
     @Test
     public void testGetModerationSummary_Success() {
-                
         when(reportCaseRepo.countByCaseStatusIn(any())).thenReturn(3L);
-        when(documentRepo.countByReportCountGreaterThanAndModerationStatusAndDeletedAtIsNull(anyInt(), any()))
-                .thenReturn(5L);
+        when(documentRepo.countByReportCountGreaterThanAndModerationStatusAndDeletedAtIsNull(anyInt(), any())).thenReturn(5L);
         when(documentRepo.countByUploadStatusAndDeletedAtIsNull(UploadStatus.PENDING)).thenReturn(2L);
         when(userRepo.countByStatus(UserStatus.BANNED)).thenReturn(1L);
         when(userRepo.countByStatus(UserStatus.PENDING)).thenReturn(4L);
@@ -158,17 +149,14 @@ public class DashboardAndUserAdminTest {
         assertEquals(1L, result.getTotalBannedUsersCount());
         assertEquals(4L, result.getTotalPendingUsersCount());
     }
-                
 
-
-            oid testBanUser_SelfBan_ThrowsException() {
-                
+    @Test
+    public void testBanUser_SelfBan_ThrowsException() {
         // Arrange
-
-            (MockedStatic<AiStudyHub.BE.security.SecurityUtils> mockedSecurity = mockStatic(
-                AiStudyHub.BE.security.SecurityUtils.class)) {
+        User admin = User.builder().userId(1L).email("admin@studyhub.com").role(UserRole.AD).build();
+        try (MockedStatic<AiStudyHub.BE.security.SecurityUtils> mockedSecurity = mockStatic(AiStudyHub.BE.security.SecurityUtils.class)) {
             mockedSecurity.when(AiStudyHub.BE.security.SecurityUtils::getCurrentUser).thenReturn(admin);
-
+            
             when(userRepo.findById(1L)).thenReturn(Optional.of(admin));
 
             // Act & Assert
@@ -178,19 +166,16 @@ public class DashboardAndUserAdminTest {
             assertEquals(400, exception.getCode());
             assertEquals("Cannot ban yourself", exception.getMessage());
         }
-                
     }
 
-            
+    @Test
     public void testBanUser_BanAdmin_ThrowsException() {
-                
         // Arrange
-
-             targetAdmin = User.builder().userId(3L).email("targetadmin@studyhub.com").role(UserRole.AD).build();
-        try (MockedStatic<AiStudyHub.BE.security.SecurityUtils> mockedSecurity = mockStatic(
-                AiStudyHub.BE.security.SecurityUtils.class)) {
+        User admin = User.builder().userId(1L).email("admin@studyhub.com").role(UserRole.AD).build();
+        User targetAdmin = User.builder().userId(3L).email("targetadmin@studyhub.com").role(UserRole.AD).build();
+        try (MockedStatic<AiStudyHub.BE.security.SecurityUtils> mockedSecurity = mockStatic(AiStudyHub.BE.security.SecurityUtils.class)) {
             mockedSecurity.when(AiStudyHub.BE.security.SecurityUtils::getCurrentUser).thenReturn(admin);
-
+            
             when(userRepo.findById(1L)).thenReturn(Optional.of(admin));
             when(userRepo.findById(3L)).thenReturn(Optional.of(targetAdmin));
 
@@ -198,95 +183,74 @@ public class DashboardAndUserAdminTest {
             GlobalException exception = assertThrows(GlobalException.class, () -> {
                 userService.banUser(3L, "Testing ban another admin");
             });
-                
             assertEquals(403, exception.getCode());
-                
             assertEquals("Cannot ban another admin account", exception.getMessage());
+        }
+    }
 
-            
-
-                
     @Test
-                
     public void testBanUser_Idempotent_ThrowsException() {
-
-             admin = User.builder().userId(1L).email("admin@studyhub.com").role(UserRole.AD).build();
-        User targetBanned = User.builder().userId(2L).email("target@studyhub.com").role(UserRole.US)
-                .status(UserStatus.BANNED).build();
-        try (MockedStatic<AiStudyHub.BE.security.SecurityUtils> mockedSecurity = mockStatic(
-                AiStudyHub.BE.security.SecurityUtils.class)) {
+        // Arrange
+        User admin = User.builder().userId(1L).email("admin@studyhub.com").role(UserRole.AD).build();
+        User targetBanned = User.builder().userId(2L).email("target@studyhub.com").role(UserRole.US).status(UserStatus.BANNED).build();
+        try (MockedStatic<AiStudyHub.BE.security.SecurityUtils> mockedSecurity = mockStatic(AiStudyHub.BE.security.SecurityUtils.class)) {
             mockedSecurity.when(AiStudyHub.BE.security.SecurityUtils::getCurrentUser).thenReturn(admin);
-
+            
             when(userRepo.findById(1L)).thenReturn(Optional.of(admin));
             when(userRepo.findById(2L)).thenReturn(Optional.of(targetBanned));
 
-                
-
+            // Act & Assert
             GlobalException exception = assertThrows(GlobalException.class, () -> {
-                
                 userService.banUser(2L, "Testing already banned");
-
+            });
             assertEquals(409, exception.getCode());
             assertEquals("User is already banned", exception.getMessage());
         }
-                
+    }
 
-        
-                
     @Test
-
-            rrange
-        User admin = User.builder().userId(1L).role(UserRole.AD).build();
-        User target = User.builder().userId(2L).role(UserRole.US).status(UserStatus.ACTIVE).email("target@studyhub
-                    com")
-                .build();
-
-        try (MockedStatic<AiStudyHub.BE.security.SecurityUtils> mockedSecurity = mockStatic(
-                AiStudyHub.BE.security.SecurityUtils.class)) {
-            mockedSecurity.when(AiStudyHub.BE.security.SecurityUtils::getCurrentUser).thenReturn(admin);
-
-            when(userRepo.findById(1L)).thenReturn(Optional.of(admin));
-            when(userRepo.findById(2L)).thenReturn(Optional.of(target));
-            when(documentRepo.countActiveDocumentsGroupByOwnerIds(any())).thenReturn(new ArrayList<>());
-                
-
-            when(downloadRepo.countDownloadsReceivedGroupByOwnerIds(any())).thenReturn(new A
-                rrayList<>());
-
-
-            AdminUserResponse response = userService.banUser(2L, "Violation of rules");
-
-            // Assert
-            assertNotNull(response);
-            assertEquals(UserStatus.BANNED, response.getStatus());
-            verify(notificationService, times(1)).sendAccountBannedNotification(eq(target), eq(null), anyString(),
-                
-
-            verify(userRepo, times(1)).save(target);
-                
-        }
-
-            
-    @Test
-    public void testUnbanUser_Success_SendsNotification() {
+    public void testBanUser_Success_SendsNotification() {
         // Arrange
         User admin = User.builder().userId(1L).role(UserRole.AD).build();
-        User target = User.builder().userId(2L).role(UserRole.US).status(UserStatus.BANNED).email("target@studyhub.com")
-                .build();
-
-
-                AiStudyHub.BE.security.SecurityUtils.class)) {
+        User target = User.builder().userId(2L).role(UserRole.US).status(UserStatus.ACTIVE).email("target@studyhub.com").build();
+        
+        try (MockedStatic<AiStudyHub.BE.security.SecurityUtils> mockedSecurity = mockStatic(AiStudyHub.BE.security.SecurityUtils.class)) {
             mockedSecurity.when(AiStudyHub.BE.security.SecurityUtils::getCurrentUser).thenReturn(admin);
-
+            
             when(userRepo.findById(1L)).thenReturn(Optional.of(admin));
             when(userRepo.findById(2L)).thenReturn(Optional.of(target));
             when(documentRepo.countActiveDocumentsGroupByOwnerIds(any())).thenReturn(new ArrayList<>());
             when(downloadRepo.countDownloadsReceivedGroupByOwnerIds(any())).thenReturn(new ArrayList<>());
 
+            // Act
+            AdminUserResponse response = userService.banUser(2L, "Violation of rules");
 
+            // Assert
+            assertNotNull(response);
+            assertEquals(UserStatus.BANNED, response.getStatus());
+            verify(notificationService, times(1)).sendAccountBannedNotification(eq(target), eq(null), anyString(), eq("Violation of rules"));
+            verify(userRepo, times(1)).save(target);
+        }
+    }
+
+    @Test
+    public void testUnbanUser_Success_SendsNotification() {
+        // Arrange
+        User admin = User.builder().userId(1L).role(UserRole.AD).build();
+        User target = User.builder().userId(2L).role(UserRole.US).status(UserStatus.BANNED).email("target@studyhub.com").build();
+        
+        try (MockedStatic<AiStudyHub.BE.security.SecurityUtils> mockedSecurity = mockStatic(AiStudyHub.BE.security.SecurityUtils.class)) {
+            mockedSecurity.when(AiStudyHub.BE.security.SecurityUtils::getCurrentUser).thenReturn(admin);
+            
+            when(userRepo.findById(1L)).thenReturn(Optional.of(admin));
+            when(userRepo.findById(2L)).thenReturn(Optional.of(target));
+            when(documentRepo.countActiveDocumentsGroupByOwnerIds(any())).thenReturn(new ArrayList<>());
+            when(downloadRepo.countDownloadsReceivedGroupByOwnerIds(any())).thenReturn(new ArrayList<>());
+
+            // Act
             AdminUserResponse response = userService.unbanUser(2L);
 
-
+            // Assert
             assertNotNull(response);
             assertEquals(UserStatus.ACTIVE, response.getStatus());
             verify(notificationService, times(1)).sendAccountUnbannedNotification(eq(target));
@@ -294,18 +258,20 @@ public class DashboardAndUserAdminTest {
         }
     }
 
- 
+    @Test
+    public void testRefreshDashboardCaches_IdleSkip() {
         // Act
         dashboardService.refreshDashboardCaches();
-
+        
         // Assert
-        verifyNoInteractions(chatMessageRepository);
+        verifyNoInteractions(chatMessageRepo);
     }
 
     @Test
     public void testRefreshDashboardCaches_Active_WarmsCache() {
         // Arrange
- 
+        when(userRepo.countByStatus(UserStatus.ACTIVE)).thenReturn(10L);
+        
         org.springframework.cache.Cache mockCache = mock(org.springframework.cache.Cache.class);
         when(cacheManager.getCache(anyString())).thenReturn(mockCache);
 
@@ -317,3 +283,4 @@ public class DashboardAndUserAdminTest {
         verify(mockCache, times(3)).put(eq(org.springframework.cache.interceptor.SimpleKey.EMPTY), any());
     }
 }
+
