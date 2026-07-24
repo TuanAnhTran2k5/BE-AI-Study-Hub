@@ -12,7 +12,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 @Repository
-public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
+public interface ChatMessageRepo extends JpaRepository<ChatMessage, Long> {
     Page<ChatMessage> findBySession_SessionIdOrderByCreatedAtDesc(Long sessionId, Pageable pageable);
     List<ChatMessage> findTop10BySession_SessionIdOrderByCreatedAtDesc(Long sessionId);
     long countBySession_SessionId(Long sessionId);

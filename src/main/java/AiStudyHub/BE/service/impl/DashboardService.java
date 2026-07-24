@@ -39,7 +39,7 @@ public class DashboardService implements IDashboard {
     private final UserRepo userRepo;
     private final DocumentRepo documentRepo;
     private final DownloadRepo downloadRepo;
-    private final ChatMessageRepository chatMessageRepository;
+    private final ChatMessageRepo chatMessageRepo;
     private final ReportCaseRepo reportCaseRepo;
     private final SubjectRepo subjectRepo;
     private final RankingRepo rankingRepo;
@@ -106,9 +106,9 @@ public class DashboardService implements IDashboard {
         long currentPeriodDownloads = downloadRepo.countByDownloadedAtBetween(thirtyDaysAgo, now);
 
         // 4. AI Queries (senderType=USER)
-        long currentQueries = chatMessageRepository.countBySenderType(SenderType.USER);
-        long prevQueries = chatMessageRepository.countBySenderTypeAndCreatedAtBetween(SenderType.USER, sixtyDaysAgo, thirtyDaysAgo);
-        long currentPeriodQueries = chatMessageRepository.countBySenderTypeAndCreatedAtBetween(SenderType.USER, thirtyDaysAgo, now);
+        long currentQueries = chatMessageRepo.countBySenderType(SenderType.USER);
+        long prevQueries = chatMessageRepo.countBySenderTypeAndCreatedAtBetween(SenderType.USER, sixtyDaysAgo, thirtyDaysAgo);
+        long currentPeriodQueries = chatMessageRepo.countBySenderTypeAndCreatedAtBetween(SenderType.USER, thirtyDaysAgo, now);
 
         return SystemStatisticsResponse.builder()
                 .totalActiveUsers(SystemStatisticsResponse.StatisticCard.builder()
@@ -218,7 +218,7 @@ public class DashboardService implements IDashboard {
         List<Object[]> rawSignups = userRepo.countSignupsByDate(since);
         List<Object[]> rawDocs = documentRepo.countNewDocumentsByDate(since);
         List<Object[]> rawDownloads = downloadRepo.countDownloadsByDate(since);
-        List<Object[]> rawAiQueries = chatMessageRepository.countAiQueriesByDate(since);
+        List<Object[]> rawAiQueries = chatMessageRepo.countAiQueriesByDate(since);
 
         // Convert query results to maps: Date (Date or LocalDate) -> Count
         Map<LocalDate, Long> signupMap = toDateMap(rawSignups);

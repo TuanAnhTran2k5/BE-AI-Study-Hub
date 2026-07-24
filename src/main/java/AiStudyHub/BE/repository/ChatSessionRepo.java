@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ChatSessionRepository extends JpaRepository<ChatSession, Long> {
+public interface ChatSessionRepo extends JpaRepository<ChatSession, Long> {
     List<ChatSession> findByUserUserIdOrderByCreatedAtDesc(Long userId);
     Optional<ChatSession> findBySessionIdAndUserUserId(Long sessionId, Long userId);
 
