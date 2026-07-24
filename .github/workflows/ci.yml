@@ -47,7 +47,7 @@ jobs:
       # --batch-mode: log sach khong co progress bar
       # ─────────────────────────────────────────
       - name: Build with Maven (compile + package)
-        run: mvn package -DskipTests --batch-mode --no-transfer-progress
+        run: mvn package -Dmaven.test.skip=true --batch-mode --no-transfer-progress
 
       # ─────────────────────────────────────────
       # BUOC 4: Luu file .jar len GitHub Artifacts
