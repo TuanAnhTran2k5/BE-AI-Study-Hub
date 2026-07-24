@@ -1,0 +1,98 @@
+name: Continuous Integration Pipeline (Maven Build, Package, Docker)
+run-name: CI triggered by ${{ github.actor }}
+
+on:
+  push:
+    branches:
+      - master
+      - main
+      - 'feature/**'   # test tren nhanh feature/xxx bat ky
+      - 'ci/**'        # nhanh danh rieng cho test CI (vi du: ci/test-pipeline)
+  pull_request:
+    branches:
+      - master
+      - main
+  workflow_dispatch:   # ← cho phep bam nut "Run workflow" tren GitHub Actions UI
+    inputs:
+      reason:
+        description: 'Ly do chay thu cong (tuy chon)'
+        required: false
+        default: 'Manual test'
+
+jobs:
+  ci-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ─────────────────────────────────────────
+      # BUOC 1: Lay source code ve runner
+      # ─────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ─────────────────────────────────────────
+      # BUOC 2: Cai Java 21 (Amazon Corretto)
+      # cache: maven -> tai su dung ~/.m2 giua cac lan chay
+      # ─────────────────────────────────────────
+      - name: Setup Java 21 (Amazon Corretto)
+        uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: '21'
+          cache: maven
+
+      # ─────────────────────────────────────────
+      # BUOC 3: Build & Package thanh file .jar
+      # -DskipTests: bo qua test (test can DB that + external services)
+      # --batch-mode: log sach khong co progress bar
+      # ─────────────────────────────────────────
+      - name: Build with Maven (compile + package)
+        run: mvn package -DskipTests --batch-mode --no-transfer-progress
+
+      # ─────────────────────────────────────────
+      # BUOC 4: Luu file .jar len GitHub Artifacts
+      # Huu ich de download ve debug khi Docker fail
+      # Tu xoa sau 7 ngay
+      # ─────────────────────────────────────────
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar-${{ github.sha }}
+          path: target/*.jar
+          retention-days: 7
+
+      # ─────────────────────────────────────────
+      # BUOC 5: Cai Docker Buildx
+      # Buildx ho tro build multi-platform va dung cache nang cao
+      # ─────────────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ─────────────────────────────────────────
+      # BUOC 6: Dang nhap vao Docker Hub
+      # Dung secrets da khai bao trong GitHub repository settings
+      # ─────────────────────────────────────────
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # ─────────────────────────────────────────
+      # BUOC 7: Build Docker image va Push len Docker Hub
+      # Tags:
+      #   - :latest        -> luon la ban moi nhat
+      #   - :<commit-sha>  -> dinh danh chinh xac commit nao
+      # cache-from/cache-to: tai su dung layer Docker giua cac lan build
+      # ─────────────────────────────────────────
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/be-ai-study-hub:latest
+            ${{ secrets.DOCKER_USERNAME }}/be-ai-study-hub:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
