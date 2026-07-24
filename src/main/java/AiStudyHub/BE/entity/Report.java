@@ -42,6 +42,7 @@ public class Report {
         @Column(columnDefinition = "TEXT")
         String description;
 
+        @Column(columnDefinition = "TEXT")
         String evidenceUrl;
 
         @Builder.Default

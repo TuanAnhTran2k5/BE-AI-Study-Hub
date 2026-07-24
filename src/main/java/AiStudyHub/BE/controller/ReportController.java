@@ -21,6 +21,11 @@ import org.springframework.web.bind.annotation.*;
 import AiStudyHub.BE.entity.ReportReason;
 import java.util.List;
 
+import AiStudyHub.BE.dto.Response.FileUploadResponse;
+import AiStudyHub.BE.service.ISupabaseStorage;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+
 @RestController
 @RequestMapping("/api/user/reports")
 @CrossOrigin("*")
@@ -31,6 +36,32 @@ import java.util.List;
 public class ReportController {
 
     IReport reportService;
+    ISupabaseStorage supabaseStorage;
+
+    @PostMapping(value = "/upload-evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload evidence image for document report to Supabase Storage")
+    public ResponseEntity<APIResponse<FileUploadResponse>> uploadEvidence(
+            @AuthenticationPrincipal User currentUser,
+            @RequestParam("file") MultipartFile file) throws Exception {
+
+        if (currentUser == null) {
+            throw new GlobalException(ErrorCode.INVALID_TOKEN);
+        }
+        if (file == null || file.isEmpty()) {
+            throw new GlobalException(400, "File is empty");
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new GlobalException(400, "Only image files (PNG, JPG, WEBP, etc.) are allowed for evidence proof.");
+        }
+
+        FileUploadResponse uploadRes = supabaseStorage.uploadFile(file, "report-evidences");
+
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Upload evidence image successfully", uploadRes)
+        );
+    }
 
     @PostMapping
     @Operation(summary = "Submit a report for a document violation")
