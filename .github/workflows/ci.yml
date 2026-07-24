@@ -31,45 +31,15 @@ jobs:
         uses: actions/checkout@v4
 
       # ─────────────────────────────────────────
-      # BUOC 2: Cai Java 21 (Amazon Corretto)
-      # cache: maven -> tai su dung ~/.m2 giua cac lan chay
-      # ─────────────────────────────────────────
-      - name: Setup Java 21 (Amazon Corretto)
-        uses: actions/setup-java@v4
-        with:
-          distribution: corretto
-          java-version: '21'
-          cache: maven
-
-      # ─────────────────────────────────────────
-      # BUOC 3: Build & Package thanh file .jar
-      # -DskipTests: bo qua test (test can DB that + external services)
-      # --batch-mode: log sach khong co progress bar
-      # ─────────────────────────────────────────
-      - name: Build with Maven (compile + package)
-        run: mvn package -Dmaven.test.skip=true --batch-mode --no-transfer-progress
-
-      # ─────────────────────────────────────────
-      # BUOC 4: Luu file .jar len GitHub Artifacts
-      # Huu ich de download ve debug khi Docker fail
-      # Tu xoa sau 7 ngay
-      # ─────────────────────────────────────────
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-jar-${{ github.sha }}
-          path: target/*.jar
-          retention-days: 7
-
-      # ─────────────────────────────────────────
-      # BUOC 5: Cai Docker Buildx
-      # Buildx ho tro build multi-platform va dung cache nang cao
+      # BUOC 2: Cai Docker Buildx
+      # Dockerfile da tu xu ly compile + package Maven ben trong
+      # Khong can cai Java hay chay Maven tren runner nua
       # ─────────────────────────────────────────
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       # ─────────────────────────────────────────
-      # BUOC 6: Dang nhap vao Docker Hub
+      # BUOC 3: Dang nhap vao Docker Hub
       # Dung secrets da khai bao trong GitHub repository settings
       # ─────────────────────────────────────────
       - name: Login to Docker Hub
@@ -79,11 +49,11 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       # ─────────────────────────────────────────
-      # BUOC 7: Build Docker image va Push len Docker Hub
+      # BUOC 4: Build Docker image va Push len Docker Hub
       # Tags:
       #   - :latest        -> luon la ban moi nhat
       #   - :<commit-sha>  -> dinh danh chinh xac commit nao
-      # cache-from/cache-to: tai su dung layer Docker giua cac lan build
+      # cache-from/cache-to: tai su dung Docker layer cache giua cac lan build
       # ─────────────────────────────────────────
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v6
