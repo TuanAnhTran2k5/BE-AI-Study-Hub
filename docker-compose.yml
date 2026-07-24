@@ -1,5 +1,27 @@
-
 services:
+  # ─────────────────────────────────────────────────────────
+  # MySQL 8.0 - Database chinh cua ung dung
+  # ─────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: aistudyhub
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    mem_limit: 512m
+
+  # ─────────────────────────────────────────────────────────
+  # Qdrant - Vector database cho AI/RAG
+  # localhost trong healthcheck la dung (chay ben trong container)
+  # ─────────────────────────────────────────────────────────
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant-db
@@ -16,7 +38,35 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+    mem_limit: 400m
+
+  # ─────────────────────────────────────────────────────────
+  # Backend - Spring Boot App
+  # Pull image tu Docker Hub (CI da build va push)
+  # Override localhost -> service name cho Docker network
+  # ─────────────────────────────────────────────────────────
+  backend:
+    image: ${DOCKER_USERNAME}/be-ai-study-hub:${IMAGE_TAG:-latest}
+    container_name: backend-app
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      # FIX: DB_URL dung 'mysql' thay vi 'localhost' (Docker service name)
+      - DB_URL=jdbc:mysql://mysql:3306/aistudyhub
+      # FIX: Qdrant host dung 'qdrant' thay vi 'localhost' (Docker service name)
+      - SPRING_AI_VECTORSTORE_QDRANT_HOST=qdrant
+    depends_on:
+      mysql:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 1g
 
 volumes:
+  mysql_data:
+    driver: local
   qdrant_data:
     driver: local
