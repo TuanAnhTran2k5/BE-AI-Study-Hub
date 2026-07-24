@@ -20,7 +20,6 @@ services:
 
   # ─────────────────────────────────────────────────────────
   # Qdrant - Vector database cho AI/RAG
-  # localhost trong healthcheck la dung (chay ben trong container)
   # ─────────────────────────────────────────────────────────
   qdrant:
     image: qdrant/qdrant:latest
@@ -32,11 +31,6 @@ services:
       - qdrant_data:/qdrant/storage
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
     restart: unless-stopped
     mem_limit: 400m
 
@@ -53,15 +47,13 @@ services:
     env_file:
       - .env
     environment:
-      # FIX: DB_URL dung 'mysql' thay vi 'localhost' (Docker service name)
       - DB_URL=jdbc:mysql://mysql:3306/aistudyhub
-      # FIX: Qdrant host dung 'qdrant' thay vi 'localhost' (Docker service name)
       - SPRING_AI_VECTORSTORE_QDRANT_HOST=qdrant
     depends_on:
       mysql:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
     mem_limit: 1g
 
