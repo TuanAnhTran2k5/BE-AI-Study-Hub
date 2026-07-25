@@ -68,9 +68,14 @@ public class QdrantConfig {
             };
         }
 
-        return QdrantVectorStore.builder(qdrantClient, embeddingModel)
-                .collectionName(collectionName)
-                .initializeSchema(initializeSchema)
-                .build();
+        try {
+            return QdrantVectorStore.builder(qdrantClient, embeddingModel)
+                    .collectionName(collectionName)
+                    .initializeSchema(initializeSchema)
+                    .build();
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(QdrantConfig.class).warn("Qdrant connection unavailable ({}), falling back to SimpleVectorStore", e.getMessage());
+            return new org.springframework.ai.vectorstore.SimpleVectorStore(embeddingModel);
+        }
     }
 }
