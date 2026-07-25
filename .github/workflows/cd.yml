@@ -99,6 +99,12 @@ jobs:
 
             # Khoi dong lai cac service (down gracefully roi up)
             docker compose up -d --remove-orphans
+            
+            echo "Đợi 15 giây cho Java Spring Boot nạp xong RAM..."
+            sleep 15
+            
+            echo "Cập nhật Nginx để chống 502..."
+            docker exec nginx-proxy-manager-app-proxy-1 nginx -s reload || true
 
             echo "Deploy completed! Running containers:"
             docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
