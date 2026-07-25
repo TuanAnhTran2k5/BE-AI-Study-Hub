@@ -45,8 +45,8 @@ public class SyllabusService implements ISyllabusService {
     private final SubjectRepo subjectRepo;
     private final SubjectSyllabusRepo subjectSyllabusRepo;
     private final SubjectSyllabusHistoryRepo subjectSyllabusHistoryRepo;
-    private final VectorStore vectorStore;
-    private final ChatClient chatClient;
+    private final org.springframework.beans.factory.ObjectProvider<VectorStore> vectorStoreProvider;
+    private final org.springframework.beans.factory.ObjectProvider<ChatClient> chatClientProvider;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -188,6 +188,12 @@ public class SyllabusService implements ISyllabusService {
     @Transactional
     public void syncToVectorStore(Long syllabusId) {
         log.info("Starting Vector Store sync for syllabus ID: {}", syllabusId);
+        VectorStore vectorStore = vectorStoreProvider.getIfAvailable();
+        if (vectorStore == null) {
+            log.warn("VectorStore bean not available in Spring context. Skipping vector sync.");
+            return;
+        }
+
         SubjectSyllabus syllabus = subjectSyllabusRepo.findById(syllabusId).orElse(null);
         if (syllabus == null) {
             log.error("SubjectSyllabus not found with ID: {}", syllabusId);
@@ -543,6 +549,12 @@ public class SyllabusService implements ISyllabusService {
                 """;
 
         try {
+            ChatClient chatClient = chatClientProvider.getIfAvailable();
+            if (chatClient == null) {
+                log.warn("ChatClient bean not available in Spring context. Skipping LLM segment parsing.");
+                return expectedSchemaFormat.startsWith("[") ? "[]" : "{}";
+            }
+
             PromptTemplate template = new PromptTemplate(promptText);
             Map<String, Object> params = Map.of(
                     "segmentText", segmentText,
