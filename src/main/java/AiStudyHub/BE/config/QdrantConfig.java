@@ -52,30 +52,10 @@ public class QdrantConfig {
      * @return the configured VectorStore
      */
     @Bean
-    public VectorStore vectorStore(QdrantClient qdrantClient, org.springframework.beans.factory.ObjectProvider<EmbeddingModel> embeddingModelProvider) {
-        EmbeddingModel embeddingModel = embeddingModelProvider.getIfAvailable();
-        if (embeddingModel == null) {
-            embeddingModel = new EmbeddingModel() {
-                @Override
-                public org.springframework.ai.embedding.EmbeddingResponse call(org.springframework.ai.embedding.EmbeddingRequest request) {
-                    return new org.springframework.ai.embedding.EmbeddingResponse(java.util.List.of());
-                }
-
-                @Override
-                public float[] embed(String text) {
-                    return new float[1536];
-                }
-            };
-        }
-
-        try {
-            return QdrantVectorStore.builder(qdrantClient, embeddingModel)
-                    .collectionName(collectionName)
-                    .initializeSchema(initializeSchema)
-                    .build();
-        } catch (Exception e) {
-            org.slf4j.LoggerFactory.getLogger(QdrantConfig.class).warn("Qdrant connection unavailable ({}), falling back to SimpleVectorStore", e.getMessage());
-            return new org.springframework.ai.vectorstore.SimpleVectorStore(embeddingModel);
-        }
+    public VectorStore vectorStore(QdrantClient qdrantClient, EmbeddingModel embeddingModel) {
+        return QdrantVectorStore.builder(qdrantClient, embeddingModel)
+                .collectionName(collectionName)
+                .initializeSchema(initializeSchema)
+                .build();
     }
 }
