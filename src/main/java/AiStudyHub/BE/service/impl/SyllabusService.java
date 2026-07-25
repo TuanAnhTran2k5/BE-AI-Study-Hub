@@ -282,6 +282,10 @@ public class SyllabusService implements ISyllabusService {
                     }
                     virtualDocs.add(createVirtualDocument(subjectCode, sectionName, sb.toString()));
                 }
+            // 5.5. Fallback: If virtualDocs is empty, use raw plainText
+            if (virtualDocs.isEmpty() && syllabus.getPlainText() != null && !syllabus.getPlainText().isBlank()) {
+                String fallbackContent = "=== THÔNG TIN TÀI LIỆU SYLLABUS MÔN HỌC " + subjectCode + " ===\n" + syllabus.getPlainText();
+                virtualDocs.add(createVirtualDocument(subjectCode, "full_text", fallbackContent));
             }
 
             // 6. Delete old vectors of this subject from Qdrant

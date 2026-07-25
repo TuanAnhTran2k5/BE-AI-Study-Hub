@@ -307,29 +307,62 @@ public class RagSystemService implements IRagSystem {
                 }
             }
 
-            // 3. Query system syllabus documents (with subject code filter if detected, or general syllabus search if no code in query)
+            // 3. Query system syllabus documents with 3-tier fallback strategy
             List<Document> syllabusChunks = new ArrayList<>();
             try {
                 FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
-                Filter.Expression filterExpression;
 
+                // Tier 1: Query with detected subject codes filter if present
                 if (!detectedSubjectCodes.isEmpty()) {
-                    filterExpression = filterBuilder.and(
-                            filterBuilder.eq("documentType", "SYSTEM_SYLLABUS"),
-                            filterBuilder.in("subjectCode", (Object[]) detectedSubjectCodes.toArray(new String[0]))
-                    ).build();
-                } else {
-                    filterExpression = filterBuilder.eq("documentType", "SYSTEM_SYLLABUS").build();
+                    try {
+                        Filter.Expression filterExpression = filterBuilder.and(
+                                filterBuilder.eq("documentType", "SYSTEM_SYLLABUS"),
+                                filterBuilder.in("subjectCode", (Object[]) detectedSubjectCodes.toArray(new String[0]))
+                        ).build();
+
+                        SearchRequest searchRequest = SearchRequest.builder()
+                                .query(question)
+                                .filterExpression(filterExpression)
+                                .similarityThreshold(0.0)
+                                .topK(5)
+                                .build();
+                        syllabusChunks = vectorStore.similaritySearch(searchRequest);
+                    } catch (Exception e) {
+                        log.warn("Tier 1 filtered syllabus search failed: {}", e.getMessage());
+                    }
                 }
 
-                SearchRequest searchRequest = SearchRequest.builder()
-                        .query(question)
-                        .filterExpression(filterExpression)
-                        .similarityThreshold(0.0)
-                        .topK(5)
-                        .build();
-                syllabusChunks = vectorStore.similaritySearch(searchRequest);
-                log.info("Retrieved {} syllabus chunks for query: {} (detected subject codes: {})",
+                // Tier 2: Fallback to general documentType = SYSTEM_SYLLABUS if no chunks retrieved yet
+                if (syllabusChunks.isEmpty()) {
+                    try {
+                        Filter.Expression filterExpression = filterBuilder.eq("documentType", "SYSTEM_SYLLABUS").build();
+                        SearchRequest searchRequest = SearchRequest.builder()
+                                .query(question)
+                                .filterExpression(filterExpression)
+                                .similarityThreshold(0.0)
+                                .topK(5)
+                                .build();
+                        syllabusChunks = vectorStore.similaritySearch(searchRequest);
+                    } catch (Exception e) {
+                        log.warn("Tier 2 general syllabus search failed: {}", e.getMessage());
+                    }
+                }
+
+                // Tier 3: Fallback to broad semantic vector search if still empty
+                if (syllabusChunks.isEmpty() && userDocChunks.isEmpty()) {
+                    try {
+                        SearchRequest searchRequest = SearchRequest.builder()
+                                .query(question)
+                                .similarityThreshold(0.0)
+                                .topK(5)
+                                .build();
+                        syllabusChunks = vectorStore.similaritySearch(searchRequest);
+                    } catch (Exception e) {
+                        log.warn("Tier 3 broad vector search failed: {}", e.getMessage());
+                    }
+                }
+
+                log.info("Retrieved {} syllabus chunks for query: '{}' (subject codes: {})",
                         syllabusChunks.size(), question, detectedSubjectCodes);
             } catch (Exception e) {
                 log.error("Failed to query syllabus chunks from Qdrant", e);
