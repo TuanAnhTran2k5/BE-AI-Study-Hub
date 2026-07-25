@@ -288,6 +288,8 @@ public class SyllabusService implements ISyllabusService {
                     }
                     virtualDocs.add(createVirtualDocument(subjectCode, sectionName, sb.toString()));
                 }
+            }
+
             // 5.5. Fallback: If virtualDocs is empty, use raw plainText
             if (virtualDocs.isEmpty() && syllabus.getPlainText() != null && !syllabus.getPlainText().isBlank()) {
                 String fallbackContent = "=== THÔNG TIN TÀI LIỆU SYLLABUS MÔN HỌC " + subjectCode + " ===\n" + syllabus.getPlainText();
@@ -481,8 +483,11 @@ public class SyllabusService implements ISyllabusService {
 
         // 2. Delete from Qdrant
         try {
-            log.info("Deleting Qdrant vectors for subject {}: {}", subjectCode, vectorIds);
-            vectorStore.delete(vectorIds);
+            VectorStore vectorStore = vectorStoreProvider.getIfAvailable();
+            if (vectorStore != null) {
+                log.info("Deleting Qdrant vectors for subject {}: {}", subjectCode, vectorIds);
+                vectorStore.delete(vectorIds);
+            }
         } catch (Exception e) {
             log.error("Failed to delete vectors from Qdrant for subject: {}", subjectCode, e);
         }
