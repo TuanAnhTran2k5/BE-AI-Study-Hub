@@ -80,8 +80,10 @@ public class ReportService implements IReport {
             throw new GlobalException(400, "You have already submitted a report for this document.");
         }
 
-        // 4. Find active case across ALL reasons to enforce one active case per document
-        List<CaseStatus> activeStatuses = List.of(CaseStatus.OPEN, CaseStatus.WARNING_1, CaseStatus.WARNING_2, CaseStatus.PENDING_REVIEW,
+        // 4. Find active case across ALL reasons to enforce one active case per
+        // document
+        List<CaseStatus> activeStatuses = List.of(CaseStatus.OPEN, CaseStatus.WARNING_1, CaseStatus.WARNING_2,
+                CaseStatus.PENDING_REVIEW,
                 CaseStatus.CLAIMED);
         ReportCase reportCase = reportCaseRepo.findFirstByDocumentAndCaseStatusIn(targetDocument, activeStatuses)
                 .orElseGet(() -> {
@@ -127,7 +129,8 @@ public class ReportService implements IReport {
     }
 
     private void processCase(ReportCase reportCase) {
-        // Exit immediately if WARNING_2, PENDING_REVIEW, CLAIMED, or terminal (RESOLVED, REJECTED)
+        // Exit immediately if WARNING_2, PENDING_REVIEW, CLAIMED, or terminal
+        // (RESOLVED, REJECTED)
         if (reportCase.getCaseStatus() == CaseStatus.WARNING_2 ||
                 reportCase.getCaseStatus() == CaseStatus.PENDING_REVIEW ||
                 reportCase.getCaseStatus() == CaseStatus.CLAIMED ||
@@ -156,7 +159,8 @@ public class ReportService implements IReport {
                 return;
             }
 
-            // Rule 2: If currentStatus is OPEN, check safety threshold Math.max(2, requiredThreshold)
+            // Rule 2: If currentStatus is OPEN, check safety threshold Math.max(2,
+            // requiredThreshold)
             int threshold = Math.max(2, reportCase.getRequiredThreshold());
             if (reportCase.getReportCount() >= threshold && reportCase.getCaseStatus() != CaseStatus.PENDING_REVIEW) {
                 reportCase.setCaseStatus(CaseStatus.PENDING_REVIEW);
@@ -177,20 +181,6 @@ public class ReportService implements IReport {
         int threshold = reportCase.getRequiredThreshold();
         int count = reportCase.getReportCount();
 
-        if (count >= threshold + 1 && reportCase.getCaseStatus() == CaseStatus.WARNING_1) {
-            reportCase.setCaseStatus(CaseStatus.WARNING_2);
-            reportCase.setSecondWarningAt(LocalDateTime.now());
-
-            int penalty = reason.getPenaltyScore() != null ? reason.getPenaltyScore() : 10;
-            deductPoints(owner, penalty, reportCase, "Penalty for escalating violation warning (WARNING_2) on document: " + document.getTitle());
-
-            notificationService.sendDocumentModerationNotification(
-                    owner, document, reason.getReasonName(), penalty, "WARNING_2 (Escalated Warning & Points Deducted)",
-                    "Your document received additional violation reports while under WARNING_1. Your account has been penalized " + penalty + " points.");
-            log.info("ReportCase ID {} escalated to WARNING_2. Penalized User ID {} by {} points.", reportCase.getCaseId(), owner.getUserId(), penalty);
-            return;
-        }
-
         if (count >= threshold && reportCase.getCaseStatus() == CaseStatus.OPEN) {
             // Trigger WARNING_1: Notify only, do NOT hide, do NOT deduct points
             reportCase.setCaseStatus(CaseStatus.WARNING_1);
@@ -199,7 +189,8 @@ public class ReportService implements IReport {
             notificationService.sendDocumentModerationNotification(
                     owner, document, reason.getReasonName(), 0, "WARNING_1 (Warning Notice)",
                     "Your document has received multiple violation reports. Please review and modify your content within 3 days to resolve the warning.");
-            log.info("ReportCase ID {} set to WARNING_1. Document ID {} remains visible for user editing.", reportCase.getCaseId(),
+            log.info("ReportCase ID {} set to WARNING_1. Document ID {} remains visible for user editing.",
+                    reportCase.getCaseId(),
                     document.getDocumentId());
         }
     }
@@ -267,7 +258,8 @@ public class ReportService implements IReport {
         }
 
         if (rc.getClaimedBy() != null && !rc.getClaimedBy().getUserId().equals(adminId)) {
-            throw new GlobalException(400, "This case is currently claimed by admin: " + rc.getClaimedBy().getFullName());
+            throw new GlobalException(400,
+                    "This case is currently claimed by admin: " + rc.getClaimedBy().getFullName());
         }
 
         if (rc.getCaseStatus() != CaseStatus.PENDING_REVIEW) {
@@ -471,7 +463,7 @@ public class ReportService implements IReport {
     @Transactional
     public void checkAndEscalateWarningCases() {
         log.info("Running scheduled warning cases escalation check...");
-        
+
         // 1. Handle WARNING_1 -> WARNING_2 / Auto-Resolve escalation
         List<ReportCase> warning1Cases = reportCaseRepo.findAllByCaseStatus(CaseStatus.WARNING_1);
         LocalDateTime warning1Threshold = LocalDateTime.now().minusDays(3);
@@ -479,16 +471,18 @@ public class ReportService implements IReport {
         for (ReportCase rc : warning1Cases) {
             if (rc.getFirstWarningAt() != null && rc.getFirstWarningAt().isBefore(warning1Threshold)) {
                 Document doc = rc.getDocument();
-                if (doc == null) continue;
+                if (doc == null)
+                    continue;
                 User owner = doc.getOwner();
 
                 // If user modified/updated the document (updatedAt > firstWarningAt)
                 if (doc.getUpdatedAt() != null && doc.getUpdatedAt().isAfter(rc.getFirstWarningAt())) {
-                    log.info("ReportCase ID {} warning 1 resolved because document ID {} was updated.", rc.getCaseId(), doc.getDocumentId());
+                    log.info("ReportCase ID {} warning 1 resolved because document ID {} was updated.", rc.getCaseId(),
+                            doc.getDocumentId());
                     rc.setCaseStatus(CaseStatus.REJECTED);
                     rc.setResolvedAt(LocalDateTime.now());
                     rc.setAdminNote("[System Auto-Resolved]: Warning resolved because owner updated the document.");
-                    
+
                     doc.setModerationStatus(ModerationStatus.NORMAL);
                     documentRepo.save(doc);
 
@@ -500,10 +494,12 @@ public class ReportService implements IReport {
                     }
 
                     // Send restoration / resolution notification
-                    notificationService.sendDocumentRestoredNotification(owner, doc, "Warning resolved after you updated the document.");
+                    notificationService.sendDocumentRestoredNotification(owner, doc,
+                            "Warning resolved after you updated the document.");
                 } else {
                     // Owner did NOT update document -> escalate to WARNING_2
-                    log.info("ReportCase ID {} escalated to WARNING_2. Owner failed to update document ID {}.", rc.getCaseId(), doc.getDocumentId());
+                    log.info("ReportCase ID {} escalated to WARNING_2. Owner failed to update document ID {}.",
+                            rc.getCaseId(), doc.getDocumentId());
                     rc.setCaseStatus(CaseStatus.WARNING_2);
                     rc.setSecondWarningAt(LocalDateTime.now());
 
@@ -515,7 +511,8 @@ public class ReportService implements IReport {
                     ReportReason reason = rc.getReason();
                     int penalty = reason.getPenaltyScore() != null ? reason.getPenaltyScore() : 10;
                     deductPoints(owner, penalty, rc,
-                            "Level 2 violation penalty (Document hidden due to no update after warning): " + reason.getReasonName());
+                            "Level 2 violation penalty (Document hidden due to no update after warning): "
+                                    + reason.getReasonName());
 
                     // Send WARNING_2 email / notification
                     notificationService.sendDocumentModerationNotification(
@@ -533,13 +530,16 @@ public class ReportService implements IReport {
         for (ReportCase rc : warning2Cases) {
             if (rc.getSecondWarningAt() != null && rc.getSecondWarningAt().isBefore(warning2Threshold)) {
                 Document doc = rc.getDocument();
-                if (doc == null) continue;
+                if (doc == null)
+                    continue;
                 User owner = doc.getOwner();
 
-                log.info("ReportCase ID {} warning 2 escalated to REMOVED due to lack of appeal within 7 days.", rc.getCaseId());
+                log.info("ReportCase ID {} warning 2 escalated to REMOVED due to lack of appeal within 7 days.",
+                        rc.getCaseId());
                 rc.setCaseStatus(CaseStatus.RESOLVED);
                 rc.setResolvedAt(LocalDateTime.now());
-                rc.setAdminNote("[System Auto-Resolved]: Document permanently removed due to no appeal within 7 days of Warning 2.");
+                rc.setAdminNote(
+                        "[System Auto-Resolved]: Document permanently removed due to no appeal within 7 days of Warning 2.");
 
                 // Permanently remove document
                 doc.setModerationStatus(ModerationStatus.REMOVED);
@@ -550,14 +550,15 @@ public class ReportService implements IReport {
                 for (Report r : reports) {
                     r.setStatus(ReportStatus.RESOLVED);
                     reportRepo.save(r);
-                    notificationService.sendReportApprovedNotification(r.getReporter(), doc, "Permanently removed after no appeal.");
+                    notificationService.sendReportApprovedNotification(r.getReporter(), doc,
+                            "Permanently removed after no appeal.");
                 }
 
                 // Send permanent removal notification
                 notificationService.sendDocumentModerationNotification(
                         owner, doc, rc.getReason().getReasonName(), 0, "REMOVED (Permanently Removed)",
                         "Your document has been permanently removed because you did not file an appeal within 7 days of the Warning 2 decision.");
-                
+
                 reportCaseRepo.save(rc);
             }
         }
