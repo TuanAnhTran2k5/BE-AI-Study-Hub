@@ -20,63 +20,56 @@ import java.util.Optional;
 @Repository
 public interface DocumentRepo extends JpaRepository<Document, Long> {
 
+        List<Document> findByOwnerUserIdOrVisibilityStatus(
+                        @Param("userId") Long userId,
+                        @Param("visibilityStatus") VisibilityStatus visibilityStatus);
 
-    List<Document> findByOwnerUserIdOrVisibilityStatus(
-            @Param("userId") Long userId,
-            @Param("visibilityStatus") VisibilityStatus visibilityStatus
-    );
+        long deleteByDocumentId(Long documentId);
 
+        List<Document> findByVisibilityStatusAndRatingCountGreaterThanEqual(
+                        @Param("visibilityStatus") VisibilityStatus visibilityStatus,
+                        @Param("minCount") Integer minCount);
 
-    long deleteByDocumentId(Long documentId);
+        List<Document> findByVisibilityStatus(
+                        @Param("visibilityStatus") VisibilityStatus visibilityStatus);
 
-    List<Document> findByVisibilityStatusAndRatingCountGreaterThanEqual(
-            @Param("visibilityStatus") VisibilityStatus visibilityStatus,
-            @Param("minCount") Integer minCount
-    );
+        List<Document> findByOwner(User owner);
 
-    List<Document> findByVisibilityStatus(
-            @Param("visibilityStatus") VisibilityStatus visibilityStatus
-    );
+        List<Document> findByOwnerUserId(Long userId);
 
+        List<Document> findByTitleContainingIgnoreCase(String keyword);
 
-    List<Document> findByOwner(User owner);
-    List<Document> findByOwnerUserId(Long userId);
+        long countByOwnerUserId(Long userId);
 
-    List<Document> findByTitleContainingIgnoreCase(String keyword);
+        long sumDownloadCountByOwnerUserId(@Param("userId") Long userId);
 
-    Optional<Document> findByTitle(String title);
+        List<Document> findBySourceDocumentDocumentId(Long sourceDocumentId);
 
-    long countByOwnerUserId(Long userId);
+        long countByUploadStatusAndModerationStatusAndDeletedAtIsNull(
+                        UploadStatus u, ModerationStatus m);
 
-    long sumDownloadCountByOwnerUserId(@Param("userId") Long userId);
+        long countByUploadStatusAndModerationStatusAndDeletedAtIsNullAndCreatedAtBetween(
+                        UploadStatus u, ModerationStatus m,
+                        LocalDateTime start, LocalDateTime end);
 
-    List<Document> findBySourceDocumentDocumentId(Long sourceDocumentId);
+        long countByUploadStatusAndDeletedAtIsNull(UploadStatus status);
 
-    long countByUploadStatusAndModerationStatusAndDeletedAtIsNull(
-            UploadStatus u, ModerationStatus m);
+        long countByReportCountGreaterThanAndModerationStatusAndDeletedAtIsNull(
+                        int min, ModerationStatus status);
 
-    long countByUploadStatusAndModerationStatusAndDeletedAtIsNullAndCreatedAtBetween(
-            UploadStatus u, ModerationStatus m,
-            LocalDateTime start, LocalDateTime end);
+        List<Object[]> countDocumentsGroupBySubject();
 
-    long countByUploadStatusAndDeletedAtIsNull(UploadStatus status);
+        Page<Document> findPopularDocuments(Pageable pageable);
 
-    long countByReportCountGreaterThanAndModerationStatusAndDeletedAtIsNull(
-            int min, ModerationStatus status);
+        List<Object[]> countNewDocumentsByDate(@Param("since") LocalDateTime since);
 
-    List<Object[]> countDocumentsGroupBySubject();
+        List<Object[]> countActiveDocumentsGroupByOwnerIds(@Param("ids") List<Long> ids);
 
-    Page<Document> findPopularDocuments(Pageable pageable);
+        long sumFileSizeOfActiveDocuments();
 
-    List<Object[]> countNewDocumentsByDate(@Param("since") LocalDateTime since);
+        List<Object[]> countActiveDocumentsGroupByFileType();
 
-    List<Object[]> countActiveDocumentsGroupByOwnerIds(@Param("ids") List<Long> ids);
-
-    long sumFileSizeOfActiveDocuments();
-
-    List<Object[]> countActiveDocumentsGroupByFileType();
-
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<Document> findByDocumentId(Long documentId);
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
+        Optional<Document> findByDocumentId(Long documentId);
 
 }

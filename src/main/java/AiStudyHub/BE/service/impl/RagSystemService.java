@@ -307,27 +307,32 @@ public class RagSystemService implements IRagSystem {
                 }
             }
 
-            // 3. Query system syllabus documents if subject codes were detected
+            // 3. Query system syllabus documents (with subject code filter if detected, or general syllabus search if no code in query)
             List<Document> syllabusChunks = new ArrayList<>();
-            if (!detectedSubjectCodes.isEmpty()) {
-                try {
-                    FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
-                    Filter.Expression filterExpression = filterBuilder.and(
+            try {
+                FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
+                Filter.Expression filterExpression;
+
+                if (!detectedSubjectCodes.isEmpty()) {
+                    filterExpression = filterBuilder.and(
                             filterBuilder.eq("documentType", "SYSTEM_SYLLABUS"),
                             filterBuilder.in("subjectCode", (Object[]) detectedSubjectCodes.toArray(new String[0]))
                     ).build();
-
-                    SearchRequest searchRequest = SearchRequest.builder()
-                            .query(question)
-                            .filterExpression(filterExpression)
-                            .similarityThreshold(0.0)
-                            .topK(5)
-                            .build();
-                    syllabusChunks = vectorStore.similaritySearch(searchRequest);
-                    log.info("Retrieved {} syllabus chunks for subject codes: {}", syllabusChunks.size(), detectedSubjectCodes);
-                } catch (Exception e) {
-                    log.error("Failed to query syllabus chunks from Qdrant", e);
+                } else {
+                    filterExpression = filterBuilder.eq("documentType", "SYSTEM_SYLLABUS").build();
                 }
+
+                SearchRequest searchRequest = SearchRequest.builder()
+                        .query(question)
+                        .filterExpression(filterExpression)
+                        .similarityThreshold(0.0)
+                        .topK(5)
+                        .build();
+                syllabusChunks = vectorStore.similaritySearch(searchRequest);
+                log.info("Retrieved {} syllabus chunks for query: {} (detected subject codes: {})",
+                        syllabusChunks.size(), question, detectedSubjectCodes);
+            } catch (Exception e) {
+                log.error("Failed to query syllabus chunks from Qdrant", e);
             }
 
             // 4. Merge all retrieved chunks
