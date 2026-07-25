@@ -18,6 +18,6 @@ public class OpenAiConfig {
         if (builder != null) {
             return builder.build();
         }
-        return null;
+        return ChatClient.builder(prompt -> null).build();
     }
 }
