@@ -51,7 +51,11 @@ public class ReportAdminController {
 
         List<ReportCaseAdminResponse> pendingCases;
         if (targetAdminId != null) {
-            pendingCases = reportCaseRepo.findPendingCasesForAdmin(targetAdminId)
+            pendingCases = reportCaseRepo.findByCaseStatusOrCaseStatusAndClaimedByUserId(
+                            CaseStatus.PENDING_REVIEW,
+                            CaseStatus.CLAIMED,
+                            targetAdminId
+                    )
                     .stream()
                     .map(this::toCaseAdminView)
                     .toList();

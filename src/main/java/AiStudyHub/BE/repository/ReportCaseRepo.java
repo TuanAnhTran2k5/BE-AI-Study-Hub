@@ -49,6 +49,9 @@ public interface ReportCaseRepo extends JpaRepository<ReportCase, Long> {
 
     List<ReportCase> findAllByCaseStatusAndClaimedAtBefore(CaseStatus status, java.time.LocalDateTime dateTime);
 
-    @org.springframework.data.jpa.repository.Query("SELECT rc FROM ReportCase rc WHERE rc.caseStatus = 'PENDING_REVIEW' OR (rc.caseStatus = 'CLAIMED' AND rc.claimedBy.userId = :adminId)")
-    List<ReportCase> findPendingCasesForAdmin(@org.springframework.data.repository.query.Param("adminId") Long adminId);
+    List<ReportCase> findByCaseStatusOrCaseStatusAndClaimedByUserId(
+            CaseStatus status1,
+            CaseStatus status2,
+            Long adminId
+    );
 }
