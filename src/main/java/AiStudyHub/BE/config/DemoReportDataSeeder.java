@@ -9,9 +9,16 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import org.springframework.context.annotation.Profile;
+
 import java.time.LocalDateTime;
 
+/**
+ * DEMO SEEDER FILE - SAFE TO DELETE AFTER LIVE DEMO PRESENTATION
+ * Note: Annotated with @Profile("!prod") so it only runs in dev/test/demo environments.
+ */
 @Component
+@Profile("!prod")
 @Slf4j
 @RequiredArgsConstructor
 public class DemoReportDataSeeder implements CommandLineRunner {
