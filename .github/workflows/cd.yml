@@ -1,0 +1,104 @@
+name: Continuous Deployment Pipeline
+run-name: CD triggered by ${{ github.actor }}
+
+on:
+  workflow_run:
+    # Phai khop CHINH XAC ten cua CI workflow
+    workflows: ["Continuous Integration Pipeline (Maven Build, Package, Docker)"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    # Chi deploy khi:
+    # 1. CI thanh cong (conclusion == success)
+    # 2. Push tu nhanh main hoac master (khong deploy tu ci/test-pipeline, feature/...)
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.head_branch == 'main' ||
+       github.event.workflow_run.head_branch == 'master')
+
+    steps:
+      # ─────────────────────────────────────────
+      # BUOC 1: Checkout dung commit SHA ma CI da build
+      # ─────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # ─────────────────────────────────────────
+      # BUOC 2: Copy docker-compose.yml len VPS
+      # File nay dinh nghia cac service: mysql, qdrant, backend
+      # ─────────────────────────────────────────
+      - name: Copy docker-compose.yml to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "docker-compose.yml"
+          target: "/root/app"
+
+      # ─────────────────────────────────────────
+      # BUOC 3: Tao file .env tren VPS va Deploy
+      # .env chua tat ca secrets (khong push len GitHub)
+      # CD tu dong tao file nay tren VPS tu GitHub Secrets
+      #
+      # FIX localhost:
+      #   - DB_URL: localhost:3306 → mysql:3306 (Docker service name)
+      #   - Qdrant: override qua environment trong docker-compose
+      # ─────────────────────────────────────────
+      - name: Create .env on VPS and Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            mkdir -p /root/app
+            cd /root/app
+
+            # Tao .env voi tat ca bien moi truong can thiet
+            # DB_URL dung 'mysql' (Docker service name) thay vi 'localhost'
+            cat > .env << 'ENVEOF'
+            DB_URL=jdbc:mysql://mysql:3306/aistudyhub
+            DB_USERNAME=root
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+
+            MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
+            MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+
+            SYSTEM_ADMIN_EMAIL=${{ secrets.SYSTEM_ADMIN_EMAIL }}
+            SYSTEM_ADMIN_PASSWORD=${{ secrets.SYSTEM_ADMIN_PASSWORD }}
+            SYSTEM_ADMIN_FULL_NAME=${{ secrets.SYSTEM_ADMIN_FULL_NAME }}
+
+            JWT_SIGNER_KEY=${{ secrets.JWT_SIGNER_KEY }}
+
+            SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+            SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+
+            SPRING_AI_OPENAI_API_KEY=${{ secrets.SPRING_AI_OPENAI_API_KEY }}
+
+            DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+            ENVEOF
+
+            # Lay IMAGE_TAG tu commit SHA cua CI da build
+            export IMAGE_TAG=${{ github.event.workflow_run.head_sha }}
+            export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+
+            echo "Deploying image: ${DOCKER_USERNAME}/be-ai-study-hub:${IMAGE_TAG}"
+
+            # Pull image moi nhat tu Docker Hub
+            docker compose pull
+
+            # Khoi dong lai cac service (down gracefully roi up)
+            docker compose up -d --remove-orphans
+
+            echo "Deploy completed! Running containers:"
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
