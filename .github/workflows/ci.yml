@@ -8,10 +8,6 @@ on:
       - main
       - 'feature/**'   # test tren nhanh feature/xxx bat ky
       - 'ci/**'        # nhanh danh rieng cho test CI (vi du: ci/test-pipeline)
-  pull_request:
-    branches:
-      - master
-      - main
   workflow_dispatch:   # ← cho phep bam nut "Run workflow" tren GitHub Actions UI
     inputs:
       reason:
