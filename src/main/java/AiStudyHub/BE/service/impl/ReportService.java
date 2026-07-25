@@ -241,11 +241,23 @@ public class ReportService implements IReport {
         if (!admin.getRole().equals(UserRole.AD)) {
             throw new GlobalException(403, "Only admins can claim cases");
         }
+
+        // If this case is already claimed by the SAME admin, return it cleanly
+        if (rc.getCaseStatus() == CaseStatus.CLAIMED && rc.getClaimedBy() != null
+                && rc.getClaimedBy().getUserId().equals(adminId)) {
+            return rc;
+        }
+
+        if (rc.getCaseStatus() == CaseStatus.RESOLVED || rc.getCaseStatus() == CaseStatus.REJECTED) {
+            throw new GlobalException(400, "This report case has already been resolved");
+        }
+
+        if (rc.getClaimedBy() != null && !rc.getClaimedBy().getUserId().equals(adminId)) {
+            throw new GlobalException(400, "This case is currently claimed by admin: " + rc.getClaimedBy().getFullName());
+        }
+
         if (rc.getCaseStatus() != CaseStatus.PENDING_REVIEW) {
             throw new GlobalException(400, "Only PENDING_REVIEW cases can be claimed");
-        }
-        if (rc.getClaimedBy() != null) {
-            throw new GlobalException(400, "This case is already claimed by another admin");
         }
 
         rc.setClaimedBy(admin);
@@ -674,5 +686,24 @@ public class ReportService implements IReport {
         notificationService.sendDocumentRestoredNotification(owner, document, note);
 
         return reportCaseRepo.save(rc);
+    }
+
+    @Override
+    @Scheduled(fixedRate = 300000) // Runs every 5 minutes
+    @Transactional
+    public void autoUnclaimExpiredCases() {
+        LocalDateTime timeoutThreshold = LocalDateTime.now().minusDays(1); // 24 hours
+        List<ReportCase> expiredCases = reportCaseRepo.findAllByCaseStatusAndClaimedAtBefore(
+                CaseStatus.CLAIMED, timeoutThreshold);
+
+        for (ReportCase rc : expiredCases) {
+            log.info("Auto-unclaiming expired ReportCase ID {} (claimed by admin ID {}) due to 24-hour timeout",
+                    rc.getCaseId(),
+                    rc.getClaimedBy() != null ? rc.getClaimedBy().getUserId() : "unknown");
+            rc.setClaimedBy(null);
+            rc.setClaimedAt(null);
+            rc.setCaseStatus(CaseStatus.PENDING_REVIEW);
+            reportCaseRepo.save(rc);
+        }
     }
 }
