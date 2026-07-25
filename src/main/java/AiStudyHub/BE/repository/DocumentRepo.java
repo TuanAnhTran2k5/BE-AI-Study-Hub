@@ -44,6 +44,8 @@ public interface DocumentRepo extends JpaRepository<Document, Long> {
 
     List<Document> findByTitleContainingIgnoreCase(String keyword);
 
+    Optional<Document> findByTitle(String title);
+
     long countByOwnerUserId(Long userId);
 
     long sumDownloadCountByOwnerUserId(@Param("userId") Long userId);
