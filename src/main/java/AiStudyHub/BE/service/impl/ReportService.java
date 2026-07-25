@@ -177,6 +177,20 @@ public class ReportService implements IReport {
         int threshold = reportCase.getRequiredThreshold();
         int count = reportCase.getReportCount();
 
+        if (count >= threshold + 1 && reportCase.getCaseStatus() == CaseStatus.WARNING_1) {
+            reportCase.setCaseStatus(CaseStatus.WARNING_2);
+            reportCase.setSecondWarningAt(LocalDateTime.now());
+
+            int penalty = reason.getPenaltyScore() != null ? reason.getPenaltyScore() : 10;
+            deductPoints(owner, penalty, reportCase, "Penalty for escalating violation warning (WARNING_2) on document: " + document.getTitle());
+
+            notificationService.sendDocumentModerationNotification(
+                    owner, document, reason.getReasonName(), penalty, "WARNING_2 (Escalated Warning & Points Deducted)",
+                    "Your document received additional violation reports while under WARNING_1. Your account has been penalized " + penalty + " points.");
+            log.info("ReportCase ID {} escalated to WARNING_2. Penalized User ID {} by {} points.", reportCase.getCaseId(), owner.getUserId(), penalty);
+            return;
+        }
+
         if (count >= threshold && reportCase.getCaseStatus() == CaseStatus.OPEN) {
             // Trigger WARNING_1: Notify only, do NOT hide, do NOT deduct points
             reportCase.setCaseStatus(CaseStatus.WARNING_1);

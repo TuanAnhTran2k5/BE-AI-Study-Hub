@@ -127,7 +127,7 @@ public class DemoReportDataSeeder implements CommandLineRunner {
                         .penaltyScore(10)
                         .build()));
 
-        // --- SCENARIO 1 DATA: Document A (W1 -> ready for 4th report to trigger W2) ---
+        // --- SCENARIO 1 DATA: Document A (2 reports ready -> 3rd triggers W1 -> 4th triggers W2) ---
         Document docA = documentRepo.save(Document.builder()
                 .owner(author)
                 .subject(defaultSubject)
@@ -139,7 +139,7 @@ public class DemoReportDataSeeder implements CommandLineRunner {
                 .visibilityStatus(VisibilityStatus.PUBLIC)
                 .uploadStatus(UploadStatus.COMPLETED)
                 .moderationStatus(ModerationStatus.NORMAL)
-                .reportCount(3)
+                .reportCount(2)
                 .downloadCount(20)
                 .build());
 
@@ -147,16 +147,14 @@ public class DemoReportDataSeeder implements CommandLineRunner {
                 .document(docA)
                 .reason(lowReason)
                 .caseLevel(ReportSeverity.LOW)
-                .reportCount(3)
+                .reportCount(2)
                 .requiredThreshold(3)
-                .caseStatus(CaseStatus.WARNING_1)
+                .caseStatus(CaseStatus.OPEN)
                 .openedAt(LocalDateTime.now().minusHours(2))
-                .firstWarningAt(LocalDateTime.now().minusHours(1))
                 .build());
 
         reportRepo.save(Report.builder().reporter(reporter1).document(docA).reason(lowReason).reportCase(caseA).description("Report 1 for Doc A").status(ReportStatus.PENDING).build());
         reportRepo.save(Report.builder().reporter(reporter2).document(docA).reason(lowReason).reportCase(caseA).description("Report 2 for Doc A").status(ReportStatus.PENDING).build());
-        reportRepo.save(Report.builder().reporter(reporter3).document(docA).reason(lowReason).reportCase(caseA).description("Report 3 for Doc A").status(ReportStatus.PENDING).build());
 
         // --- SCENARIO 2 DATA: Document B (Ready for live High Severity report) ---
         Document docB = documentRepo.save(Document.builder()
