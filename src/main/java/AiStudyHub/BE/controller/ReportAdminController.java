@@ -25,6 +25,9 @@ import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import java.util.List;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import AiStudyHub.BE.entity.User;
+
 @RestController
 @RequestMapping("/api/admin/report-cases")
 @CrossOrigin("*")
@@ -37,12 +40,32 @@ public class ReportAdminController {
     private final IReport reportService;
 
     @GetMapping("/pending")
-    public ResponseEntity<APIResponse<List<ReportCaseAdminResponse>>> getPendingCases() {
-        List<CaseStatus> pendingStatuses = List.of(CaseStatus.PENDING_REVIEW, CaseStatus.CLAIMED);
-        List<ReportCaseAdminResponse> pendingCases = reportCaseRepo.findAllByCaseStatusIn(pendingStatuses)
-                .stream()
-                .map(this::toCaseAdminView)
-                .toList();
+    public ResponseEntity<APIResponse<List<ReportCaseAdminResponse>>> getPendingCases(
+            @AuthenticationPrincipal User currentUser,
+            @RequestParam(required = false) Long adminId
+    ) {
+        // Auto-unclaim any expired claimed cases (> 15 mins) before returning
+        reportService.autoUnclaimExpiredCases();
+
+        Long targetAdminId = (currentUser != null) ? currentUser.getUserId() : adminId;
+
+        List<ReportCaseAdminResponse> pendingCases;
+        if (targetAdminId != null) {
+            pendingCases = reportCaseRepo.findByCaseStatusOrCaseStatusAndClaimedByUserId(
+                            CaseStatus.PENDING_REVIEW,
+                            CaseStatus.CLAIMED,
+                            targetAdminId
+                    )
+                    .stream()
+                    .map(this::toCaseAdminView)
+                    .toList();
+        } else {
+            pendingCases = reportCaseRepo.findAllByCaseStatusIn(List.of(CaseStatus.PENDING_REVIEW, CaseStatus.CLAIMED))
+                    .stream()
+                    .map(this::toCaseAdminView)
+                    .toList();
+        }
+
         return ResponseEntity.ok(APIResponse.response(200, "Get pending report cases successfully", pendingCases));
     }
 

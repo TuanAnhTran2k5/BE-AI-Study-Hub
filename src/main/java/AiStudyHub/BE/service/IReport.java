@@ -19,4 +19,5 @@ public interface IReport {
     void deleteReason(Long reasonId);
 
     ReportCase refundAppeal(Long caseId, Long adminId, String note);
+    void autoUnclaimExpiredCases();
 }
