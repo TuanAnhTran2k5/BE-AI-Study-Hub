@@ -8,6 +8,7 @@ import AiStudyHub.BE.dto.Request.RatingRequest;
 import AiStudyHub.BE.dto.Request.UpdateTextContentRequest;
 import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.User;
+import AiStudyHub.BE.security.SecurityUtils;
 import AiStudyHub.BE.service.IGamification;
 import AiStudyHub.BE.service.IDocument;
 import io.swagger.v3.oas.annotations.Operation;
@@ -153,9 +154,8 @@ public class DocumentController {
 
     @Operation(summary = "Get my documents")
     @GetMapping("/my-documents")
-    public ResponseEntity<APIResponse<List<DocumentResponse>>> getMyDocuments(
-            @AuthenticationPrincipal User currentUser) {
-
+    public ResponseEntity<APIResponse<List<DocumentResponse>>> getMyDocuments() {
+        User currentUser = SecurityUtils.getCurrentUser();
         List<DocumentResponse> response = documentService.getMyDocuments(currentUser.getUserId());
         return ResponseEntity.ok(
                 APIResponse.response(200, "Get my documents successfully", response)

@@ -1,38 +1,30 @@
 name: Continuous Deployment Pipeline
-run-name: CD triggered by ${{ github.actor }}
+run-name: BE CD triggered by ${{ github.actor }}
 
 on:
   workflow_run:
-    # Phai khop CHINH XAC ten cua CI workflow
     workflows: ["Continuous Integration Pipeline (Maven Build, Package, Docker)"]
     types:
       - completed
 
+concurrency:
+  group: be-cd-deploy
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
-    # Chi deploy khi:
-    # 1. CI thanh cong (conclusion == success)
-    # 2. Push tu nhanh main hoac master (khong deploy tu ci/test-pipeline, feature/...)
     if: >
       github.event.workflow_run.conclusion == 'success' &&
       (github.event.workflow_run.head_branch == 'main' ||
        github.event.workflow_run.head_branch == 'master')
 
     steps:
-      # ─────────────────────────────────────────
-      # BUOC 1: Checkout dung commit SHA ma CI da build
-      # ─────────────────────────────────────────
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      # ─────────────────────────────────────────
-      # BUOC 2: Copy docker-compose.yml len VPS
-      # File nay dinh nghia cac service: mysql, qdrant, backend
-      # ─────────────────────────────────────────
       - name: Copy docker-compose.yml to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -42,15 +34,6 @@ jobs:
           source: "docker-compose.yml"
           target: "/root/app"
 
-      # ─────────────────────────────────────────
-      # BUOC 3: Tao file .env tren VPS va Deploy
-      # .env chua tat ca secrets (khong push len GitHub)
-      # CD tu dong tao file nay tren VPS tu GitHub Secrets
-      #
-      # FIX localhost:
-      #   - DB_URL: localhost:3306 → mysql:3306 (Docker service name)
-      #   - Qdrant: override qua environment trong docker-compose
-      # ─────────────────────────────────────────
       - name: Create .env on VPS and Deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -61,8 +44,29 @@ jobs:
             mkdir -p /root/app
             cd /root/app
 
-            # Tao .env voi tat ca bien moi truong can thiet
-            # DB_URL dung 'mysql' (Docker service name) thay vi 'localhost'
+            # 1. Kiểm tra dung lượng đĩa trống và khởi tạo Swap 2GB (Idempotent)
+            DISK_FREE=$(df / --output=avail -BG | tail -1 | tr -d 'G ')
+            if [ "$DISK_FREE" -ge 5 ]; then
+                if [ ! -f /swapfile ]; then
+                    echo "Dung lượng đĩa trống ${DISK_FREE}GB. Tạo swap file 2GB..."
+                    fallocate -l 2G /swapfile || true
+                    chmod 600 /swapfile || true
+                    mkswap /swapfile || true
+                    swapon /swapfile || true
+                    echo '/swapfile none swap sw 0 0' >> /etc/fstab || true
+                else
+                    echo "Swapfile đã tồn tại, bỏ qua."
+                fi
+            else
+                echo "⚠️ Dung lượng đĩa còn dưới 5GB (${DISK_FREE}GB), bỏ qua tạo swap để tránh tràn đĩa!"
+            fi
+
+            # 2. Cấu hình vm.swappiness=10
+            sed -i '/vm.swappiness/d' /etc/sysctl.conf || true
+            echo 'vm.swappiness=10' >> /etc/sysctl.conf || true
+            sysctl -w vm.swappiness=10 || true
+
+            # 3. Tạo file .env từ secrets
             cat > .env << 'ENVEOF'
             DB_URL=jdbc:mysql://mysql:3306/aistudyhub
             DB_USERNAME=root
@@ -88,23 +92,22 @@ jobs:
             DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
             ENVEOF
 
-            # Lay IMAGE_TAG tu commit SHA cua CI da build
             export IMAGE_TAG=${{ github.event.workflow_run.head_sha }}
             export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
 
             echo "Deploying image: ${DOCKER_USERNAME}/be-ai-study-hub:${IMAGE_TAG}"
 
-            # Pull image moi nhat tu Docker Hub
             docker compose pull
-
-            # Khoi dong lai cac service (down gracefully roi up)
             docker compose up -d --remove-orphans
-            
-            echo "Đợi 15 giây cho Java Spring Boot nạp xong RAM..."
+
+            echo "Đợi 15 giây cho Java Spring Boot sẵn sàng..."
             sleep 15
-            
-            echo "Cập nhật Nginx để chống 502..."
+
+            echo "Cập nhật Nginx Proxy Manager..."
             docker exec nginx-proxy-manager-app-proxy-1 nginx -s reload || true
+
+            echo "Dọn dẹp các Docker image rác cũ..."
+            docker image prune -af --filter "until=24h" || true
 
             echo "Deploy completed! Running containers:"
             docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"

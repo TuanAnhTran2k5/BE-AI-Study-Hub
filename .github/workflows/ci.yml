@@ -1,60 +1,43 @@
 name: Continuous Integration Pipeline (Maven Build, Package, Docker)
-run-name: CI triggered by ${{ github.actor }}
+run-name: BE CI triggered by ${{ github.actor }}
 
 on:
   push:
     branches:
       - master
       - main
-      - 'feature/**'   # test tren nhanh feature/xxx bat ky
-      - 'ci/**'        # nhanh danh rieng cho test CI (vi du: ci/test-pipeline)
   pull_request:
     branches:
       - master
       - main
-  workflow_dispatch:   # ← cho phep bam nut "Run workflow" tren GitHub Actions UI
+  workflow_dispatch:
     inputs:
       reason:
-        description: 'Ly do chay thu cong (tuy chon)'
+        description: 'Lý do chạy thủ công'
         required: false
         default: 'Manual test'
+
+concurrency:
+  group: be-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci-pipeline:
     runs-on: ubuntu-latest
 
     steps:
-      # ─────────────────────────────────────────
-      # BUOC 1: Lay source code ve runner
-      # ─────────────────────────────────────────
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ─────────────────────────────────────────
-      # BUOC 2: Cai Docker Buildx
-      # Dockerfile da tu xu ly compile + package Maven ben trong
-      # Khong can cai Java hay chay Maven tren runner nua
-      # ─────────────────────────────────────────
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ─────────────────────────────────────────
-      # BUOC 3: Dang nhap vao Docker Hub
-      # Dung secrets da khai bao trong GitHub repository settings
-      # ─────────────────────────────────────────
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # ─────────────────────────────────────────
-      # BUOC 4: Build Docker image va Push len Docker Hub
-      # Tags:
-      #   - :latest        -> luon la ban moi nhat
-      #   - :<commit-sha>  -> dinh danh chinh xac commit nao
-      # cache-from/cache-to: tai su dung Docker layer cache giua cac lan build
-      # ─────────────────────────────────────────
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v6
         with:
