@@ -16,4 +16,5 @@ public interface ISubjectService {
     List<SubjectResponse> getSubjectsBySemesterAndCombo(Long semesterId, Long comboId);
     List<SubjectResponse> searchSubjects(String keyword);
     SubjectResponse restoreSubject(Long subjectId);
+    List<SubjectResponse> getUnassignedComboSubjects();
 }

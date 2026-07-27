@@ -14,7 +14,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
@@ -27,6 +28,7 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
@@ -103,8 +105,8 @@ public class SyllabusService implements ISyllabusService {
     }
 
     @Async
-    @EventListener
-    @Transactional
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void handleSyllabusProcessEvent(SyllabusProcessEvent event) {
         parseSyllabusAsync(event.getSyllabusId());
     }
@@ -132,6 +134,12 @@ public class SyllabusService implements ISyllabusService {
             String loText = extractSegment(plainText, "LO(s)", "sessions");
             String sessionsText = extractSegment(plainText, "sessions", "Constructive question(s)");
             String assessmentsText = extractSegment(plainText, "assessment(s)", "");
+            if (assessmentsText.trim().isEmpty()) {
+                assessmentsText = extractSegment(plainText, "Assessments", "");
+            }
+            if (assessmentsText.trim().isEmpty()) {
+                assessmentsText = extractSegment(plainText, "Assessment scheme", "");
+            }
 
             if (sessionsText.isEmpty()) {
                 // Fallback search if headers are formatted slightly differently
@@ -151,7 +159,7 @@ public class SyllabusService implements ISyllabusService {
             String loSchema = "[\n  {\n    \"code\": \"mã LO (e.g. CLO1)\",\n    \"detail\": \"chi tiết chuẩn đầu ra\"\n  }\n]";
             String loJson = callLlmToParseSegment(loText, loSchema);
 
-            String assessmentsSchema = "[\n  {\n    \"type\": \"loại đầu điểm (e.g. Lab, Progress Test, Presentation, Final Exam)\",\n    \"weight\": \"trọng số (e.g. 20%)\",\n    \"completionCriteria\": \"tiêu chí hoàn thành (e.g. 4.0)\"\n  }\n]";
+            String assessmentsSchema = "[\n  {\n    \"type\": \"loại đầu điểm (e.g. Lab, Progress Test, Presentation, Final Exam)\",\n    \"weight\": \"trọng số (e.g. 20%)\",\n    \"duration\": \"thời gian làm bài (e.g. 60 minutes)\",\n    \"format\": \"hình thức thi, số lượng câu hỏi, quy định tài liệu (e.g. Multiple Choice 40 questions, Open book)\",\n    \"completionCriteria\": \"tiêu chí hoàn thành (e.g. 4.0)\"\n  }\n]";
             String assessmentsJson = callLlmToParseSegment(assessmentsText, assessmentsSchema);
 
             String sessionsSchema = "[\n  {\n    \"no\": 1,\n    \"topic\": \"tên chủ đề buổi học\",\n    \"tasks\": \"nhiệm vụ sinh viên\",\n    \"lo\": \"mã LO liên kết (e.g. CLO1)\"\n  }\n]";
@@ -253,9 +261,11 @@ public class SyllabusService implements ISyllabusService {
             if (assessNode != null && assessNode.isArray()) {
                 StringBuilder sb = new StringBuilder("=== CẤU TRÚC ĐIỂM ĐÁNH GIÁ MÔN HỌC " + subjectCode + " ===\n");
                 for (JsonNode as : assessNode) {
-                    sb.append(String.format("- %s: Trọng số: %s. Tiêu chí hoàn thành tối thiểu: %s\n",
+                    sb.append(String.format("- %s: Trọng số: %s. Thời gian thi: %s. Hình thức thi: %s. Tiêu chí hoàn thành tối thiểu: %s\n",
                             as.path("type").asText(""),
                             as.path("weight").asText(""),
+                            as.path("duration").asText("N/A"),
+                            as.path("format").asText("N/A"),
                             as.path("completionCriteria").asText("N/A")));
                 }
                 virtualDocs.add(createVirtualDocument(subjectCode, "assessments", sb.toString()));
@@ -370,8 +380,8 @@ public class SyllabusService implements ISyllabusService {
     }
 
     @Async
-    @EventListener
-    @Transactional
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void handleSyllabusSyncEvent(SyllabusSyncRequestEvent event) {
         syncToVectorStore(event.getSyllabusId());
     }

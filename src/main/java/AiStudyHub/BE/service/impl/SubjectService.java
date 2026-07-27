@@ -177,4 +177,12 @@ public class SubjectService implements ISubjectService {
         subject = subjectRepo.save(subject);
         return subjectMapper.toSubjectResponse(subject);
     }
+
+    @Override
+    public List<SubjectResponse> getUnassignedComboSubjects() {
+        return subjectRepo.findBySubjectTypeAndComboSubjectIsNullAndIsDeletedFalse(SubjectType.COMBO)
+                .stream()
+                .map(subjectMapper::toSubjectResponse)
+                .collect(Collectors.toList());
+    }
 }

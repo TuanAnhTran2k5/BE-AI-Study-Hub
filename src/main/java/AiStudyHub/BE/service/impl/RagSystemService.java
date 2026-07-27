@@ -13,6 +13,7 @@ import AiStudyHub.BE.dto.Response.DeleteResponse;
 import AiStudyHub.BE.dto.Response.RagDocumentResponse;
 import AiStudyHub.BE.entity.RagChunk;
 import AiStudyHub.BE.entity.RagDocument;
+import AiStudyHub.BE.entity.Subject;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.entity.ChatSession;
 import AiStudyHub.BE.entity.ChatMessage;
@@ -140,7 +141,7 @@ public class RagSystemService implements IRagSystem {
             2. Context-Only Answering: You must rely STRICTLY on the provided Context to answer the user's question. Do not answer questions that require external academic or general knowledge unless that knowledge directly explains or clarifies the provided Context.
             3. Strict Refusal if Context is Missing: If the Context is "EMPTY_CONTEXT_NO_DOCUMENTS_RETRIEVED" or does not contain enough information to answer the question, you MUST politely refuse to answer. Explain to the user in their dominant language (e.g. if the question is in English, respond in English; if the question is in Vietnamese, respond in Vietnamese) that you cannot find any matching syllabus or document in the system, and suggest they upload or link a document to the session. Do NOT attempt to answer or make up (hallucinate) details using your general knowledge.
             4. Refusal for Missing Documents: If the user specifically asks about details of an un-retrieved document or syllabus, politely inform them that the document content is missing while refusing to answer.
-            5. Conversation History: Use Previous Conversation History to maintain conversation flow, understand references ("this", "that", "the previous topic"), and support a natural multi-turn chat experience.
+            5. Conversation History & Fresh Context: Use Previous Conversation History to maintain conversation flow. HOWEVER, the Context provided below is FRESHLY RETRIEVED for the Current User Question. If the history contains previous AI refusals saying "I cannot find information", you MUST IGNORE those past refusals if the fresh Context now contains the answer.
             6. Temporal Accuracy: The current system date and time is {currentDate}. Always use this exact current date when answering any time-related questions (such as "today", "current year", "now"). Never claim your knowledge or date is restricted to an old pre-training cutoff date when discussing dates.
             
             Formatting & Conversation Rules:            
@@ -213,11 +214,11 @@ public class RagSystemService implements IRagSystem {
             // 1.5. If no full subject codes detected, scan for prefixes (like "CSI", "PRJ") and map them to full codes
             if (detectedSubjectCodes.isEmpty()) {
                 try {
-                    List<String> allSubjectCodes = subjectRepo.findAll().stream()
-                            .map(s -> s.getSubjectCode().toUpperCase())
+                    List<String> allSubjectCodes = subjectRepo.findByIsDeletedFalse().stream()
+                            .map(Subject::getSubjectCode)
                             .toList();
                     for (String code : allSubjectCodes) {
-                        String prefix = code.replaceAll("[0-9]", "");
+                        String prefix = code.toUpperCase().replaceAll("[0-9]", "");
                         if (!prefix.isEmpty() && question.toUpperCase().matches(".*\\b" + prefix + "\\b.*")) {
                             detectedSubjectCodes.add(code);
                         }
