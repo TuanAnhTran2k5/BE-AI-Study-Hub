@@ -144,7 +144,10 @@ public class UserService implements IUser {
     public GlobalLeaderboardResponse getMyLeaderboardRank(Long userId) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
-        int rank = (int) (userRepo.countByTotalScoreGreaterThan(user.getTotalScore() == null ? 0L : user.getTotalScore()) + 1);
+        long score = user.getTotalScore() == null ? 0L : user.getTotalScore();
+        long greaterScoreCount = userRepo.countByTotalScoreGreaterThan(score);
+        long sameScoreCount = userRepo.countByTotalScoreAndUserIdLessThan(score, user.getUserId());
+        int rank = (int) (greaterScoreCount + sameScoreCount + 1);
         int totalUsers = (int) userRepo.count();
         return GlobalLeaderboardResponse.builder()
                 .rank(rank)
@@ -163,8 +166,8 @@ public class UserService implements IUser {
         for (int i = 0; i < userPage.getContent().size(); i++) {
             User u = userPage.getContent().get(i);
             
-            // Calculate global rank for this user
-            int rank = (int) (userRepo.countByTotalScoreGreaterThan(u.getTotalScore() == null ? 0L : u.getTotalScore()) + 1);
+            // Calculate global rank for this user using index
+            int rank = page * size + i + 1;
             
             // Calculate rank object based on totalScore
             long userScore = u.getTotalScore() == null ? 0L : u.getTotalScore();
@@ -277,7 +280,9 @@ public class UserService implements IUser {
         long unreadNotifCount = notificationRepo.countByUserUserIdAndIsRead(user.getUserId(), false);
 
         // 8. Leaderboard Position (weekly and global)
-        int globalRank = (int) (userRepo.countByTotalScoreGreaterThan(user.getTotalScore() == null ? 0L : user.getTotalScore()) + 1);
+        long greaterScoreCount = userRepo.countByTotalScoreGreaterThan(userScore);
+        long sameScoreCount = userRepo.countByTotalScoreAndUserIdLessThan(userScore, user.getUserId());
+        int globalRank = (int) (greaterScoreCount + sameScoreCount + 1);
         
         // Find weekly score and rank
         LocalDate weekStart = calculateWeekStart(LocalDate.now());
@@ -285,7 +290,8 @@ public class UserService implements IUser {
         Integer weeklyRank = null;
         if (weeklyScore != null) {
             weeklyRank = (int) (weeklyScoreRepo.findByWeekStart(weekStart).stream()
-                    .filter(ws -> ws.getScore() > weeklyScore.getScore())
+                    .filter(ws -> ws.getScore() > weeklyScore.getScore() || 
+                            (ws.getScore().equals(weeklyScore.getScore()) && ws.getUser().getUserId() < user.getUserId()))
                     .count() + 1);
         }
 
