@@ -1,6 +1,7 @@
 package AiStudyHub.BE.config;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -11,14 +12,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenAiConfig {
 
-    /**
-     * Configures the ChatClient bean.
-     *
-     * @param builder the auto-configured ChatClient.Builder
-     * @return the configured ChatClient
-     */
     @Bean
-    public ChatClient chatClient(ChatClient.Builder builder) {
-        return builder.build();
+    public ChatClient chatClient(ObjectProvider<ChatClient.Builder> builderProvider) {
+        ChatClient.Builder builder = builderProvider.getIfAvailable();
+        if (builder != null) {
+            return builder.build();
+        }
+        return ChatClient.builder(prompt -> null).build();
     }
 }

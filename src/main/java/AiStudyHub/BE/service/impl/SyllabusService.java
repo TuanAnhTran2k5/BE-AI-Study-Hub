@@ -47,8 +47,8 @@ public class SyllabusService implements ISyllabusService {
     private final SubjectRepo subjectRepo;
     private final SubjectSyllabusRepo subjectSyllabusRepo;
     private final SubjectSyllabusHistoryRepo subjectSyllabusHistoryRepo;
-    private final VectorStore vectorStore;
-    private final ChatClient chatClient;
+    private final org.springframework.beans.factory.ObjectProvider<VectorStore> vectorStoreProvider;
+    private final org.springframework.beans.factory.ObjectProvider<ChatClient> chatClientProvider;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -196,6 +196,12 @@ public class SyllabusService implements ISyllabusService {
     @Transactional
     public void syncToVectorStore(Long syllabusId) {
         log.info("Starting Vector Store sync for syllabus ID: {}", syllabusId);
+        VectorStore vectorStore = vectorStoreProvider.getIfAvailable();
+        if (vectorStore == null) {
+            log.warn("VectorStore bean not available in Spring context. Skipping vector sync.");
+            return;
+        }
+
         SubjectSyllabus syllabus = subjectSyllabusRepo.findById(syllabusId).orElse(null);
         if (syllabus == null) {
             log.error("SubjectSyllabus not found with ID: {}", syllabusId);
@@ -292,6 +298,12 @@ public class SyllabusService implements ISyllabusService {
                     }
                     virtualDocs.add(createVirtualDocument(subjectCode, sectionName, sb.toString()));
                 }
+            }
+
+            // 5.5. Fallback: If virtualDocs is empty, use raw plainText
+            if (virtualDocs.isEmpty() && syllabus.getPlainText() != null && !syllabus.getPlainText().isBlank()) {
+                String fallbackContent = "=== THÔNG TIN TÀI LIỆU SYLLABUS MÔN HỌC " + subjectCode + " ===\n" + syllabus.getPlainText();
+                virtualDocs.add(createVirtualDocument(subjectCode, "full_text", fallbackContent));
             }
 
             // 6. Delete old vectors of this subject from Qdrant
@@ -481,8 +493,11 @@ public class SyllabusService implements ISyllabusService {
 
         // 2. Delete from Qdrant
         try {
-            log.info("Deleting Qdrant vectors for subject {}: {}", subjectCode, vectorIds);
-            vectorStore.delete(vectorIds);
+            VectorStore vectorStore = vectorStoreProvider.getIfAvailable();
+            if (vectorStore != null) {
+                log.info("Deleting Qdrant vectors for subject {}: {}", subjectCode, vectorIds);
+                vectorStore.delete(vectorIds);
+            }
         } catch (Exception e) {
             log.error("Failed to delete vectors from Qdrant for subject: {}", subjectCode, e);
         }
@@ -549,6 +564,12 @@ public class SyllabusService implements ISyllabusService {
                 """;
 
         try {
+            ChatClient chatClient = chatClientProvider.getIfAvailable();
+            if (chatClient == null) {
+                log.warn("ChatClient bean not available in Spring context. Skipping LLM segment parsing.");
+                return expectedSchemaFormat.startsWith("[") ? "[]" : "{}";
+            }
+
             PromptTemplate template = new PromptTemplate(promptText);
             Map<String, Object> params = Map.of(
                     "segmentText", segmentText,

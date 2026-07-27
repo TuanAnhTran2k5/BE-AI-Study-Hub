@@ -1,6 +1,6 @@
 services:
   # ─────────────────────────────────────────────────────────
-  # MySQL 8.0 - Database chinh cua ung dung
+  # MySQL 8.0 - Database chính của ứng dụng
   # ─────────────────────────────────────────────────────────
   mysql:
     image: mysql:8.0
@@ -17,6 +17,11 @@ services:
       retries: 5
     restart: unless-stopped
     mem_limit: 512m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ─────────────────────────────────────────────────────────
   # Qdrant - Vector database cho AI/RAG
@@ -31,13 +36,17 @@ services:
       - qdrant_data:/qdrant/storage
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__STORAGE__ON_DISK_PAYLOAD=true
     restart: unless-stopped
-    mem_limit: 400m
+    mem_limit: 300m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ─────────────────────────────────────────────────────────
   # Backend - Spring Boot App
-  # Pull image tu Docker Hub (CI da build va push)
-  # Override localhost -> service name cho Docker network
   # ─────────────────────────────────────────────────────────
   backend:
     image: ${DOCKER_USERNAME}/be-ai-study-hub:${IMAGE_TAG:-latest}
@@ -49,17 +58,28 @@ services:
     environment:
       - DB_URL=jdbc:mysql://mysql:3306/aistudyhub
       - SPRING_AI_VECTORSTORE_QDRANT_HOST=qdrant
+      - JAVA_TOOL_OPTIONS=-Xms256m -Xmx600m -XX:MaxMetaspaceSize=200m -XX:ReservedCodeCacheSize=64m -XX:MaxDirectMemorySize=128m
     depends_on:
       mysql:
         condition: service_healthy
       qdrant:
         condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
-    mem_limit: 1g
+    mem_limit: 1000m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - default
       - app-network
-
 
 volumes:
   mysql_data:
@@ -69,4 +89,4 @@ volumes:
 
 networks:
   app-network:
-    external: true
+    external: true
