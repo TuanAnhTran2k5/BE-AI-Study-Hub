@@ -70,6 +70,10 @@ public class SubjectService implements ISubjectService {
         ComboSubject combo = request.getComboId() != null
                 ? comboSubjectRepo.findById(request.getComboId()).orElse(null) : null;
 
+        if (request.getSubjectType() == SubjectType.CORE) {
+            combo = null;
+        }
+
         Subject subject = Subject.builder()
                 .subjectCode(request.getSubjectCode())
                 .subjectName(request.getSubjectName())
@@ -107,6 +111,10 @@ public class SubjectService implements ISubjectService {
                 .orElseThrow(() -> new GlobalException(404, "Semester not found"));
         ComboSubject combo = request.getComboId() != null
                 ? comboSubjectRepo.findById(request.getComboId()).orElse(null) : null;
+
+        if (request.getSubjectType() == SubjectType.CORE) {
+            combo = null;
+        }
 
         subject.setSubjectCode(request.getSubjectCode());
         subject.setSubjectName(request.getSubjectName());
@@ -169,8 +177,7 @@ public class SubjectService implements ISubjectService {
         }
 
         if (subject.getComboSubject() != null && Boolean.TRUE.equals(subject.getComboSubject().getIsDeleted())) {
-            subject.getComboSubject().setIsDeleted(false);
-            comboSubjectRepo.save(subject.getComboSubject());
+            subject.setComboSubject(null);
         }
 
         subject.setIsDeleted(false);

@@ -14,6 +14,7 @@ import AiStudyHub.BE.constraint.UserStatus;
 public interface UserRepo extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
     long countByTotalScoreGreaterThan(Long score);
+    long countByTotalScoreAndUserIdLessThan(Long score, Long userId);
     List<User> findAllByOrderByTotalScoreDescUserIdAsc();
     Page<User> findAllByOrderByTotalScoreDescUserIdAsc(Pageable pageable);
 

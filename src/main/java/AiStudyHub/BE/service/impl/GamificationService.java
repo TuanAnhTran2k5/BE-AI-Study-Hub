@@ -666,7 +666,8 @@ public class GamificationService implements IGamification {
     private List<WeeklyScore> topWeeklyScores(LocalDate weekStart) {
         return weeklyScoreRepo.findByWeekStart(weekStart).stream()
                 .filter(ws -> ws.getScore() != null && ws.getScore() > 0)
-                .sorted(Comparator.comparingInt(WeeklyScore::getScore).reversed())
+                .sorted(Comparator.comparingInt(WeeklyScore::getScore).reversed()
+                        .thenComparing(ws -> ws.getUser().getUserId()))
                 .toList();
     }
 
