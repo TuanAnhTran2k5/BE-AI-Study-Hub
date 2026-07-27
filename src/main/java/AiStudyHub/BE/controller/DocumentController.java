@@ -5,6 +5,7 @@ import AiStudyHub.BE.constraint.VisibilityStatus;
 import AiStudyHub.BE.dto.Request.DocumentUpdateRequest;
 import AiStudyHub.BE.dto.Request.DocumentUploadRequest;
 import AiStudyHub.BE.dto.Request.RatingRequest;
+import AiStudyHub.BE.dto.Request.UpdateTextContentRequest;
 import AiStudyHub.BE.dto.Response.*;
 import AiStudyHub.BE.entity.User;
 import AiStudyHub.BE.service.IGamification;
@@ -57,6 +58,30 @@ public class DocumentController {
 
         return ResponseEntity.ok(
                 APIResponse.response(200, "Upload document successfully", response));
+    }
+
+    @Operation(summary = "Replace Document File")
+    @PostMapping(value = "/{documentId}/replace-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<APIResponse<DocumentUpdateResponse>> replaceDocumentFile(
+            @PathVariable Long documentId,
+            @RequestParam("file") MultipartFile file) throws Exception {
+
+        DocumentUpdateResponse response = documentService.replaceDocumentFile(documentId, file);
+
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Replace document file successfully", response));
+    }
+
+    @Operation(summary = "Update Text Content Directly")
+    @PutMapping("/{documentId}/text-content")
+    public ResponseEntity<APIResponse<DocumentUpdateResponse>> updateTextContent(
+            @PathVariable Long documentId,
+            @Valid @RequestBody UpdateTextContentRequest request) throws Exception {
+
+        DocumentUpdateResponse response = documentService.updateTextContent(documentId, request);
+
+        return ResponseEntity.ok(
+                APIResponse.response(200, "Update document text content successfully", response));
     }
 
     @Operation(summary = "Delete Document")
