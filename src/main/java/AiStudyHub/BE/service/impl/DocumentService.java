@@ -35,6 +35,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 
+import org.springframework.web.multipart.MultipartFile;
+import java.nio.charset.StandardCharsets;
 import java.io.ByteArrayInputStream;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -169,6 +171,163 @@ public class DocumentService implements IDocument {
             throw e;
         }
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentUpdateResponse replaceDocumentFile(Long documentId, MultipartFile file) throws Exception {
+        User currentUser = SecurityUtils.getCurrentUser();
+
+        Document document = documentRepo.findById(documentId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (!document.getOwner().getUserId().equals(currentUser.getUserId())) {
+            throw new GlobalException(ErrorCode.FORBIDDEN_UPDATE_DOCUMENT);
+        }
+
+        if (document.getSourceDocument() != null) {
+            throw new GlobalException(400, "Cannot replace file of a downloaded/copied document");
+        }
+
+        // Validate Extension
+        String oldFileName = document.getFileName() != null ? document.getFileName() : "";
+        String newFileName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "";
+        
+        String oldExt = getExtension(oldFileName).toLowerCase();
+        String newExt = getExtension(newFileName).toLowerCase();
+
+        if (!oldExt.equals(newExt)) {
+            throw new GlobalException(400, "The replacement file must have the same extension as the original file: " + oldExt);
+        }
+
+        long oldFileSize = document.getFileSize() == null ? 0L : document.getFileSize();
+        long newFileSize = file.getSize();
+
+        // Validate Storage Capacity (increase = new - old)
+        if (newFileSize > oldFileSize) {
+            storageService.validateStorage(currentUser, newFileSize - oldFileSize);
+        }
+
+        byte[] fileBytes = file.getBytes();
+        String contentType = file.getContentType();
+        String oldFileUrl = document.getFileUrl();
+
+        // 1. Upload to Supabase
+        FileUploadResponse fileMetadata = supabaseStorageService.uploadBytes(fileBytes, newFileName, null, contentType);
+        
+        // 2. Update Document Entity
+        document.setFileName(fileMetadata.getOriginalFileName());
+        document.setFileUrl(fileMetadata.getPublicUrl());
+        document.setFileType(fileMetadata.getContentType());
+        document.setFileSize(fileMetadata.getFileSize());
+        
+        // Reset moderation/upload status if needed, but since it's an edit, we might keep it NORMAL and COMPLETED.
+        document.setUploadStatus(UploadStatus.UPLOADING);
+        document = documentRepo.save(document);
+
+        // 3. Duplicate Check
+        Document duplicatedDoc = duplicateCheckService.performDuplicateCheck(document.getDocumentId(), fileBytes);
+        if (duplicatedDoc != null) {
+            document.setVisibilityStatus(VisibilityStatus.PRIVATE);
+            log.info("Duplication detected during replace! Document set to PRIVATE.");
+        }
+
+        // 4. Update user storage usage
+        if (newFileSize > oldFileSize) {
+            storageService.increaseStorage(currentUser, newFileSize - oldFileSize);
+        } else if (oldFileSize > newFileSize) {
+            storageService.decreaseStorage(currentUser, oldFileSize - newFileSize);
+        }
+        userRepo.save(currentUser);
+
+        // 5. Delete old RAG and Re-index
+        RagDocument ragDoc = ragDocumentRepository.findByDocumentDocumentId(documentId).orElse(null);
+        if (ragDoc != null) {
+            ragSystemService.deleteDocument(documentId);
+        }
+        documentRagIndexer.autoIndexIfSupported(document, fileBytes);
+
+        document.setUploadStatus(UploadStatus.COMPLETED);
+        document = documentRepo.save(document);
+
+        // 6. Delete old file from Supabase
+        safeDeleteFile(oldFileUrl);
+
+        return documentMapper.toDocumentUpdateResponse(document);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentUpdateResponse updateTextContent(Long documentId, AiStudyHub.BE.dto.Request.UpdateTextContentRequest request) throws Exception {
+        User currentUser = SecurityUtils.getCurrentUser();
+
+        Document document = documentRepo.findById(documentId)
+                .orElseThrow(() -> new GlobalException(ErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (!document.getOwner().getUserId().equals(currentUser.getUserId())) {
+            throw new GlobalException(ErrorCode.FORBIDDEN_UPDATE_DOCUMENT);
+        }
+
+        if (document.getSourceDocument() != null) {
+            throw new GlobalException(400, "Cannot edit text of a downloaded/copied document");
+        }
+
+        String fileName = document.getFileName() != null ? document.getFileName() : "document.txt";
+        String ext = getExtension(fileName).toLowerCase();
+
+        if (!ext.equals(".txt") && !ext.equals(".md")) {
+            throw new GlobalException(400, "Only .txt and .md files can be edited directly");
+        }
+
+        byte[] fileBytes = request.getContent().getBytes(StandardCharsets.UTF_8);
+        long oldFileSize = document.getFileSize() == null ? 0L : document.getFileSize();
+        long newFileSize = fileBytes.length;
+
+        if (newFileSize > oldFileSize) {
+            storageService.validateStorage(currentUser, newFileSize - oldFileSize);
+        }
+
+        String oldFileUrl = document.getFileUrl();
+        String contentType = document.getFileType() != null ? document.getFileType() : "text/plain";
+
+        // 1. Upload to Supabase
+        FileUploadResponse fileMetadata = supabaseStorageService.uploadBytes(fileBytes, fileName, null, contentType);
+        
+        // 2. Update Document Entity
+        document.setFileUrl(fileMetadata.getPublicUrl());
+        document.setFileSize(fileMetadata.getFileSize());
+        document.setUploadStatus(UploadStatus.UPLOADING);
+        document = documentRepo.save(document);
+
+        // 3. Duplicate Check
+        Document duplicatedDoc = duplicateCheckService.performDuplicateCheck(document.getDocumentId(), fileBytes);
+        if (duplicatedDoc != null) {
+            document.setVisibilityStatus(VisibilityStatus.PRIVATE);
+        }
+
+        // 4. Update user storage usage
+        if (newFileSize > oldFileSize) {
+            storageService.increaseStorage(currentUser, newFileSize - oldFileSize);
+        } else if (oldFileSize > newFileSize) {
+            storageService.decreaseStorage(currentUser, oldFileSize - newFileSize);
+        }
+        userRepo.save(currentUser);
+
+        // 5. Delete old RAG and Re-index
+        RagDocument ragDoc = ragDocumentRepository.findByDocumentDocumentId(documentId).orElse(null);
+        if (ragDoc != null) {
+            ragSystemService.deleteDocument(documentId);
+        }
+        documentRagIndexer.autoIndexIfSupported(document, fileBytes);
+
+        document.setUploadStatus(UploadStatus.COMPLETED);
+        document = documentRepo.save(document);
+
+        // 6. Delete old file from Supabase
+        safeDeleteFile(oldFileUrl);
+
+        return documentMapper.toDocumentUpdateResponse(document);
+    }
+
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -614,6 +773,13 @@ public class DocumentService implements IDocument {
     }
 
     // --- UTILS ---
+
+    private String getExtension(String fileName) {
+        if (fileName == null || !fileName.contains(".")) {
+            return "";
+        }
+        return fileName.substring(fileName.lastIndexOf("."));
+    }
 
 
     private DocumentResponse enrichDocumentResponse(Document doc) {
