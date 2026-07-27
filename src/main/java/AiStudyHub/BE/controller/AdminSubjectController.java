@@ -34,6 +34,11 @@ public class AdminSubjectController {
         return ResponseEntity.ok(APIResponse.response(200, "Get subject successfully", subjectService.getSubjectById(id)));
     }
 
+    @GetMapping("/unassigned-combo")
+    public ResponseEntity<APIResponse<List<SubjectResponse>>> getUnassignedComboSubjects() {
+        return ResponseEntity.ok(APIResponse.response(200, "Get unassigned combo subjects successfully", subjectService.getUnassignedComboSubjects()));
+    }
+
     @PostMapping
     public ResponseEntity<APIResponse<SubjectResponse>> createSubject(@RequestBody SubjectRequest request) {
         return ResponseEntity.status(201).body(APIResponse.response(201, "Create subject successfully", subjectService.createSubject(request)));
