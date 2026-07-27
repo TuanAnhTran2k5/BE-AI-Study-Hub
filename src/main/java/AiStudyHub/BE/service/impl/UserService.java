@@ -31,6 +31,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -66,34 +68,28 @@ public class UserService implements IUser {
 
 
     @Override
+    @Transactional
     public UserResponse updateProfile(Long userId, UpdateProfileRequest request) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new GlobalException(ErrorCode.USER_NOT_FOUND));
 
+        String oldAvatarUrl = user.getAvatarUrl();
         userMapper.updateUserFromRequest(request, user);
+
+        boolean avatarUploaded = false;
+        String uploadedAvatarUrl = null;
 
         // Upload avatar lên Supabase Avatars bucket nếu có file mới
         if (request.getAvatar() != null && !request.getAvatar().isEmpty()) {
             MultipartFile avatarFile = request.getAvatar();
 
             try {
-                // 1. Xóa avatar cũ trên Supabase nếu là URL Supabase (không xóa Google/Base64)
-                String oldAvatarUrl = user.getAvatarUrl();
-                if (oldAvatarUrl != null && !oldAvatarUrl.isBlank()
-                        && !oldAvatarUrl.contains("googleusercontent.com")
-                        && !oldAvatarUrl.startsWith("data:")) {
-                    try {
-                        supabaseStorage.deleteFile(oldAvatarUrl);
-                        log.info("Deleted old Supabase avatar: {}", oldAvatarUrl);
-                    } catch (Exception e) {
-                        log.warn("Failed to delete old avatar from Supabase (non-critical): {}", e.getMessage());
-                    }
-                }
-
-                // 2. Upload avatar mới lên Supabase Avatars bucket
+                // 1. Upload avatar mới trước
                 FileUploadResponse uploaded = supabaseStorage.uploadFileToBucket(avatarFile, null, avatarBucket);
-                user.setAvatarUrl(uploaded.getPublicUrl());
-                log.info("Avatar uploaded to Supabase: {}", uploaded.getPublicUrl());
+                uploadedAvatarUrl = uploaded.getPublicUrl();
+                user.setAvatarUrl(uploadedAvatarUrl);
+                avatarUploaded = true;
+                log.info("Avatar uploaded to Supabase: {}", uploadedAvatarUrl);
 
             } catch (GlobalException e) {
                 throw e;
@@ -104,6 +100,35 @@ public class UserService implements IUser {
         }
 
         userRepo.save(user);
+
+        // 3. Xóa avatar cũ trên Supabase SAU KHI Transaction đã commit thành công
+        if (avatarUploaded && oldAvatarUrl != null && !oldAvatarUrl.isBlank()
+                && !oldAvatarUrl.contains("googleusercontent.com")
+                && !oldAvatarUrl.startsWith("data:")) {
+
+            final String fileToDelete = oldAvatarUrl;
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            supabaseStorage.deleteFile(fileToDelete);
+                            log.info("Deleted old Supabase avatar after transaction commit: {}", fileToDelete);
+                        } catch (Exception e) {
+                            log.warn("Failed to delete old avatar after transaction commit: {}", e.getMessage());
+                        }
+                    }
+                });
+            } else {
+                // Fallback nếu không có transaction active
+                try {
+                    supabaseStorage.deleteFile(fileToDelete);
+                    log.info("Deleted old Supabase avatar immediately: {}", fileToDelete);
+                } catch (Exception e) {
+                    log.warn("Failed to delete old avatar immediately: {}", e.getMessage());
+                }
+            }
+        }
 
         return buildUserProfileResponse(user, null);
     }

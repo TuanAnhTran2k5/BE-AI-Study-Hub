@@ -9,11 +9,15 @@ import AiStudyHub.BE.dto.Response.DocumentUploadResponse;
 import AiStudyHub.BE.dto.Response.DocumentResponse;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 public interface IDocument {
     DocumentUploadResponse uploadDocument(DocumentUploadRequest request) throws Exception;
+
+    DocumentUpdateResponse replaceDocumentFile(Long documentId, MultipartFile file) throws Exception;
+    DocumentUpdateResponse updateTextContent(Long documentId, AiStudyHub.BE.dto.Request.UpdateTextContentRequest request) throws Exception;
 
     DocumentUpdateResponse updateDocument(Long documentId, DocumentUpdateRequest request);
     DeleteResponse deleteDocument(Long documentId) throws Exception;

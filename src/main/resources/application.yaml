@@ -34,7 +34,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     show-sql: true
     defer-datasource-initialization: true
 
@@ -89,7 +89,7 @@ app:
 
 jwt:
   signerKey: ${JWT_SIGNER_KEY}
-  valid-duration: 3600
+  valid-duration: 10800
 
 supabase:
   url: ${SUPABASE_URL}
@@ -97,7 +97,6 @@ supabase:
   storage:
     bucket: Documents
     avatar-bucket: Avatars
-    signed-url-expiration: 3600
 
 springdoc:
   swagger-ui:

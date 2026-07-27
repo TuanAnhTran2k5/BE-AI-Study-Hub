@@ -1,5 +1,6 @@
 package AiStudyHub.BE.repository;
 
+import AiStudyHub.BE.constraint.SubjectType;
 import AiStudyHub.BE.entity.Subject;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -12,6 +13,8 @@ public interface SubjectRepo extends JpaRepository<Subject, Long> {
 
     List<Subject> findBySemesterSemesterIdAndComboSubjectIsNullAndIsDeletedFalse(Long semesterId);
 
+    List<Subject> findBySubjectTypeAndComboSubjectIsNullAndIsDeletedFalse(SubjectType subjectType);
+
     List<Subject> findBySemesterSemesterIdAndComboSubjectComboIdAndIsDeletedFalse(Long semesterId, Long comboId);
 
     List<Subject> findBySubjectNameContainingIgnoreCaseAndIsDeletedFalse(String subjectName);
@@ -22,4 +25,5 @@ public interface SubjectRepo extends JpaRepository<Subject, Long> {
 
     Optional<Subject> findBySubjectCode(String subjectCode);
 
+    List<Subject> findByIsDeletedFalse();
 }

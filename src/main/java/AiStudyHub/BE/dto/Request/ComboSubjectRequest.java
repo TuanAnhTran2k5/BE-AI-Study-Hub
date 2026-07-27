@@ -13,4 +13,5 @@ public class ComboSubjectRequest {
     String comboCode;
     String comboName;
     List<SubjectRequest> subjects; // Required on create, optional on update
+    List<Long> existingSubjectIds; // Optional on create and update
 }

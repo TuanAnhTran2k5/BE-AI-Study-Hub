@@ -56,9 +56,17 @@ services:
         condition: service_started
     restart: unless-stopped
     mem_limit: 1g
+    networks:
+      - default
+      - app-network
+
 
 volumes:
   mysql_data:
     driver: local
   qdrant_data:
     driver: local
+
+networks:
+  app-network:
+    external: true
