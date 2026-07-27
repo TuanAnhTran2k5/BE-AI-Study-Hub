@@ -65,7 +65,7 @@ services:
       qdrant:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/api/user/academic/semesters || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
