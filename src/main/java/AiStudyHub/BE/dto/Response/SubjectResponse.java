@@ -25,4 +25,6 @@ public class SubjectResponse {
     String comboName;
 
     Boolean isDeleted;
-}
+
+    Boolean hasSyllabus;
+}
