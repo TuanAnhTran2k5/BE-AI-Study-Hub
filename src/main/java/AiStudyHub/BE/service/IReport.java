@@ -20,4 +20,5 @@ public interface IReport {
 
     ReportCase refundAppeal(Long caseId, Long adminId, String note);
     void autoUnclaimExpiredCases();
+    int cleanupExpiredReportEvidences();
 }
