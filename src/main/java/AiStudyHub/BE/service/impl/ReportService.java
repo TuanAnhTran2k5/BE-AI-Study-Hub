@@ -731,7 +731,20 @@ public class ReportService implements IReport {
     @Transactional
     public int cleanupExpiredReportEvidences() {
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
-        List<Report> expiredReports = reportRepo.findExpiredEvidencesForCleanup(thirtyDaysAgo);
+        List<Report> reportsWithEvidence = reportRepo.findByEvidenceUrlIsNotNullAndEvidenceUrlNot("");
+
+        List<Report> expiredReports = reportsWithEvidence.stream()
+                .filter(r -> r.getReportCase() != null)
+                .filter(r -> {
+                    CaseStatus status = r.getReportCase().getCaseStatus();
+                    return status == CaseStatus.RESOLVED || status == CaseStatus.REJECTED;
+                })
+                .filter(r -> {
+                    LocalDateTime resolvedAt = r.getReportCase().getResolvedAt();
+                    LocalDateTime targetTime = resolvedAt != null ? resolvedAt : r.getCreatedAt();
+                    return targetTime != null && targetTime.isBefore(thirtyDaysAgo);
+                })
+                .toList();
 
         if (expiredReports.isEmpty()) {
             return 0;

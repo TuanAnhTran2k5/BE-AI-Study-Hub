@@ -33,6 +33,5 @@ public interface ReportRepo extends JpaRepository<Report, Long> {
 
     boolean existsByReason(ReportReason reason);
 
-    @org.springframework.data.jpa.repository.Query("SELECT r FROM Report r WHERE r.evidenceUrl IS NOT NULL AND r.evidenceUrl <> '' AND r.reportCase IS NOT NULL AND r.reportCase.caseStatus IN (AiStudyHub.BE.constraint.CaseStatus.RESOLVED, AiStudyHub.BE.constraint.CaseStatus.REJECTED) AND (r.reportCase.resolvedAt <= :thresholdDate OR (r.reportCase.resolvedAt IS NULL AND r.createdAt <= :thresholdDate))")
-    List<Report> findExpiredEvidencesForCleanup(@org.springframework.data.repository.query.Param("thresholdDate") LocalDateTime thresholdDate);
+    List<Report> findByEvidenceUrlIsNotNullAndEvidenceUrlNot(String empty);
 }
