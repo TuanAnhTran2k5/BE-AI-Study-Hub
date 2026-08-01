@@ -17,6 +17,7 @@ public interface SubjectMapper {
     @Mapping(target = "comboCode", source = "comboSubject.comboCode")
     @Mapping(target = "comboName", source = "comboSubject.comboName")
     @Mapping(target = "isDeleted", source = "subject.isDeleted")
+    @Mapping(target = "hasSyllabus", expression = "java(subject.getSubjectSyllabus() != null)")
     SubjectResponse toSubjectResponse(Subject subject);
 
     @Mapping(target = "success", constant = "true")

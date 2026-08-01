@@ -4,6 +4,7 @@ import AiStudyHub.BE.constraint.SubjectType;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.BatchSize;
 
 @Entity
 @Table(
@@ -48,4 +49,8 @@ public class Subject {
     @Builder.Default
     @Column(nullable = false)
     Boolean isDeleted = false;
+
+    @BatchSize(size = 50)
+    @OneToOne(mappedBy = "subject", fetch = FetchType.LAZY, optional = true)
+    SubjectSyllabus subjectSyllabus;
 }
