@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import AiStudyHub.BE.service.ISupabaseStorage;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -32,6 +33,7 @@ public class ReportService implements IReport {
     private final ScoreTypeRepo scoreTypeRepo;
     private final INotification notificationService;
     private final IGamification rankingBadgeService;
+    private final ISupabaseStorage supabaseStorage;
 
     @Override
     @Transactional
