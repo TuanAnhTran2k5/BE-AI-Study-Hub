@@ -26,6 +26,9 @@ import AiStudyHub.BE.service.ISupabaseStorage;
 import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
 
+import lombok.experimental.NonFinal;
+import org.springframework.beans.factory.annotation.Value;
+
 @RestController
 @RequestMapping("/api/user/reports")
 @CrossOrigin("*")
@@ -37,6 +40,10 @@ public class ReportController {
 
     IReport reportService;
     ISupabaseStorage supabaseStorage;
+
+    @Value("${supabase.storage.report-bucket:ReportEvidences}")
+    @NonFinal
+    String reportBucket;
 
     @PostMapping(value = "/upload-evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload evidence image for document report to Supabase Storage")
@@ -56,7 +63,7 @@ public class ReportController {
             throw new GlobalException(400, "Only image files (PNG, JPG, WEBP, etc.) are allowed for evidence proof.");
         }
 
-        FileUploadResponse uploadRes = supabaseStorage.uploadFile(file, "report-evidences");
+        FileUploadResponse uploadRes = supabaseStorage.uploadFileToBucket(file, null, reportBucket);
 
         return ResponseEntity.ok(
                 APIResponse.response(200, "Upload evidence image successfully", uploadRes)
