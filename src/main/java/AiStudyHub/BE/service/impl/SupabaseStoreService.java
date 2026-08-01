@@ -39,8 +39,16 @@ public class SupabaseStoreService implements ISupabaseStorage {
     private String supabaseBucket;
 
     /** Bucket dành riêng cho Avatar uploads */
-    @Value("${supabase.storage.avatar-bucket}")
+    @Value("${supabase.storage.avatar-bucket:Avatars}")
     private String avatarBucket;
+
+    /** Bucket dành riêng cho Syllabus uploads */
+    @Value("${supabase.storage.syllabus-bucket:Syllabus}")
+    private String syllabusBucket;
+
+    /** Bucket dành riêng cho Report Evidences uploads */
+    @Value("${supabase.storage.report-bucket:ReportEvidences}")
+    private String reportBucket;
 
     public SupabaseStoreService(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder
@@ -362,9 +370,9 @@ public class SupabaseStoreService implements ISupabaseStorage {
 
     private String detectBucketFromUrl(String fileUrlPath) {
         if (fileUrlPath == null) return supabaseBucket;
-        // Danh sách các bucket đã biết — avatar bucket được kiểm tra trước
-        for (String bucket : List.of(avatarBucket, supabaseBucket)) {
-            if (fileUrlPath.contains("/" + bucket + "/")) {
+        // Danh sách các bucket đã biết
+        for (String bucket : List.of(avatarBucket, syllabusBucket, reportBucket, supabaseBucket)) {
+            if (bucket != null && fileUrlPath.contains("/" + bucket + "/")) {
                 return bucket;
             }
         }
@@ -389,7 +397,8 @@ public class SupabaseStoreService implements ISupabaseStorage {
         String value = fileUrlOrPath.trim();
 
         // Kiểm tra tất cả các bucket đã biết
-        for (String bucket : List.of(avatarBucket, supabaseBucket)) {
+        for (String bucket : List.of(avatarBucket, syllabusBucket, reportBucket, supabaseBucket)) {
+            if (bucket == null) continue;
             String publicMarker = "/storage/v1/object/public/" + bucket + "/";
             String privateMarker = "/storage/v1/object/" + bucket + "/";
             String signedMarker = "/storage/v1/object/sign/" + bucket + "/";

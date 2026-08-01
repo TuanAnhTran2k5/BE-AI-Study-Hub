@@ -22,6 +22,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import lombok.experimental.NonFinal;
+import org.springframework.beans.factory.annotation.Value;
+
 @RestController
 @RequestMapping("/api/admin/curriculum/syllabus")
 @CrossOrigin("*")
@@ -33,6 +36,10 @@ public class AdminSyllabusController {
     ISupabaseStorage supabaseStorage;
     SubjectSyllabusRepo subjectSyllabusRepo;
 
+    @Value("${supabase.storage.syllabus-bucket:Syllabus}")
+    @NonFinal
+    String syllabusBucket;
+
     @PostMapping(value = "/upload/{subjectId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<APIResponse<SyllabusResponse>> uploadSyllabus(
             @PathVariable Long subjectId,
@@ -42,8 +49,8 @@ public class AdminSyllabusController {
         String adminUsername = admin.getEmail() != null ? admin.getEmail() : admin.getFullName();
 
         try {
-            // 1. Upload PDF to Supabase Storage
-            FileUploadResponse uploadResponse = supabaseStorage.uploadFile(file, "syllabus");
+            // 1. Upload PDF to Supabase Storage (Syllabus bucket)
+            FileUploadResponse uploadResponse = supabaseStorage.uploadFileToBucket(file, null, syllabusBucket);
             
             // 2. Initialize syllabus record and trigger async parsing
             SubjectSyllabus syllabus = syllabusService.initSyllabusUpload(

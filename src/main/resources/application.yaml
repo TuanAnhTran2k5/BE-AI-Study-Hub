@@ -97,6 +97,8 @@ supabase:
   storage:
     bucket: Documents
     avatar-bucket: Avatars
+    syllabus-bucket: Syllabus
+    report-bucket: ReportEvidences
 
 springdoc:
   swagger-ui:
