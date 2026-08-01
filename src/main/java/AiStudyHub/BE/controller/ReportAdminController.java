@@ -151,6 +151,13 @@ public class ReportAdminController {
         return ResponseEntity.ok(APIResponse.response(200, "Delete report reason successfully", null));
     }
 
+    @PostMapping("/cleanup-evidences")
+    @Operation(summary = "Manually trigger cleanup of expired report evidence images (>30 days)")
+    public ResponseEntity<APIResponse<String>> cleanupEvidences() {
+        int cleanedCount = reportService.cleanupExpiredReportEvidences();
+        return ResponseEntity.ok(APIResponse.response(200, "Cleaned up " + cleanedCount + " expired report evidence files from Supabase.", null));
+    }
+
     private ReportCaseAdminResponse toCaseAdminView(ReportCase rc) {
         return ReportCaseAdminResponse.builder()
                 .caseId(rc.getCaseId())

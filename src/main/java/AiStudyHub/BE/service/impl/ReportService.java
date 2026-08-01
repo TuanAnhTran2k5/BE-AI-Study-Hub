@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import AiStudyHub.BE.service.ISupabaseStorage;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -32,6 +33,7 @@ public class ReportService implements IReport {
     private final ScoreTypeRepo scoreTypeRepo;
     private final INotification notificationService;
     private final IGamification rankingBadgeService;
+    private final ISupabaseStorage supabaseStorage;
 
     @Override
     @Transactional
@@ -720,5 +722,55 @@ public class ReportService implements IReport {
             rc.setCaseStatus(CaseStatus.PENDING_REVIEW);
             reportCaseRepo.save(rc);
         }
+    }
+
+    /**
+     * Tự động dọn dẹp ảnh bằng chứng (evidenceUrl) của các báo cáo đã hoàn tất xử lý (RESOLVED/REJECTED) quá 30 ngày.
+     * Chạy định kỳ vào 3:00 sáng mỗi ngày.
+     */
+    @Override
+    @Scheduled(cron = "${report.evidence.cleanup.cron:0 0 3 * * *}")
+    @Transactional
+    public int cleanupExpiredReportEvidences() {
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        List<Report> reportsWithEvidence = reportRepo.findByEvidenceUrlIsNotNullAndEvidenceUrlNot("");
+
+        List<Report> expiredReports = reportsWithEvidence.stream()
+                .filter(r -> r.getReportCase() != null)
+                .filter(r -> {
+                    CaseStatus status = r.getReportCase().getCaseStatus();
+                    return status == CaseStatus.RESOLVED || status == CaseStatus.REJECTED;
+                })
+                .filter(r -> {
+                    LocalDateTime resolvedAt = r.getReportCase().getResolvedAt();
+                    LocalDateTime targetTime = resolvedAt != null ? resolvedAt : r.getCreatedAt();
+                    return targetTime != null && targetTime.isBefore(thirtyDaysAgo);
+                })
+                .toList();
+
+        if (expiredReports.isEmpty()) {
+            return 0;
+        }
+
+        log.info("Starting cleanup for {} expired report evidence images (>30 days)...", expiredReports.size());
+        int deletedCount = 0;
+
+        for (Report report : expiredReports) {
+            String evidenceUrl = report.getEvidenceUrl();
+            if (evidenceUrl != null && !evidenceUrl.isBlank()) {
+                try {
+                    // 1. Xóa file thực tế trên Supabase Storage
+                    supabaseStorage.deleteFile(evidenceUrl);
+                    deletedCount++;
+                } catch (Exception e) {
+                    log.warn("Failed to delete evidence file from Supabase: url={}, error={}", evidenceUrl, e.getMessage());
+                }
+                // 2. Clear evidenceUrl trong database
+                report.setEvidenceUrl(null);
+            }
+        }
+        reportRepo.saveAll(expiredReports);
+        log.info("Successfully cleaned up {} expired report evidence files.", deletedCount);
+        return deletedCount;
     }
 }

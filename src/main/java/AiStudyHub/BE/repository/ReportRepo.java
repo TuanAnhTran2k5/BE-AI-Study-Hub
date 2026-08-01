@@ -32,4 +32,6 @@ public interface ReportRepo extends JpaRepository<Report, Long> {
     List<Report> findAllByReporterOrderByCreatedAtDesc(User reporter);
 
     boolean existsByReason(ReportReason reason);
+
+    List<Report> findByEvidenceUrlIsNotNullAndEvidenceUrlNot(String empty);
 }
